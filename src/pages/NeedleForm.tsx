@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
+import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
 
 const TYPES = ['대바늘', '코바늘', '줄바늘', '장갑바늘', '기타'];
@@ -30,6 +31,7 @@ export default function NeedleForm() {
   }
   async function remove() {
     if (!nid || !confirm('이 바늘을 삭제할까요?')) return;
+    await db.projectNeedles.where('needleId').equals(nid).delete();
     await db.needles.delete(nid); nav('/library/needles');
   }
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
@@ -56,6 +58,7 @@ export default function NeedleForm() {
         <Field label="길이"><input className={inp} value={f.length} onChange={u('length')} placeholder="80cm" /></Field>
       </div>
       <Field label="메모"><textarea className={`${inp} min-h-[72px]`} value={f.note} onChange={u('note')} /></Field>
+      {editing && <ReverseProjectsSection kind="needle" refId={nid} />}
 
       <div className="sticky bottom-20 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex gap-2">

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
+import { ImageInput } from '@/components/ImageInput';
 import { Save, Trash2 } from 'lucide-react';
 
 export default function YarnForm() {
@@ -15,6 +16,7 @@ export default function YarnForm() {
   const [f, setF] = useState({
     name: '', brand: '', colorName: '', colorCode: '', shop: '', fiber: '', weight: '', totalGrams: 0, note: '',
   });
+  const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export default function YarnForm() {
         colorCode: existing.colorCode || '', shop: existing.shop || '', fiber: existing.fiber || '',
         weight: existing.weight || '', totalGrams: existing.totalGrams, note: existing.note || '',
       });
+      setPhoto(existing.photoDataUrl);
       setHyd(true);
     }
   }, [editing, existing, hyd]);
@@ -31,11 +34,12 @@ export default function YarnForm() {
   async function save() {
     if (!f.name.trim()) return alert('실 이름을 입력해 주세요.');
     const t = now();
+    const payload = { ...f, photoDataUrl: photo, updatedAt: t };
     if (editing && yid) {
-      await db.yarns.update(yid, { ...f, updatedAt: t });
+      await db.yarns.update(yid, payload);
       nav(`/library/yarns/${yid}`);
     } else {
-      const id = (await db.yarns.add({ ...f, createdAt: t, updatedAt: t })) as number;
+      const id = (await db.yarns.add({ ...payload, createdAt: t })) as number;
       nav(`/library/yarns/${id}`);
     }
   }
@@ -53,6 +57,9 @@ export default function YarnForm() {
   return (
     <div className="space-y-4">
       <PageHeader title={editing ? '실 수정' : '새 실'} back />
+      <Field label="대표 이미지">
+        <ImageInput value={photo} onChange={setPhoto} aspect="square" />
+      </Field>
       <Field label="이름 *"><input className={inp} value={f.name} onChange={u('name')} /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="브랜드"><input className={inp} value={f.brand} onChange={u('brand')} /></Field>
