@@ -11,10 +11,10 @@ const tabs = [
 export default function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 mx-auto w-full max-w-2xl px-4 pb-28 pt-6">
+      <main className="flex-1 mx-auto w-full max-w-2xl px-4 pb-28 pt-6 animate-fade-in">
         <Outlet />
       </main>
-      <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border/70 bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70">
+      <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-card/90 backdrop-blur-xl">
         <div
           className="mx-auto max-w-2xl grid grid-cols-4"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -25,21 +25,23 @@ export default function AppLayout() {
               to={t.to}
               end={t.end}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
+                `flex flex-col items-center gap-1 py-2.5 text-[10.5px] font-semibold transition-colors ${
                   isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`
               }
             >
-              <t.icon className="h-[18px] w-[18px]" strokeWidth={isActiveStroke(t.to)} />
-              {t.label}
+              {({ isActive }) => (
+                <>
+                  <div className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-primary-soft' : ''}`}>
+                    <t.icon className="h-[17px] w-[17px]" strokeWidth={isActive ? 2.2 : 1.75} />
+                  </div>
+                  {t.label}
+                </>
+              )}
             </NavLink>
           ))}
         </div>
       </nav>
     </div>
   );
-}
-
-function isActiveStroke(_to: string) {
-  return 1.75;
 }

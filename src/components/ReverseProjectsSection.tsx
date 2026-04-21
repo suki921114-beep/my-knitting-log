@@ -20,11 +20,11 @@ export default function ReverseProjectsSection({ kind, refId }: { kind: Kind; re
   if (!refId) return null;
 
   return (
-    <section>
-      <h2 className="mb-2 px-1 font-serif text-base font-semibold text-ink">사용된 프로젝트</h2>
+    <section className="space-y-2">
+      <h2 className="section-title">사용된 프로젝트</h2>
       {links.length === 0 ? (
-        <p className="rounded-xl bg-secondary/50 px-3 py-4 text-center text-xs text-muted-foreground">
-          아직 연결된 프로젝트가 없습니다.
+        <p className="rounded-2xl bg-secondary/60 px-3 py-4 text-center text-[12px] text-muted-foreground">
+          아직 연결된 프로젝트가 없어요
         </p>
       ) : (
         <ul className="space-y-2">
@@ -33,8 +33,8 @@ export default function ReverseProjectsSection({ kind, refId }: { kind: Kind; re
             if (!p) return null;
             return (
               <li key={l.id}>
-                <Link to={`/projects/${l.projectId}`} className="card-soft flex items-center justify-between p-3">
-                  <span className="text-sm text-ink">{p.name}</span>
+                <Link to={`/projects/${l.projectId}`} className="card-soft flex items-center justify-between p-3 hover:shadow-soft">
+                  <span className="text-[13.5px] font-semibold text-foreground">{p.name}</span>
                   <span className={`chip ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
                 </Link>
               </li>

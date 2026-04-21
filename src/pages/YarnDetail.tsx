@@ -28,24 +28,24 @@ export default function YarnDetail() {
         back
         subtitle={[yarn.brand, yarn.colorName, yarn.colorCode && `(${yarn.colorCode})`].filter(Boolean).join(' · ')}
         right={
-          <Link to={`/library/yarns/${yid}/edit`} className="rounded-full bg-secondary px-3 py-1.5 text-xs font-medium">
-            <Pencil className="inline h-3.5 w-3.5" /> 수정
+          <Link to={`/library/yarns/${yid}/edit`} className="btn-soft btn-sm">
+            <Pencil className="h-3.5 w-3.5" /> 수정
           </Link>
         }
       />
 
-      <div className="card-soft bg-gradient-card p-5">
+      <div className="card-soft bg-primary-soft p-5">
         <div className="flex items-baseline justify-between">
           <div>
-            <div className="text-xs text-muted-foreground">잔여량</div>
-            <div className="font-serif text-3xl font-semibold text-primary">{remaining}<span className="ml-1 text-base font-normal text-muted-foreground">g</span></div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary/80">잔여량</div>
+            <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-primary">{remaining}<span className="ml-1 text-base font-medium text-primary/70">g</span></div>
           </div>
-          <div className="text-right text-xs text-muted-foreground">
+          <div className="text-right text-[11.5px] text-primary/80">
             <div>총 {total}g</div>
             <div>사용 {used}g</div>
           </div>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-card/60">
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
@@ -58,8 +58,8 @@ export default function YarnDetail() {
         </div>
       )}
 
-      <section>
-        <h2 className="mb-2 px-1 font-serif text-base font-semibold text-ink">사용된 프로젝트</h2>
+      <section className="space-y-2">
+        <h2 className="section-title">사용된 프로젝트</h2>
         {links.length === 0 ? (
           <p className="rounded-xl bg-secondary/50 px-3 py-4 text-center text-xs text-muted-foreground">아직 사용 기록이 없습니다.</p>
         ) : (
