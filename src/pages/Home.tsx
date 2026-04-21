@@ -106,16 +106,19 @@ export default function Home() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone: 'primary' | 'accent' | 'neutral' }) {
+function StatLink({ to, label, value, tone }: { to: string; label: string; value: number; tone: 'primary' | 'accent' | 'neutral' }) {
   const toneClass =
     tone === 'primary' ? 'bg-primary-soft text-primary' :
     tone === 'accent' ? 'bg-accent-soft text-accent-foreground' :
     'bg-secondary text-foreground';
   return (
-    <div className={`rounded-2xl px-3.5 py-3 ${toneClass}`}>
+    <Link
+      to={to}
+      className={`block rounded-2xl px-3.5 py-3 transition active:scale-[0.97] hover:shadow-soft ${toneClass}`}
+    >
       <div className="text-[11px] font-semibold opacity-80">{label}</div>
       <div className="mt-1 text-[22px] font-extrabold leading-none tracking-tight">{value}</div>
-    </div>
+    </Link>
   );
 }
 
