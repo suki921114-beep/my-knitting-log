@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,81 +6,93 @@
 
 @layer base {
   :root {
-    /* Refined oat / camel / terracotta — slightly lower saturation for a calmer, modern feel */
-    --background: 36 28% 96%;
-    --foreground: 25 22% 16%;
+    /* Soft Kitsch Atelier — milky ivory base, soft lilac primary, butter accent, plum charcoal text */
+    --background: 40 40% 98%;            /* milky ivory */
+    --foreground: 270 18% 22%;           /* plum charcoal */
 
-    --card: 36 35% 99%;
-    --card-foreground: 25 22% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 270 18% 22%;
 
-    --popover: 36 35% 99%;
-    --popover-foreground: 25 22% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 18% 22%;
 
-    --primary: 26 38% 38%;               /* deeper, muted camel */
-    --primary-foreground: 36 35% 98%;
+    --primary: 268 36% 64%;              /* soft lilac */
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 270 55% 94%;         /* lilac wash */
 
-    --secondary: 34 22% 91%;
-    --secondary-foreground: 25 22% 22%;
+    --secondary: 270 20% 95%;
+    --secondary-foreground: 270 18% 28%;
 
-    --muted: 34 18% 93%;
-    --muted-foreground: 25 10% 46%;
+    --muted: 270 16% 95%;
+    --muted-foreground: 270 8% 50%;
 
-    --accent: 14 42% 50%;                /* muted terracotta */
-    --accent-foreground: 36 35% 98%;
+    --accent: 44 78% 70%;                /* butter yellow */
+    --accent-foreground: 35 40% 22%;
+    --accent-soft: 46 90% 92%;
 
-    --destructive: 6 55% 46%;
-    --destructive-foreground: 36 35% 98%;
+    --destructive: 354 60% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 32 16% 86%;
-    --input: 32 16% 86%;
-    --ring: 26 38% 42%;
+    --border: 270 18% 92%;
+    --input: 270 18% 92%;
+    --ring: 268 40% 70%;
 
-    --radius: 1rem;
+    --radius: 1.25rem;
 
-    --warm: 32 40% 78%;
-    --sage: 100 14% 56%;
-    --cream: 38 38% 95%;
-    --ink: 25 26% 20%;
+    /* Status palette — muted, tonal */
+    --status-progress-bg: 268 50% 95%;
+    --status-progress-fg: 268 38% 48%;
+    --status-planned-bg: 200 45% 94%;
+    --status-planned-fg: 210 28% 42%;
+    --status-done-bg: 142 32% 92%;
+    --status-done-fg: 150 28% 36%;
+    --status-hold-bg: 30 18% 92%;
+    --status-hold-fg: 30 14% 42%;
 
-    --gradient-warm: linear-gradient(135deg, hsl(36 38% 94%), hsl(26 30% 84%));
-    --gradient-card: linear-gradient(160deg, hsl(36 35% 99%), hsl(34 22% 95%));
-    --shadow-soft: 0 1px 2px hsl(28 25% 25% / 0.04), 0 6px 18px -10px hsl(28 30% 25% / 0.10);
-    --shadow-card: 0 1px 0 hsl(28 25% 25% / 0.02), 0 4px 14px -10px hsl(28 30% 22% / 0.12);
+    --shadow-soft: 0 1px 2px hsl(270 20% 30% / 0.04), 0 8px 24px -16px hsl(270 30% 30% / 0.10);
+    --shadow-card: 0 1px 0 hsl(270 20% 30% / 0.02), 0 4px 18px -14px hsl(270 30% 30% / 0.10);
+    --shadow-pop: 0 10px 30px -18px hsl(270 30% 30% / 0.20);
 
-    --sidebar-background: 36 28% 96%;
-    --sidebar-foreground: 25 22% 22%;
-    --sidebar-primary: 26 38% 38%;
-    --sidebar-primary-foreground: 36 35% 98%;
-    --sidebar-accent: 34 22% 91%;
-    --sidebar-accent-foreground: 25 22% 22%;
-    --sidebar-border: 32 16% 86%;
-    --sidebar-ring: 26 38% 42%;
+    --sidebar-background: 40 40% 98%;
+    --sidebar-foreground: 270 18% 28%;
+    --sidebar-primary: 268 36% 64%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 270 20% 95%;
+    --sidebar-accent-foreground: 270 18% 28%;
+    --sidebar-border: 270 18% 92%;
+    --sidebar-ring: 268 40% 70%;
   }
 
   .dark {
-    --background: 25 14% 10%;
-    --foreground: 36 24% 92%;
-    --card: 25 14% 13%;
-    --card-foreground: 36 24% 92%;
-    --popover: 25 14% 13%;
-    --popover-foreground: 36 24% 92%;
-    --primary: 26 38% 58%;
-    --primary-foreground: 25 14% 10%;
-    --secondary: 25 10% 18%;
-    --secondary-foreground: 36 24% 92%;
-    --muted: 25 10% 18%;
-    --muted-foreground: 36 10% 65%;
-    --accent: 14 42% 55%;
-    --accent-foreground: 25 14% 10%;
-    --destructive: 6 50% 50%;
-    --destructive-foreground: 36 24% 92%;
-    --border: 25 10% 22%;
-    --input: 25 10% 22%;
-    --ring: 26 38% 58%;
-    --warm: 32 30% 50%;
-    --sage: 100 12% 48%;
-    --cream: 25 12% 16%;
-    --ink: 36 24% 92%;
+    --background: 270 14% 10%;
+    --foreground: 270 16% 92%;
+    --card: 270 14% 13%;
+    --card-foreground: 270 16% 92%;
+    --popover: 270 14% 13%;
+    --popover-foreground: 270 16% 92%;
+    --primary: 268 40% 72%;
+    --primary-foreground: 270 14% 10%;
+    --primary-soft: 268 30% 22%;
+    --secondary: 270 10% 18%;
+    --secondary-foreground: 270 16% 92%;
+    --muted: 270 10% 18%;
+    --muted-foreground: 270 10% 65%;
+    --accent: 44 60% 65%;
+    --accent-foreground: 270 14% 10%;
+    --accent-soft: 44 30% 22%;
+    --destructive: 354 50% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 10% 22%;
+    --input: 270 10% 22%;
+    --ring: 268 40% 70%;
+    --status-progress-bg: 268 30% 22%;
+    --status-progress-fg: 268 50% 80%;
+    --status-planned-bg: 210 25% 22%;
+    --status-planned-fg: 210 40% 78%;
+    --status-done-bg: 150 22% 20%;
+    --status-done-fg: 150 30% 76%;
+    --status-hold-bg: 30 12% 22%;
+    --status-hold-fg: 30 14% 72%;
   }
 }
 
@@ -93,25 +105,74 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     font-feature-settings: "ss01", "cv11";
   }
   h1, h2, h3, h4 {
-    font-family: 'Fraunces', Georgia, serif;
-    letter-spacing: -0.015em;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 700;
   }
-  /* Subtle, modern focus ring */
   :where(button, a, input, textarea, select):focus-visible {
     @apply outline-none ring-2 ring-ring/40 ring-offset-2 ring-offset-background;
+  }
+  ::selection {
+    background: hsl(var(--primary-soft));
+    color: hsl(var(--foreground));
   }
 }
 
 @layer components {
+  /* Unified card */
   .card-soft {
-    @apply rounded-2xl border border-border/70 bg-card transition-colors;
+    @apply rounded-2xl border border-border/70 bg-card transition-all;
     box-shadow: var(--shadow-card);
   }
+  .card-soft:hover {
+    border-color: hsl(var(--border));
+  }
+
+  /* Compact pill chip */
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none;
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[10.5px] font-semibold leading-none tracking-tight;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-sm font-semibold transition-all disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-primary-foreground px-4 py-2.5 hover:opacity-95 active:scale-[0.98];
+    box-shadow: var(--shadow-soft);
+  }
+  .btn-soft {
+    @apply btn bg-secondary text-secondary-foreground px-3.5 py-2 hover:bg-muted;
+  }
+  .btn-ghost {
+    @apply btn px-3 py-2 text-foreground hover:bg-secondary;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  /* Inputs */
+  .input-pill {
+    @apply w-full rounded-full border border-input bg-card py-2.5 pl-9 pr-4 text-sm outline-none transition-colors focus:border-ring/60;
+  }
+
+  /* Filter chip */
+  .filter-chip {
+    @apply shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors;
+  }
+  .filter-chip-on {
+    @apply bg-foreground text-background;
+  }
+  .filter-chip-off {
+    @apply bg-secondary text-muted-foreground hover:text-foreground;
+  }
+
+  /* Section heading */
+  .section-title {
+    @apply px-1 text-[13px] font-bold uppercase tracking-[0.08em] text-muted-foreground;
   }
 }

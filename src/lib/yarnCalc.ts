@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Yarn } from './db';
+import { db } from './db';
 
 export function useYarnRemaining(yarnId?: number) {
   return useLiveQuery(async () => {
@@ -31,9 +31,9 @@ export function statusLabel(s: string) {
 
 export function statusColor(s: string) {
   return ({
-    planned: 'bg-secondary text-secondary-foreground',
-    in_progress: 'bg-accent/15 text-accent',
-    done: 'bg-sage/20 text-foreground',
-    on_hold: 'bg-muted text-muted-foreground',
-  } as any)[s] || 'bg-muted';
+    planned: 'bg-status-planned-bg text-status-planned-fg',
+    in_progress: 'bg-status-progress-bg text-status-progress-fg',
+    done: 'bg-status-done-bg text-status-done-fg',
+    on_hold: 'bg-status-hold-bg text-status-hold-fg',
+  } as any)[s] || 'bg-muted text-muted-foreground';
 }
