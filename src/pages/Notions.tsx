@@ -34,18 +34,18 @@ export default function Notions() {
           {filtered.map(n => (
             <li key={n.id}>
               <Link to={`/library/notions/${n.id}/edit`} className="card-soft flex items-center gap-3 p-2.5 hover:shadow-soft">
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-secondary">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
                   {n.photoDataUrl ? (
                     <img src={n.photoDataUrl} alt={n.name} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground"><ImageIcon className="h-4 w-4" /></div>
+                    <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold text-foreground">{n.name}</div>
-                  <div className="truncate text-[11.5px] text-muted-foreground">{[n.kind, n.shop].filter(Boolean).join(' · ')}</div>
+                  <div className="truncate text-[11.5px] text-muted-foreground">{[n.kind, n.shop].filter(Boolean).join(' · ') || '—'}</div>
                 </div>
-                {typeof n.quantity === 'number' && <div className="text-[13px] font-bold text-primary">{n.quantity}</div>}
+                {typeof n.quantity === 'number' && <div className="text-[13px] font-bold text-primary tabular-nums">{n.quantity}</div>}
               </Link>
             </li>
           ))}
@@ -55,11 +55,11 @@ export default function Notions() {
           {filtered.map(n => (
             <li key={n.id}>
               <Link to={`/library/notions/${n.id}/edit`} className="card-soft block overflow-hidden hover:shadow-soft">
-                <div className="aspect-square bg-secondary">
+                <div className="aspect-square overflow-hidden">
                   {n.photoDataUrl ? (
                     <img src={n.photoDataUrl} alt={n.name} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground"><ImageIcon className="h-5 w-5" /></div>
+                    <div className="img-placeholder"><ImageIcon className="h-5 w-5" /></div>
                   )}
                 </div>
                 <div className="p-2">

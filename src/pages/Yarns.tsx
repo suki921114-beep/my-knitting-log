@@ -100,13 +100,11 @@ export default function Yarns() {
             return (
               <li key={s.yarn.id}>
                 <Link to={`/library/yarns/${s.yarn.id}`} className="card-soft block overflow-hidden hover:shadow-soft">
-                  <div className="aspect-square bg-secondary">
+                  <div className="aspect-square overflow-hidden">
                     {s.yarn.photoDataUrl ? (
                       <img src={s.yarn.photoDataUrl} alt={s.yarn.name} className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <ImageIcon className="h-6 w-6" />
-                      </div>
+                      <div className="img-placeholder"><ImageIcon className="h-6 w-6" /></div>
                     )}
                   </div>
                   <div className="space-y-1.5 p-2.5">
@@ -115,7 +113,7 @@ export default function Yarns() {
                     <div className="h-1 overflow-hidden rounded-full bg-secondary">
                       <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="text-[11px] font-bold text-primary">{s.remaining}<span className="font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
+                    <div className="text-[11px] font-bold text-primary tabular-nums">{s.remaining}<span className="font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
                   </div>
                 </Link>
               </li>
@@ -129,13 +127,11 @@ export default function Yarns() {
 
 function Thumb({ src }: { src?: string }) {
   return (
-    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-secondary">
+    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-          <ImageIcon className="h-4 w-4" />
-        </div>
+        <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
       )}
     </div>
   );

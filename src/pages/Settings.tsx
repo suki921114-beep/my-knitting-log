@@ -74,17 +74,17 @@ export default function Settings() {
       <div className="card-soft p-4">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-            <ShieldCheck className="h-4.5 w-4.5" />
+            <ShieldCheck className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold text-foreground">로컬 저장</div>
             <p className="text-[11.5px] text-muted-foreground">이 기기에만 저장됨</p>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-3">
+        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-4">
           <Meta label="저장된 항목" value={`${totalItems}개`} />
           <Meta label="마지막 백업" value={lastBackupLabel} />
-        </div>
+        </dl>
       </div>
 
       <Section title="백업">
@@ -123,15 +123,16 @@ export default function Settings() {
       <Section title="위험 영역">
         <button
           onClick={handleClear}
-          className="card-soft flex w-full items-center gap-3 border-destructive/30 bg-destructive/5 p-4 transition active:scale-[0.99]"
+          className="card-danger flex w-full items-center gap-3 p-4 text-left"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
             <Trash2 className="h-4 w-4" />
           </span>
-          <div className="min-w-0 flex-1 text-left">
+          <div className="min-w-0 flex-1">
             <div className="text-[13.5px] font-semibold text-destructive">전체 삭제</div>
-            <div className="text-[11.5px] text-destructive/70">되돌릴 수 없음</div>
+            <div className="text-[11.5px] text-destructive/70">되돌릴 수 없어요</div>
           </div>
+          <ChevronRight className="h-4 w-4 text-destructive/50" />
         </button>
       </Section>
     </div>
@@ -140,9 +141,9 @@ export default function Settings() {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-[13px] font-semibold text-foreground">{value}</div>
+    <div className="min-w-0">
+      <dt className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-[14px] font-bold tracking-tight text-foreground tabular-nums">{value}</dd>
     </div>
   );
 }

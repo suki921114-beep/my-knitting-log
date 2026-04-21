@@ -157,22 +157,37 @@
 
   /* Inputs */
   .input-pill {
-    @apply w-full rounded-full border border-input bg-card py-2.5 pl-9 pr-4 text-sm outline-none transition-colors focus:border-ring/60;
+    @apply w-full rounded-full border border-input bg-card py-2.5 pl-10 pr-4 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground/70 focus:border-ring/60 focus:bg-card focus:ring-2 focus:ring-ring/20;
   }
 
-  /* Filter chip */
+  /* Filter chip — unified height/padding */
   .filter-chip {
-    @apply shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors;
+    @apply inline-flex shrink-0 items-center justify-center rounded-full px-3.5 py-1.5 text-[12px] font-semibold leading-none transition-colors;
   }
   .filter-chip-on {
-    @apply bg-foreground text-background;
+    @apply bg-foreground text-background font-bold;
   }
   .filter-chip-off {
-    @apply bg-secondary text-muted-foreground hover:text-foreground;
+    @apply bg-secondary text-muted-foreground hover:bg-muted hover:text-foreground;
   }
 
   /* Section heading */
   .section-title {
-    @apply px-1 text-[13px] font-bold uppercase tracking-[0.08em] text-muted-foreground;
+    @apply px-1 text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground;
+  }
+
+  /* Image placeholder — unified across cards */
+  .img-placeholder {
+    @apply flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted text-muted-foreground/60;
+  }
+
+  /* Press-feedback for clickable stat tiles */
+  .press-tile {
+    @apply transition-all duration-150 active:scale-[0.96] active:brightness-95;
+  }
+
+  /* Subtle danger surface */
+  .card-danger {
+    @apply rounded-2xl border border-destructive/20 bg-destructive/[0.04] transition-all active:scale-[0.99];
   }
 }

@@ -88,29 +88,31 @@ export default function Projects() {
         <ul className="space-y-2.5">
           {filtered.map(p => {
             const cover = p.photos?.[0];
+            const meta = [p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ');
             return (
               <li key={p.id}>
                 <Link to={`/projects/${p.id}`} className="card-soft flex items-center gap-3 overflow-hidden p-2.5 hover:shadow-soft">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-secondary">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">
                     {cover ? (
                       <img src={cover} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <ImageIcon className="h-4 w-4" />
-                      </div>
+                      <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[14.5px] font-semibold text-foreground">{p.name}</h3>
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <span className={`chip ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
-                      {(p.size || p.gauge) && (
-                        <span className="truncate text-[11.5px] text-muted-foreground">
-                          {[p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ')}
-                        </span>
-                      )}
+                    {/* 1줄: 제목 + 상태 */}
+                    <div className="flex items-center gap-2">
+                      <h3 className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-foreground">{p.name}</h3>
+                      <span className={`chip shrink-0 ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
                     </div>
-                    {p.progressNote && <p className="mt-1 line-clamp-1 text-[12px] text-muted-foreground">{p.progressNote}</p>}
+                    {/* 2줄: 보조 정보 */}
+                    {meta && (
+                      <div className="mt-1 truncate text-[11.5px] text-muted-foreground">{meta}</div>
+                    )}
+                    {/* 3줄: 메모 */}
+                    {p.progressNote && (
+                      <p className="mt-0.5 line-clamp-1 text-[12px] text-muted-foreground/85">{p.progressNote}</p>
+                    )}
                   </div>
                 </Link>
               </li>

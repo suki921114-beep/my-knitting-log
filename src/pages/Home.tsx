@@ -33,8 +33,7 @@ export default function Home() {
       <div className="grid grid-cols-3 gap-2">
         <StatLink to="/projects?status=in_progress" label="진행중" value={stats.inProgress} tone="primary" />
         <StatLink to="/projects?status=done" label="완성" value={stats.done} tone="accent" />
-        <StatLink to="/library/yarns" label="실 종류" value={stats.yarns} tone="neutral" />
-      </div>
+        <StatLink to="/library/yarns" label="보유 실" value={stats.yarns} tone="neutral" /></div>
 
       {/* Quick actions */}
       <section>
@@ -58,13 +57,11 @@ export default function Home() {
               const cover = p.photos?.[0];
               return (
                 <Link key={p.id} to={`/projects/${p.id}`} className="card-soft flex items-center gap-3 overflow-hidden p-2.5 hover:shadow-soft">
-                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-secondary">
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
                     {cover ? (
                       <img src={cover} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <ImageIcon className="h-4 w-4" />
-                      </div>
+                      <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -114,10 +111,14 @@ function StatLink({ to, label, value, tone }: { to: string; label: string; value
   return (
     <Link
       to={to}
-      className={`block rounded-2xl px-3.5 py-3 transition active:scale-[0.97] hover:shadow-soft ${toneClass}`}
+      role="button"
+      className={`press-tile group relative block rounded-2xl px-3.5 py-3 hover:shadow-soft ${toneClass}`}
     >
-      <div className="text-[11px] font-semibold opacity-80">{label}</div>
-      <div className="mt-1 text-[22px] font-extrabold leading-none tracking-tight">{value}</div>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold opacity-75">{label}</span>
+        <ArrowRight className="h-3 w-3 opacity-40 transition-opacity group-hover:opacity-80" />
+      </div>
+      <div className="mt-1.5 text-[22px] font-extrabold leading-none tracking-tight tabular-nums">{value}</div>
     </Link>
   );
 }

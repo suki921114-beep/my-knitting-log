@@ -34,17 +34,17 @@ export default function Patterns() {
           {filtered.map(p => (
             <li key={p.id}>
               <Link to={`/library/patterns/${p.id}/edit`} className="card-soft flex items-center gap-3 p-2.5 hover:shadow-soft">
-                <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl bg-secondary">
+                <div className="h-16 w-20 shrink-0 overflow-hidden rounded-xl">
                   {p.imageDataUrl ? (
                     <img src={p.imageDataUrl} alt={p.name} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground"><ImageIcon className="h-4 w-4" /></div>
+                    <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold text-foreground">{p.name}</div>
                   <div className="truncate text-[11.5px] text-muted-foreground">
-                    {[p.designer, p.difficulty, p.sizeInfo].filter(Boolean).join(' · ')}
+                    {[p.designer, p.difficulty, p.sizeInfo].filter(Boolean).join(' · ') || '—'}
                   </div>
                 </div>
               </Link>
@@ -56,11 +56,11 @@ export default function Patterns() {
           {filtered.map(p => (
             <li key={p.id}>
               <Link to={`/library/patterns/${p.id}/edit`} className="card-soft block overflow-hidden hover:shadow-soft">
-                <div className="aspect-[4/5] bg-secondary">
+                <div className="aspect-[4/5] overflow-hidden">
                   {p.imageDataUrl ? (
                     <img src={p.imageDataUrl} alt={p.name} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground"><ImageIcon className="h-6 w-6" /></div>
+                    <div className="img-placeholder"><ImageIcon className="h-6 w-6" /></div>
                   )}
                 </div>
                 <div className="p-2.5">
