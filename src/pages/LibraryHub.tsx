@@ -1,27 +1,34 @@
 import { Link } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
-import { Layers, Scroll, Ruler, Sparkles } from 'lucide-react';
+import { Layers, Scroll, Ruler, Sparkles, ChevronRight } from 'lucide-react';
 
 const ITEMS = [
-  { to: '/library/yarns', label: '실', desc: '재고와 사용처를 추적하세요', icon: Layers, tone: 'bg-warm/30' },
-  { to: '/library/patterns', label: '도안', desc: '디자이너·출처·링크 보관', icon: Scroll, tone: 'bg-sage/25' },
-  { to: '/library/needles', label: '바늘', desc: '대바늘·코바늘·줄바늘', icon: Ruler, tone: 'bg-accent/15' },
-  { to: '/library/notions', label: '부자재', desc: '단추, 마커, 라벨…', icon: Sparkles, tone: 'bg-cream' },
+  { to: '/library/yarns', label: '실', tag: 'Yarn', icon: Layers, accent: 'text-primary bg-primary-soft' },
+  { to: '/library/patterns', label: '도안', tag: 'Pattern', icon: Scroll, accent: 'text-accent-foreground bg-accent-soft' },
+  { to: '/library/needles', label: '바늘', tag: 'Needle', icon: Ruler, accent: 'text-primary bg-primary-soft' },
+  { to: '/library/notions', label: '부자재', tag: 'Notion', icon: Sparkles, accent: 'text-accent-foreground bg-accent-soft' },
 ];
 
 export default function LibraryHub() {
   return (
     <div>
-      <PageHeader title="라이브러리" subtitle="작업에 쓰는 재료들을 정리해요." />
-      <div className="grid grid-cols-2 gap-3">
+      <PageHeader title="라이브러리" />
+      <ul className="space-y-2">
         {ITEMS.map(it => (
-          <Link key={it.to} to={it.to} className={`card-soft block p-4 ${it.tone}`}>
-            <it.icon className="h-6 w-6 text-primary" />
-            <div className="mt-3 font-serif text-lg font-semibold text-ink">{it.label}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{it.desc}</div>
-          </Link>
+          <li key={it.to}>
+            <Link to={it.to} className="card-soft flex items-center gap-3.5 p-4 hover:shadow-soft">
+              <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${it.accent}`}>
+                <it.icon className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <div className="flex-1">
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{it.tag}</div>
+                <div className="text-[15px] font-bold text-foreground">{it.label}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

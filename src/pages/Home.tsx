@@ -2,116 +2,150 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
-import PageHeader from '@/components/PageHeader';
-import PrivacyNote from '@/components/PrivacyNote';
-import { Plus, Scroll, AlertTriangle, ArrowRight, Layers } from 'lucide-react';
+import { Plus, Scroll, AlertTriangle, ArrowRight, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
 
 export default function Home() {
   const inProgress = useLiveQuery(
     () => db.projects.where('status').equals('in_progress').reverse().sortBy('updatedAt'),
     []
   );
-  const recent = useLiveQuery(() => db.projects.orderBy('updatedAt').reverse().limit(5).toArray(), []);
-  const yarnStats = useAllYarnStats();
-  const lowStock = (yarnStats || []).filter(s => s.remaining <= Math.max(20, s.yarn.totalGrams * 0.1)).slice(0, 4);
+  const allProjects = useLiveQuery(() => db.projects.toArray(), []) || [];
+  const yarnStats = useAllYarnStats() || [];
+  const lowStock = yarnStats
+    .filter(s => s.remaining <= Math.max(20, s.yarn.totalGrams * 0.1))
+    .sort((a, b) => a.remaining - b.remaining)
+    .slice(0, 4);
+
+  const stats = {
+    inProgress: allProjects.filter(p => p.status === 'in_progress').length,
+    done: allProjects.filter(p => p.status === 'done').length,
+    yarns: yarnStats.length,
+  };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="안녕하세요 ☁️"
-        subtitle="오늘도 한 코 한 코, 천천히."
-      />
+    <div className="space-y-7">
+      {/* Atelier hero */}
+      <header className="space-y-1">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">My Atelier</p>
+        <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-foreground">내 작업실</h1>
+      </header>
 
+      {/* Mini stats */}
       <div className="grid grid-cols-3 gap-2">
-        <QuickCard to="/projects/new" icon={Plus} label="새 프로젝트" tone="accent" />
-        <QuickCard to="/library/yarns/new" icon={Layers} label="실 추가" />
-        <QuickCard to="/library/patterns/new" icon={Scroll} label="도안 추가" />
+        <Stat label="진행중" value={stats.inProgress} tone="primary" />
+        <Stat label="완성" value={stats.done} tone="accent" />
+        <Stat label="실 종류" value={stats.yarns} tone="neutral" />
       </div>
 
-      <Section title="진행중인 프로젝트" to="/projects">
+      {/* Quick actions */}
+      <section>
+        <div className="mb-2.5 flex items-center justify-between">
+          <h2 className="section-title">바로 추가</h2>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <QuickCard to="/projects/new" icon={Plus} label="프로젝트" tone="primary" />
+          <QuickCard to="/library/yarns/new" icon={Layers} label="실" tone="accent" />
+          <QuickCard to="/library/patterns/new" icon={Scroll} label="도안" tone="neutral" />
+        </div>
+      </section>
+
+      {/* In-progress */}
+      <Section title="오늘의 뜨개" to="/projects" cta="전체">
         {!inProgress?.length ? (
-          <Empty text="아직 진행중인 프로젝트가 없어요." />
+          <Empty icon={Sparkles} text="진행중인 작업이 없어요" />
         ) : (
           <div className="space-y-2">
-            {inProgress.slice(0, 3).map(p => (
-              <Link key={p.id} to={`/projects/${p.id}`} className="card-soft block p-4 hover:border-primary/40 transition">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium text-ink">{p.name}</h3>
+            {inProgress.slice(0, 3).map(p => {
+              const cover = p.photos?.[0];
+              return (
+                <Link key={p.id} to={`/projects/${p.id}`} className="card-soft flex items-center gap-3 overflow-hidden p-2.5 hover:shadow-soft">
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-secondary">
+                    {cover ? (
+                      <img src={cover} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <ImageIcon className="h-4 w-4" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-[14px] font-semibold text-foreground">{p.name}</h3>
+                    {p.progressNote && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{p.progressNote}</p>}
+                  </div>
                   <span className={`chip ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
-                </div>
-                {p.progressNote && <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{p.progressNote}</p>}
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </Section>
 
-      <Section title="최근 수정" to="/projects">
-        {!recent?.length ? (
-          <Empty text="기록이 쌓이면 여기에 보여요." />
-        ) : (
-          <div className="space-y-1.5">
-            {recent.map(p => (
-              <Link key={p.id} to={`/projects/${p.id}`} className="flex items-center justify-between rounded-xl px-3 py-2.5 hover:bg-secondary/60">
-                <span className="text-sm text-ink">{p.name}</span>
-                <span className="text-xs text-muted-foreground">{statusLabel(p.status)}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </Section>
-
-      <Section title="재고가 부족한 실" to="/library/yarns">
+      {/* Low stock */}
+      <Section title="재고 알림" to="/library/yarns" cta="실 보기">
         {!lowStock.length ? (
-          <Empty text="재고가 모두 넉넉합니다." />
+          <Empty icon={Sparkles} text="재고가 모두 넉넉해요" />
         ) : (
           <div className="space-y-2">
             {lowStock.map(s => (
-              <Link key={s.yarn.id} to={`/library/yarns/${s.yarn.id}`} className="card-soft flex items-center justify-between p-3.5">
-                <div>
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
-                    <AlertTriangle className="h-3.5 w-3.5 text-accent" />
-                    {s.yarn.name}
-                  </div>
-                  {s.yarn.brand && <div className="text-xs text-muted-foreground">{s.yarn.brand}</div>}
+              <Link key={s.yarn.id} to={`/library/yarns/${s.yarn.id}`} className="card-soft flex items-center gap-3 p-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft">
+                  <AlertTriangle className="h-4 w-4 text-accent-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13.5px] font-semibold text-foreground">{s.yarn.name}</div>
+                  {s.yarn.brand && <div className="truncate text-[11.5px] text-muted-foreground">{s.yarn.brand}</div>}
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-semibold text-accent">{s.remaining}g</div>
-                  <div className="text-[11px] text-muted-foreground">/ {s.yarn.totalGrams}g</div>
+                  <div className="text-[14px] font-bold text-primary">{s.remaining}<span className="ml-0.5 text-[11px] font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
                 </div>
               </Link>
             ))}
           </div>
         )}
       </Section>
-
-      <PrivacyNote />
     </div>
   );
 }
 
-function QuickCard({ to, icon: Icon, label, tone }: { to: string; icon: any; label: string; tone?: 'accent' }) {
+function Stat({ label, value, tone }: { label: string; value: number; tone: 'primary' | 'accent' | 'neutral' }) {
+  const toneClass =
+    tone === 'primary' ? 'bg-primary-soft text-primary' :
+    tone === 'accent' ? 'bg-accent-soft text-accent-foreground' :
+    'bg-secondary text-foreground';
+  return (
+    <div className={`rounded-2xl px-3.5 py-3 ${toneClass}`}>
+      <div className="text-[11px] font-semibold opacity-80">{label}</div>
+      <div className="mt-1 text-[22px] font-extrabold leading-none tracking-tight">{value}</div>
+    </div>
+  );
+}
+
+function QuickCard({ to, icon: Icon, label, tone }: { to: string; icon: any; label: string; tone: 'primary' | 'accent' | 'neutral' }) {
+  const iconClass =
+    tone === 'primary' ? 'bg-primary text-primary-foreground' :
+    tone === 'accent' ? 'bg-accent text-accent-foreground' :
+    'bg-foreground text-background';
   return (
     <Link
       to={to}
-      className={`card-soft flex flex-col items-center justify-center gap-1.5 py-4 text-center transition hover:translate-y-[-1px] ${
-        tone === 'accent' ? 'bg-gradient-warm' : ''
-      }`}
+      className="card-soft flex flex-col items-center justify-center gap-2 py-4 text-center transition hover:-translate-y-0.5"
     >
-      <Icon className="h-5 w-5 text-primary" />
-      <span className="text-xs font-medium text-ink">{label}</span>
+      <span className={`flex h-9 w-9 items-center justify-center rounded-full ${iconClass}`}>
+        <Icon className="h-4 w-4" strokeWidth={2.4} />
+      </span>
+      <span className="text-[12px] font-semibold text-foreground">{label}</span>
     </Link>
   );
 }
 
-function Section({ title, to, children }: { title: string; to?: string; children: React.ReactNode }) {
+function Section({ title, to, cta, children }: { title: string; to?: string; cta?: string; children: React.ReactNode }) {
   return (
     <section>
       <div className="mb-2.5 flex items-center justify-between px-1">
-        <h2 className="font-serif text-lg font-semibold text-ink">{title}</h2>
+        <h2 className="section-title">{title}</h2>
         {to && (
-          <Link to={to} className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-primary">
-            전체 <ArrowRight className="h-3 w-3" />
+          <Link to={to} className="flex items-center gap-0.5 text-[11.5px] font-semibold text-muted-foreground hover:text-primary">
+            {cta || '전체'} <ArrowRight className="h-3 w-3" />
           </Link>
         )}
       </div>
@@ -120,6 +154,11 @@ function Section({ title, to, children }: { title: string; to?: string; children
   );
 }
 
-function Empty({ text }: { text: string }) {
-  return <div className="rounded-xl bg-secondary/50 px-4 py-6 text-center text-sm text-muted-foreground">{text}</div>;
+function Empty({ icon: Icon, text }: { icon: any; text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-secondary/60 px-4 py-8 text-center">
+      <Icon className="h-5 w-5 text-muted-foreground" />
+      <p className="text-[12.5px] text-muted-foreground">{text}</p>
+    </div>
+  );
 }
