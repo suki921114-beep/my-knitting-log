@@ -69,7 +69,7 @@ export default function Projects() {
         {FILTERS.map(f => (
           <button
             key={f.v}
-            onClick={() => setFilter(f.v)}
+            onClick={() => handleFilter(f.v)}
             className={`filter-chip ${filter === f.v ? 'filter-chip-on' : 'filter-chip-off'}`}
           >
             {f.label}
