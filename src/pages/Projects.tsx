@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, ProjectStatus } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
@@ -14,10 +14,28 @@ const FILTERS: { v: 'all' | ProjectStatus; label: string }[] = [
   { v: 'on_hold', label: '보류' },
 ];
 
+const VALID: ProjectStatus[] = ['in_progress', 'planned', 'done', 'on_hold'];
+
 export default function Projects() {
-  const [filter, setFilter] = useState<'all' | ProjectStatus>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initial = searchParams.get('status');
+  const [filter, setFilter] = useState<'all' | ProjectStatus>(
+    initial && VALID.includes(initial as ProjectStatus) ? (initial as ProjectStatus) : 'all'
+  );
   const [q, setQ] = useState('');
   const projects = useLiveQuery(() => db.projects.orderBy('updatedAt').reverse().toArray(), []);
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s && VALID.includes(s as ProjectStatus)) setFilter(s as ProjectStatus);
+    else if (!s) setFilter('all');
+  }, [searchParams]);
+
+  function handleFilter(v: 'all' | ProjectStatus) {
+    setFilter(v);
+    if (v === 'all') setSearchParams({});
+    else setSearchParams({ status: v });
+  }
 
   const filtered = useMemo(() => {
     if (!projects) return [];
