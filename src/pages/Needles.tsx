@@ -13,7 +13,7 @@ export default function Needles() {
   return (
     <div>
       <PageHeader title="바늘" back right={
-        <Link to="/library/needles/new" className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-soft">
+        <Link to="/library/needles/new" className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-soft">
           <Plus className="h-3.5 w-3.5" /> 추가
         </Link>
       } />
