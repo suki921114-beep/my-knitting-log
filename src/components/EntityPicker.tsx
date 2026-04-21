@@ -56,7 +56,7 @@ export default function EntityPicker<T extends BaseLink>({ kind, links, onChange
     return db.notions.orderBy('updatedAt').reverse().toArray();
   }, [kind]) || [];
 
-  const map = useMemo(() => new Map(items.map((it: any) => [it.id!, it])), [items]);
+  const map = useMemo(() => new Map<number, any>((items as any[]).map(it => [it.id as number, it])), [items]);
 
   function update(idx: number, patch: Partial<T>) {
     const next = links.slice();
