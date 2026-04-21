@@ -1,11 +1,13 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, now, Project, ProjectStatus, Yarn } from '@/lib/db';
+import { db, now, ProjectStatus } from '@/lib/db';
 import { statusLabel } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import PrivacyNote from '@/components/PrivacyNote';
 import YarnPicker, { YarnLink } from '@/components/YarnPicker';
+import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
+import { MultiImageInput } from '@/components/ImageInput';
 import { Save, Trash2 } from 'lucide-react';
 
 const STATUSES: ProjectStatus[] = ['planned', 'in_progress', 'done', 'on_hold'];
@@ -17,8 +19,20 @@ export default function ProjectForm() {
   const projectId = id ? Number(id) : undefined;
 
   const existing = useLiveQuery(() => (projectId ? db.projects.get(projectId) : undefined), [projectId]);
-  const existingLinks = useLiveQuery(
+  const existingYarnLinks = useLiveQuery(
     () => (projectId ? db.projectYarns.where('projectId').equals(projectId).toArray() : []),
+    [projectId]
+  );
+  const existingPatternLinks = useLiveQuery(
+    () => (projectId ? db.projectPatterns.where('projectId').equals(projectId).toArray() : []),
+    [projectId]
+  );
+  const existingNeedleLinks = useLiveQuery(
+    () => (projectId ? db.projectNeedles.where('projectId').equals(projectId).toArray() : []),
+    [projectId]
+  );
+  const existingNotionLinks = useLiveQuery(
+    () => (projectId ? db.projectNotions.where('projectId').equals(projectId).toArray() : []),
     [projectId]
   );
 
@@ -30,8 +44,13 @@ export default function ProjectForm() {
   const [gauge, setGauge] = useState('');
   const [progressNote, setProgressNote] = useState('');
   const [finishedNote, setFinishedNote] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
   const [yarnLinks, setYarnLinks] = useState<YarnLink[]>([]);
+  const [patternLinks, setPatternLinks] = useState<PatternLink[]>([]);
+  const [needleLinks, setNeedleLinks] = useState<NeedleLink[]>([]);
+  const [notionLinks, setNotionLinks] = useState<NotionLink[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [linksHydrated, setLinksHydrated] = useState(false);
 
   useEffect(() => {
     if (editing && existing && !hydrated) {
@@ -43,23 +62,30 @@ export default function ProjectForm() {
       setGauge(existing.gauge || '');
       setProgressNote(existing.progressNote || '');
       setFinishedNote(existing.finishedNote || '');
+      setPhotos(existing.photos || []);
       setHydrated(true);
     }
   }, [editing, existing, hydrated]);
 
   useEffect(() => {
-    if (editing && existingLinks && !yarnLinks.length && existingLinks.length) {
-      setYarnLinks(
-        existingLinks.map(l => ({
-          id: l.id,
-          yarnId: l.yarnId,
-          usedGrams: l.usedGrams,
-          colorNote: l.colorNote || '',
-          usageNote: l.usageNote || '',
-        }))
-      );
-    }
-  }, [editing, existingLinks]); // eslint-disable-line
+    if (!editing || linksHydrated) return;
+    if (!existingYarnLinks || !existingPatternLinks || !existingNeedleLinks || !existingNotionLinks) return;
+    setYarnLinks(
+      existingYarnLinks.map(l => ({
+        id: l.id,
+        yarnId: l.yarnId,
+        usedGrams: l.usedGrams,
+        colorNote: l.colorNote || '',
+        usageNote: l.usageNote || '',
+      }))
+    );
+    setPatternLinks(existingPatternLinks.map(l => ({ id: l.id, refId: l.patternId, note: l.note || '' })));
+    setNeedleLinks(existingNeedleLinks.map(l => ({ id: l.id, refId: l.needleId, note: l.note || '' })));
+    setNotionLinks(
+      existingNotionLinks.map(l => ({ id: l.id, refId: l.notionId, quantity: l.quantity, note: l.note || '' }))
+    );
+    setLinksHydrated(true);
+  }, [editing, existingYarnLinks, existingPatternLinks, existingNeedleLinks, existingNotionLinks, linksHydrated]);
 
   async function save() {
     if (!name.trim()) {
@@ -68,58 +94,57 @@ export default function ProjectForm() {
     }
     const t = now();
     let pid = projectId;
+    const payload = {
+      name: name.trim(),
+      status,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      size: size || undefined,
+      gauge: gauge || undefined,
+      progressNote: progressNote || undefined,
+      finishedNote: finishedNote || undefined,
+      photos: photos.length ? photos : undefined,
+      updatedAt: t,
+    };
     if (editing && pid) {
-      await db.projects.update(pid, {
-        name: name.trim(),
-        status,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        size: size || undefined,
-        gauge: gauge || undefined,
-        progressNote: progressNote || undefined,
-        finishedNote: finishedNote || undefined,
-        updatedAt: t,
-      });
+      await db.projects.update(pid, payload);
     } else {
-      pid = (await db.projects.add({
-        name: name.trim(),
-        status,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        size: size || undefined,
-        gauge: gauge || undefined,
-        progressNote: progressNote || undefined,
-        finishedNote: finishedNote || undefined,
-        createdAt: t,
-        updatedAt: t,
-      })) as number;
+      pid = (await db.projects.add({ ...payload, createdAt: t })) as number;
     }
 
-    // sync yarn links
-    const oldIds = (existingLinks || []).map(l => l.id!);
-    const keptIds = yarnLinks.filter(l => l.id).map(l => l.id!);
-    const toDelete = oldIds.filter(i => !keptIds.includes(i));
-    if (toDelete.length) await db.projectYarns.bulkDelete(toDelete);
-    for (const l of yarnLinks) {
-      if (l.id) {
-        await db.projectYarns.update(l.id, {
-          usedGrams: l.usedGrams,
-          colorNote: l.colorNote || undefined,
-          usageNote: l.usageNote || undefined,
-          updatedAt: t,
-        });
-      } else {
-        await db.projectYarns.add({
-          projectId: pid!,
-          yarnId: l.yarnId,
-          usedGrams: l.usedGrams,
-          colorNote: l.colorNote || undefined,
-          usageNote: l.usageNote || undefined,
-          createdAt: t,
-          updatedAt: t,
-        });
-      }
-    }
+    // sync each link table
+    await syncLinks(db.projectYarns, existingYarnLinks || [], yarnLinks, l => ({
+      projectId: pid!,
+      yarnId: l.yarnId,
+      usedGrams: l.usedGrams,
+      colorNote: l.colorNote || undefined,
+      usageNote: l.usageNote || undefined,
+    }), l => ({
+      usedGrams: l.usedGrams,
+      colorNote: l.colorNote || undefined,
+      usageNote: l.usageNote || undefined,
+      updatedAt: t,
+    }), t);
+
+    await syncLinks(db.projectPatterns, existingPatternLinks || [], patternLinks, l => ({
+      projectId: pid!,
+      patternId: l.refId,
+      note: l.note || undefined,
+    }), l => ({ note: l.note || undefined, updatedAt: t }), t);
+
+    await syncLinks(db.projectNeedles, existingNeedleLinks || [], needleLinks, l => ({
+      projectId: pid!,
+      needleId: l.refId,
+      note: l.note || undefined,
+    }), l => ({ note: l.note || undefined, updatedAt: t }), t);
+
+    await syncLinks(db.projectNotions, existingNotionLinks || [], notionLinks, l => ({
+      projectId: pid!,
+      notionId: l.refId,
+      quantity: l.quantity,
+      note: l.note || undefined,
+    }), l => ({ quantity: l.quantity, note: l.note || undefined, updatedAt: t }), t);
+
     nav(`/projects/${pid}`);
   }
 
@@ -127,6 +152,9 @@ export default function ProjectForm() {
     if (!projectId) return;
     if (!confirm('이 프로젝트를 삭제할까요? 사용한 실 기록도 함께 사라집니다.')) return;
     await db.projectYarns.where('projectId').equals(projectId).delete();
+    await db.projectPatterns.where('projectId').equals(projectId).delete();
+    await db.projectNeedles.where('projectId').equals(projectId).delete();
+    await db.projectNotions.where('projectId').equals(projectId).delete();
     await db.projects.delete(projectId);
     nav('/projects');
   }
@@ -166,8 +194,24 @@ export default function ProjectForm() {
         <Field label="게이지"><input className={inputCls} value={gauge} onChange={e => setGauge(e.target.value)} placeholder="22코 28단/10cm" /></Field>
       </div>
 
+      <Field label="도안">
+        <EntityPicker kind="pattern" links={patternLinks} onChange={setPatternLinks} />
+      </Field>
+
       <Field label="사용한 실">
         <YarnPicker links={yarnLinks} onChange={setYarnLinks} />
+      </Field>
+
+      <Field label="바늘">
+        <EntityPicker kind="needle" links={needleLinks} onChange={setNeedleLinks} />
+      </Field>
+
+      <Field label="부자재">
+        <EntityPicker kind="notion" links={notionLinks} onChange={setNotionLinks} />
+      </Field>
+
+      <Field label="사진">
+        <MultiImageInput values={photos} onChange={setPhotos} />
       </Field>
 
       <Field label="진행 메모">
@@ -194,6 +238,28 @@ export default function ProjectForm() {
       </div>
     </div>
   );
+}
+
+// Generic link table sync helper
+async function syncLinks<L extends { id?: number }>(
+  table: any,
+  existing: L[],
+  current: L[],
+  buildAdd: (l: L) => any,
+  buildUpdate: (l: L) => any,
+  t: number
+) {
+  const oldIds = existing.map(l => l.id!).filter(Boolean);
+  const keptIds = current.filter(l => l.id).map(l => l.id!);
+  const toDelete = oldIds.filter(i => !keptIds.includes(i));
+  if (toDelete.length) await table.bulkDelete(toDelete);
+  for (const l of current) {
+    if (l.id) {
+      await table.update(l.id, buildUpdate(l));
+    } else {
+      await table.add({ ...buildAdd(l), createdAt: t, updatedAt: t });
+    }
+  }
 }
 
 const inputCls = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';
