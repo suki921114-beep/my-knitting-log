@@ -30,6 +30,7 @@ export default function NeedleForm() {
   }
   async function remove() {
     if (!nid || !confirm('이 바늘을 삭제할까요?')) return;
+    await db.projectNeedles.where('needleId').equals(nid).delete();
     await db.needles.delete(nid); nav('/library/needles');
   }
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
