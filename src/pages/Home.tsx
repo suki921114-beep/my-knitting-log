@@ -4,10 +4,7 @@ import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import PrivacyNote from '@/components/PrivacyNote';
-import { Plus, Notebook, Spool, Scroll, AlertTriangle, ArrowRight } from 'lucide-react';
-
-// lucide doesn't have Spool — fallback to a knit-friendly icon
-import { Layers } from 'lucide-react';
+import { Plus, Scroll, AlertTriangle, ArrowRight, Layers } from 'lucide-react';
 
 export default function Home() {
   const inProgress = useLiveQuery(
