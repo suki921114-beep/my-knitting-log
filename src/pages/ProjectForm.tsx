@@ -241,9 +241,9 @@ export default function ProjectForm() {
 }
 
 // Generic link table sync helper
-async function syncLinks<L extends { id?: number }>(
+async function syncLinks<L extends { id?: number }, E extends { id?: number }>(
   table: any,
-  existing: L[],
+  existing: E[],
   current: L[],
   buildAdd: (l: L) => any,
   buildUpdate: (l: L) => any,
