@@ -5,6 +5,7 @@ import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import PrivacyNote from '@/components/PrivacyNote';
 import { ImageInput } from '@/components/ImageInput';
+import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
 
 export default function PatternForm() {
@@ -60,6 +61,7 @@ export default function PatternForm() {
       <Field label="도안 링크"><input className={inp} value={f.link} onChange={u('link')} placeholder="https://" /></Field>
       <Field label="사이즈 정보"><input className={inp} value={f.sizeInfo} onChange={u('sizeInfo')} /></Field>
       <Field label="메모"><textarea className={`${inp} min-h-[80px]`} value={f.note} onChange={u('note')} /></Field>
+      {editing && <ReverseProjectsSection kind="pattern" refId={pid} />}
       <PrivacyNote kind="memo" />
       <Actions editing={editing} onSave={save} onRemove={remove} />
     </div>

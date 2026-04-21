@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { ImageInput } from '@/components/ImageInput';
+import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
 
 export default function NotionForm() {
@@ -51,6 +52,7 @@ export default function NotionForm() {
       </div>
       <Field label="구매처"><input className={inp} value={f.shop} onChange={u('shop')} /></Field>
       <Field label="메모"><textarea className={`${inp} min-h-[72px]`} value={f.note} onChange={u('note')} /></Field>
+      {editing && <ReverseProjectsSection kind="notion" refId={nid} />
 
       <div className="sticky bottom-20 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex gap-2">
