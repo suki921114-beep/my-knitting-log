@@ -101,16 +101,16 @@ export default function Projects() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="truncate text-[14.5px] font-semibold text-foreground">{p.name}</h3>
+                    <h3 className="truncate text-[14.5px] font-semibold text-foreground">{p.name}</h3>
+                    <div className="mt-1 flex items-center gap-1.5">
                       <span className={`chip ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
+                      {(p.size || p.gauge) && (
+                        <span className="truncate text-[11.5px] text-muted-foreground">
+                          {[p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
                     </div>
-                    {(p.size || p.gauge) && (
-                      <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                        {[p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                    {p.progressNote && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{p.progressNote}</p>}
+                    {p.progressNote && <p className="mt-1 line-clamp-1 text-[12px] text-muted-foreground">{p.progressNote}</p>}
                   </div>
                 </Link>
               </li>
