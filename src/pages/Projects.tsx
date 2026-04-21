@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, ProjectStatus } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
@@ -14,10 +14,28 @@ const FILTERS: { v: 'all' | ProjectStatus; label: string }[] = [
   { v: 'on_hold', label: '보류' },
 ];
 
+const VALID: ProjectStatus[] = ['in_progress', 'planned', 'done', 'on_hold'];
+
 export default function Projects() {
-  const [filter, setFilter] = useState<'all' | ProjectStatus>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initial = searchParams.get('status');
+  const [filter, setFilter] = useState<'all' | ProjectStatus>(
+    initial && VALID.includes(initial as ProjectStatus) ? (initial as ProjectStatus) : 'all'
+  );
   const [q, setQ] = useState('');
   const projects = useLiveQuery(() => db.projects.orderBy('updatedAt').reverse().toArray(), []);
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s && VALID.includes(s as ProjectStatus)) setFilter(s as ProjectStatus);
+    else if (!s) setFilter('all');
+  }, [searchParams]);
+
+  function handleFilter(v: 'all' | ProjectStatus) {
+    setFilter(v);
+    if (v === 'all') setSearchParams({});
+    else setSearchParams({ status: v });
+  }
 
   const filtered = useMemo(() => {
     if (!projects) return [];
@@ -51,7 +69,7 @@ export default function Projects() {
         {FILTERS.map(f => (
           <button
             key={f.v}
-            onClick={() => setFilter(f.v)}
+            onClick={() => handleFilter(f.v)}
             className={`filter-chip ${filter === f.v ? 'filter-chip-on' : 'filter-chip-off'}`}
           >
             {f.label}
@@ -83,16 +101,16 @@ export default function Projects() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="truncate text-[14.5px] font-semibold text-foreground">{p.name}</h3>
+                    <h3 className="truncate text-[14.5px] font-semibold text-foreground">{p.name}</h3>
+                    <div className="mt-1 flex items-center gap-1.5">
                       <span className={`chip ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
+                      {(p.size || p.gauge) && (
+                        <span className="truncate text-[11.5px] text-muted-foreground">
+                          {[p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
                     </div>
-                    {(p.size || p.gauge) && (
-                      <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                        {[p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                    {p.progressNote && <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{p.progressNote}</p>}
+                    {p.progressNote && <p className="mt-1 line-clamp-1 text-[12px] text-muted-foreground">{p.progressNote}</p>}
                   </div>
                 </Link>
               </li>
