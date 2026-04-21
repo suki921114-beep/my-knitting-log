@@ -23,18 +23,17 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       {/* Atelier hero */}
-      <header className="space-y-1">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">My Atelier</p>
-        <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-foreground">내 작업실</h1>
+      <header>
+        <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-foreground">내 작업실</h1>
       </header>
 
-      {/* Mini stats */}
+      {/* Mini stats — clickable */}
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="진행중" value={stats.inProgress} tone="primary" />
-        <Stat label="완성" value={stats.done} tone="accent" />
-        <Stat label="실 종류" value={stats.yarns} tone="neutral" />
+        <StatLink to="/projects?status=in_progress" label="진행중" value={stats.inProgress} tone="primary" />
+        <StatLink to="/projects?status=done" label="완성" value={stats.done} tone="accent" />
+        <StatLink to="/library/yarns" label="실 종류" value={stats.yarns} tone="neutral" />
       </div>
 
       {/* Quick actions */}
