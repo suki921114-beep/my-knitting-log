@@ -57,6 +57,22 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        warm: "hsl(var(--warm))",
+        sage: "hsl(var(--sage))",
+        cream: "hsl(var(--cream))",
+        ink: "hsl(var(--ink))",
+      },
+      fontFamily: {
+        serif: ['Fraunces', 'Georgia', 'serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      backgroundImage: {
+        'gradient-warm': 'var(--gradient-warm)',
+        'gradient-card': 'var(--gradient-card)',
+      },
+      boxShadow: {
+        soft: 'var(--shadow-soft)',
+        card: 'var(--shadow-card)',
       },
       borderRadius: {
         lg: "var(--radius)",
