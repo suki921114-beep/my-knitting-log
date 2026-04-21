@@ -38,7 +38,7 @@ export default function ProjectDetail() {
         title={project.name}
         back
         right={
-          <Link to={`/projects/${pid}/edit`} className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium">
+          <Link to={`/projects/${pid}/edit`} className="btn-soft btn-sm">
             <Pencil className="h-3.5 w-3.5" /> 수정
           </Link>
         }
@@ -206,13 +206,13 @@ function Thumb({ src }: { src?: string }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 className="mb-2 px-1 font-serif text-base font-semibold text-ink">{title}</h2>
+    <section className="space-y-2">
+      <h2 className="section-title">{title}</h2>
       {children}
     </section>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-xl bg-secondary/50 px-3 py-4 text-center text-xs text-muted-foreground">{text}</p>;
+  return <p className="rounded-2xl bg-secondary/60 px-3 py-4 text-center text-[12px] text-muted-foreground">{text}</p>;
 }
