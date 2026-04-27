@@ -5,6 +5,7 @@ import { statusLabel, statusColor } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, Image as ImageIcon } from 'lucide-react';
 import { useState } from 'react';
+import RowCounterSection from '@/components/RowCounterSection';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -166,6 +167,8 @@ export default function ProjectDetail() {
           </ul>
         )}
       </Section>
+
+      <RowCounterSection projectId={pid} />
 
       {project.progressNote && (
         <Section title="진행 메모">
