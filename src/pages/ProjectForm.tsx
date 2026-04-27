@@ -201,8 +201,13 @@ export default function ProjectForm() {
         <EntityPicker kind="pattern" links={patternLinks} onChange={setPatternLinks} />
       </Field>
 
-      <Field label="사용한 실">
-        <YarnPicker links={yarnLinks} onChange={setYarnLinks} />
+      <Field label={status === 'planned' ? '사용할 실 (예상)' : '사용한 실'}>
+        <YarnPicker
+          links={yarnLinks}
+          onChange={setYarnLinks}
+          showPlanned={status === 'planned'}
+          currentProjectId={projectId}
+        />
       </Field>
 
       <Field label="바늘">
