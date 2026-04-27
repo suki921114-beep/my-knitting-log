@@ -205,7 +205,7 @@ export const now = () => Date.now();
 
 export async function exportAll() {
   const data = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     projects: await db.projects.toArray(),
     patterns: await db.patterns.toArray(),
@@ -216,6 +216,8 @@ export async function exportAll() {
     projectPatterns: await db.projectPatterns.toArray(),
     projectNeedles: await db.projectNeedles.toArray(),
     projectNotions: await db.projectNotions.toArray(),
+    rowCounters: await db.rowCounters.toArray(),
+    gaugePresets: await db.gaugePresets.toArray(),
   };
   return data;
 }
@@ -223,7 +225,7 @@ export async function exportAll() {
 export async function importAll(data: any) {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets],
     async () => {
       if (data.projects) await db.projects.bulkPut(data.projects);
       if (data.patterns) await db.patterns.bulkPut(data.patterns);
@@ -234,6 +236,8 @@ export async function importAll(data: any) {
       if (data.projectPatterns) await db.projectPatterns.bulkPut(data.projectPatterns);
       if (data.projectNeedles) await db.projectNeedles.bulkPut(data.projectNeedles);
       if (data.projectNotions) await db.projectNotions.bulkPut(data.projectNotions);
+      if (data.rowCounters) await db.rowCounters.bulkPut(data.rowCounters);
+      if (data.gaugePresets) await db.gaugePresets.bulkPut(data.gaugePresets);
     }
   );
 }
@@ -241,7 +245,7 @@ export async function importAll(data: any) {
 export async function clearAll() {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets],
     async () => {
       await Promise.all([
         db.projects.clear(),
@@ -253,7 +257,10 @@ export async function clearAll() {
         db.projectPatterns.clear(),
         db.projectNeedles.clear(),
         db.projectNotions.clear(),
+        db.rowCounters.clear(),
+        db.gaugePresets.clear(),
       ]);
     }
   );
 }
+
