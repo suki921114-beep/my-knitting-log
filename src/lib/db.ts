@@ -78,6 +78,8 @@ export interface ProjectYarn {
   projectId: number;
   yarnId: number;
   usedGrams: number;
+  /** 예상 소요량(g). 주로 'planned' 프로젝트에서 부족 여부 판단에 사용 */
+  plannedGrams?: number;
   colorNote?: string;
   usageNote?: string;
   createdAt: number;
