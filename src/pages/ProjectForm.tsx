@@ -75,6 +75,7 @@ export default function ProjectForm() {
         id: l.id,
         yarnId: l.yarnId,
         usedGrams: l.usedGrams,
+        plannedGrams: l.plannedGrams,
         colorNote: l.colorNote || '',
         usageNote: l.usageNote || '',
       }))
@@ -117,10 +118,12 @@ export default function ProjectForm() {
       projectId: pid!,
       yarnId: l.yarnId,
       usedGrams: l.usedGrams,
+      plannedGrams: l.plannedGrams,
       colorNote: l.colorNote || undefined,
       usageNote: l.usageNote || undefined,
     }), l => ({
       usedGrams: l.usedGrams,
+      plannedGrams: l.plannedGrams,
       colorNote: l.colorNote || undefined,
       usageNote: l.usageNote || undefined,
       updatedAt: t,
@@ -198,8 +201,13 @@ export default function ProjectForm() {
         <EntityPicker kind="pattern" links={patternLinks} onChange={setPatternLinks} />
       </Field>
 
-      <Field label="사용한 실">
-        <YarnPicker links={yarnLinks} onChange={setYarnLinks} />
+      <Field label={status === 'planned' ? '사용할 실 (예상)' : '사용한 실'}>
+        <YarnPicker
+          links={yarnLinks}
+          onChange={setYarnLinks}
+          showPlanned={status === 'planned'}
+          currentProjectId={projectId}
+        />
       </Field>
 
       <Field label="바늘">

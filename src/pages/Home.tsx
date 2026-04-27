@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
-import { Plus, Scroll, AlertTriangle, ArrowRight, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Plus, Scroll, ArrowRight, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
 
 export default function Home() {
   const inProgress = useLiveQuery(
@@ -11,9 +11,9 @@ export default function Home() {
   );
   const allProjects = useLiveQuery(() => db.projects.toArray(), []) || [];
   const yarnStats = useAllYarnStats() || [];
-  const lowStock = yarnStats
-    .filter(s => s.remaining <= Math.max(20, s.yarn.totalGrams * 0.1))
-    .sort((a, b) => a.remaining - b.remaining)
+  const topRemaining = yarnStats
+    .filter(s => s.remaining > 0)
+    .sort((a, b) => b.remaining - a.remaining)
     .slice(0, 4);
 
   const stats = {
@@ -79,26 +79,38 @@ export default function Home() {
         )}
       </Section>
 
-      {/* Low stock */}
-      <Section title="재고 알림" to="/library/yarns" cta="실 보기">
-        {!lowStock.length ? (
-          <Empty icon={Sparkles} text="재고가 모두 넉넉해요" />
+      {/* Top remaining — yarns to use up first */}
+      <Section title="우선 사용할 실" to="/library/yarns" cta="실 보기">
+        {!topRemaining.length ? (
+          <Empty icon={Sparkles} text="등록된 실이 없어요" />
         ) : (
           <div className="space-y-2">
-            {lowStock.map(s => (
-              <Link key={s.yarn.id} to={`/library/yarns/${s.yarn.id}`} className="card-soft flex items-center gap-3 p-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft">
-                  <AlertTriangle className="h-4 w-4 text-accent-foreground" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13.5px] font-semibold text-foreground">{s.yarn.name}</div>
-                  {s.yarn.brand && <div className="truncate text-[11.5px] text-muted-foreground">{s.yarn.brand}</div>}
-                </div>
-                <div className="text-right">
-                  <div className="text-[14px] font-bold text-primary">{s.remaining}<span className="ml-0.5 text-[11px] font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
-                </div>
-              </Link>
-            ))}
+            {topRemaining.map(s => {
+              const pct = s.yarn.totalGrams > 0
+                ? Math.max(0, Math.min(100, (s.remaining / s.yarn.totalGrams) * 100))
+                : 0;
+              return (
+                <Link key={s.yarn.id} to={`/library/yarns/${s.yarn.id}`} className="card-soft flex items-center gap-3 p-2.5 hover:shadow-soft">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
+                    {s.yarn.photoDataUrl ? (
+                      <img src={s.yarn.photoDataUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13.5px] font-semibold text-foreground">{s.yarn.name}</div>
+                    {s.yarn.brand && <div className="truncate text-[11.5px] text-muted-foreground">{s.yarn.brand}</div>}
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-secondary">
+                      <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[14px] font-bold text-primary tabular-nums">{s.remaining}<span className="ml-0.5 text-[11px] font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </Section>
