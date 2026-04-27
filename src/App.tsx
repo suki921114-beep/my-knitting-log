@@ -19,6 +19,7 @@ import NeedleForm from "./pages/NeedleForm";
 import Notions from "./pages/Notions";
 import NotionForm from "./pages/NotionForm";
 import Settings from "./pages/Settings";
+import GaugeCalculator from "./pages/GaugeCalculator";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/library/notions/new" element={<NotionForm />} />
             <Route path="/library/notions/:id/edit" element={<NotionForm />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/tools/gauge" element={<GaugeCalculator />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

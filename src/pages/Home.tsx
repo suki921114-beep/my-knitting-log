@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
-import { Plus, Scroll, ArrowRight, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Plus, Scroll, ArrowRight, Layers, Sparkles, Image as ImageIcon, Calculator } from 'lucide-react';
 
 export default function Home() {
   const inProgress = useLiveQuery(
@@ -48,6 +48,20 @@ export default function Home() {
           <QuickCard to="/library/yarns/new" icon={Layers} label="실" tone="accent" />
           <QuickCard to="/library/patterns/new" icon={Scroll} label="도안" tone="neutral" />
         </div>
+
+        <Link
+          to="/tools/gauge"
+          className="card-soft press-tile mt-2 flex items-center gap-3 p-3.5 hover:shadow-soft"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+            <Calculator className="h-4.5 w-4.5" strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-bold text-foreground">게이지 계산기</div>
+            <div className="text-[11.5px] text-muted-foreground">도안 게이지를 내 게이지로 보정해요</div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
       </section>
 
       {/* In-progress */}

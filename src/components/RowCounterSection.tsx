@@ -1,0 +1,222 @@
+import { useState, useRef, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, now, RowCounter } from '@/lib/db';
+import { Plus, Minus, MoreHorizontal, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+
+function vibrate(ms = 10) {
+  try { (navigator as any).vibrate?.(ms); } catch {}
+}
+
+export default function RowCounterSection({ projectId }: { projectId: number }) {
+  const counters = useLiveQuery(
+    () => db.rowCounters.where('projectId').equals(projectId).sortBy('createdAt'),
+    [projectId]
+  ) || [];
+
+  async function addCounter() {
+    const t = now();
+    await db.rowCounters.add({
+      projectId,
+      name: `카운터 ${counters.length + 1}`,
+      count: 0,
+      createdAt: t,
+      updatedAt: t,
+    });
+  }
+
+  return (
+    <section className="space-y-2">
+      <h2 className="section-title">단수 카운터</h2>
+
+      {counters.length === 0 ? (
+        <div className="rounded-2xl bg-secondary/60 px-4 py-6 text-center">
+          <p className="text-[12.5px] text-muted-foreground">첫 카운터를 만들어 단수를 세어보세요</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {counters.map(c => <CounterCard key={c.id} counter={c} />)}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={addCounter}
+        className="flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-border bg-transparent px-4 py-3 text-[13px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/40 hover:text-primary"
+      >
+        <Plus className="h-4 w-4" /> 카운터 추가
+      </button>
+    </section>
+  );
+}
+
+function CounterCard({ counter }: { counter: RowCounter }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [name, setName] = useState(counter.name);
+  const [goalStr, setGoalStr] = useState(counter.goal?.toString() || '');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    if (menuOpen) document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuOpen]);
+
+  async function update(patch: Partial<RowCounter>) {
+    await db.rowCounters.update(counter.id!, { ...patch, updatedAt: now() });
+  }
+  async function inc() { vibrate(10); await update({ count: counter.count + 1 }); }
+  async function dec() { if (counter.count <= 0) return; vibrate(8); await update({ count: counter.count - 1 }); }
+  async function reset() { setMenuOpen(false); await update({ count: 0 }); }
+  async function remove() {
+    setMenuOpen(false);
+    if (confirm(`"${counter.name}" 카운터를 삭제할까요?`)) {
+      await db.rowCounters.delete(counter.id!);
+    }
+  }
+  async function saveName() {
+    const trimmed = name.trim() || counter.name;
+    setEditing(false);
+    if (trimmed !== counter.name) await update({ name: trimmed });
+  }
+  async function saveGoal() {
+    setEditingGoal(false);
+    const n = parseInt(goalStr, 10);
+    const goal = isNaN(n) || n <= 0 ? undefined : n;
+    if (goal !== counter.goal) await update({ goal });
+  }
+
+  const pct = counter.goal && counter.goal > 0
+    ? Math.min(100, Math.round((counter.count / counter.goal) * 100))
+    : 0;
+
+  return (
+    <div className="card-soft relative p-4">
+      {/* Header: name + menu */}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        {editing ? (
+          <input
+            autoFocus
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setName(counter.name); setEditing(false); } }}
+            className="min-w-0 flex-1 rounded-lg border border-input bg-card px-2 py-1 text-[14px] font-semibold text-foreground outline-none focus:border-ring/60"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setName(counter.name); setEditing(true); }}
+            className="min-w-0 flex-1 truncate text-left text-[14px] font-semibold text-foreground"
+          >
+            {counter.name}
+          </button>
+        )}
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(v => !v)}
+            className="-m-1 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
+            aria-label="메뉴"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-pop">
+              <MenuItem icon={Pencil} onClick={() => { setMenuOpen(false); setName(counter.name); setEditing(true); }}>이름 수정</MenuItem>
+              <MenuItem icon={RotateCcw} onClick={reset}>0으로 초기화</MenuItem>
+              <MenuItem icon={Trash2} onClick={remove} danger>삭제</MenuItem>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Counter row */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={dec}
+          disabled={counter.count <= 0}
+          aria-label="감소"
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition active:scale-90 disabled:opacity-40"
+        >
+          <Minus className="h-7 w-7" strokeWidth={2.6} />
+        </button>
+
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center">
+          <div className="text-[44px] font-extrabold leading-none tracking-tight text-foreground tabular-nums">
+            {counter.count}
+            <span className="ml-1 text-[18px] font-bold text-muted-foreground">단</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={inc}
+          aria-label="증가"
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft transition active:scale-90"
+        >
+          <Plus className="h-7 w-7" strokeWidth={2.6} />
+        </button>
+      </div>
+
+      {/* Goal */}
+      <div className="mt-3">
+        {editingGoal ? (
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="text-[11.5px] text-muted-foreground">목표</span>
+            <input
+              autoFocus
+              type="number"
+              inputMode="numeric"
+              value={goalStr}
+              onChange={e => setGoalStr(e.target.value)}
+              onBlur={saveGoal}
+              onKeyDown={e => { if (e.key === 'Enter') saveGoal(); if (e.key === 'Escape') { setGoalStr(counter.goal?.toString() || ''); setEditingGoal(false); } }}
+              placeholder="없음"
+              className="w-20 rounded-lg border border-input bg-card px-2 py-1 text-center text-[12px] outline-none focus:border-ring/60"
+            />
+            <span className="text-[11.5px] text-muted-foreground">단</span>
+          </div>
+        ) : counter.goal ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => { setGoalStr(counter.goal!.toString()); setEditingGoal(true); }}
+              className="flex w-full items-center justify-between text-[11.5px] text-muted-foreground hover:text-foreground"
+            >
+              <span>목표: {counter.goal}단</span>
+              <span className="font-semibold tabular-nums">{pct}%</span>
+            </button>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-secondary">
+              <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setGoalStr(''); setEditingGoal(true); }}
+            className="block w-full text-center text-[11.5px] text-muted-foreground hover:text-foreground"
+          >
+            + 목표 단수 설정
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuItem({ icon: Icon, children, onClick, danger }: { icon: any; children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] hover:bg-secondary ${danger ? 'text-destructive' : 'text-foreground'}`}
+    >
+      <Icon className="h-3.5 w-3.5" /> {children}
+    </button>
+  );
+}

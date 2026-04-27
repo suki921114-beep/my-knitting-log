@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import PageHeader from '@/components/PageHeader';
 import { db } from '@/lib/db';
 import { useAllYarnStats } from '@/lib/yarnCalc';
-import { Layers, Scroll, Ruler, Sparkles, ChevronRight } from 'lucide-react';
+import { Layers, Scroll, Ruler, Sparkles, ChevronRight, Calculator } from 'lucide-react';
 
 export default function LibraryHub() {
   const counts = useLiveQuery(async () => ({
@@ -69,6 +69,21 @@ export default function LibraryHub() {
           </li>
         ))}
       </ul>
+
+      <h2 className="section-title mt-6 mb-2">도구</h2>
+      <Link
+        to="/tools/gauge"
+        className="card-soft press-tile flex items-center gap-3.5 p-4 hover:shadow-soft"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-soft text-accent-foreground">
+          <Calculator className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-bold text-foreground">게이지 계산기</div>
+          <div className="mt-0.5 text-[12px] text-muted-foreground">도안 게이지 → 내 게이지 보정</div>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
     </div>
   );
 }

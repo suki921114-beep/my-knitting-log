@@ -114,6 +114,25 @@ export interface ProjectNotion {
   updatedAt: number;
 }
 
+export interface RowCounter {
+  id?: number;
+  projectId: number;
+  name: string;
+  count: number;
+  goal?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface GaugePreset {
+  id?: number;
+  name: string;
+  stitches: number; // per 10cm
+  rows: number;     // per 10cm
+  createdAt: number;
+  updatedAt: number;
+}
+
 class KnitDB extends Dexie {
   projects!: Table<Project, number>;
   patterns!: Table<Pattern, number>;
@@ -124,6 +143,8 @@ class KnitDB extends Dexie {
   projectPatterns!: Table<ProjectPattern, number>;
   projectNeedles!: Table<ProjectNeedle, number>;
   projectNotions!: Table<ProjectNotion, number>;
+  rowCounters!: Table<RowCounter, number>;
+  gaugePresets!: Table<GaugePreset, number>;
 
   constructor() {
     super('knit-db');
@@ -161,6 +182,20 @@ class KnitDB extends Dexie {
         }
       }
     });
+    // v3: row counters & gauge presets
+    this.version(3).stores({
+      projects: '++id, status, updatedAt, name',
+      patterns: '++id, name, updatedAt',
+      yarns: '++id, name, brand, updatedAt',
+      needles: '++id, type, updatedAt',
+      notions: '++id, name, updatedAt',
+      projectYarns: '++id, projectId, yarnId',
+      projectPatterns: '++id, projectId, patternId',
+      projectNeedles: '++id, projectId, needleId',
+      projectNotions: '++id, projectId, notionId',
+      rowCounters: '++id, projectId, updatedAt',
+      gaugePresets: '++id, updatedAt',
+    });
   }
 }
 
@@ -170,7 +205,7 @@ export const now = () => Date.now();
 
 export async function exportAll() {
   const data = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     projects: await db.projects.toArray(),
     patterns: await db.patterns.toArray(),
@@ -181,6 +216,8 @@ export async function exportAll() {
     projectPatterns: await db.projectPatterns.toArray(),
     projectNeedles: await db.projectNeedles.toArray(),
     projectNotions: await db.projectNotions.toArray(),
+    rowCounters: await db.rowCounters.toArray(),
+    gaugePresets: await db.gaugePresets.toArray(),
   };
   return data;
 }
@@ -188,7 +225,7 @@ export async function exportAll() {
 export async function importAll(data: any) {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets],
     async () => {
       if (data.projects) await db.projects.bulkPut(data.projects);
       if (data.patterns) await db.patterns.bulkPut(data.patterns);
@@ -199,6 +236,8 @@ export async function importAll(data: any) {
       if (data.projectPatterns) await db.projectPatterns.bulkPut(data.projectPatterns);
       if (data.projectNeedles) await db.projectNeedles.bulkPut(data.projectNeedles);
       if (data.projectNotions) await db.projectNotions.bulkPut(data.projectNotions);
+      if (data.rowCounters) await db.rowCounters.bulkPut(data.rowCounters);
+      if (data.gaugePresets) await db.gaugePresets.bulkPut(data.gaugePresets);
     }
   );
 }
@@ -206,7 +245,7 @@ export async function importAll(data: any) {
 export async function clearAll() {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets],
     async () => {
       await Promise.all([
         db.projects.clear(),
@@ -218,7 +257,10 @@ export async function clearAll() {
         db.projectPatterns.clear(),
         db.projectNeedles.clear(),
         db.projectNotions.clear(),
+        db.rowCounters.clear(),
+        db.gaugePresets.clear(),
       ]);
     }
   );
 }
+
