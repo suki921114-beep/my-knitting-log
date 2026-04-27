@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
-import { Plus, Scroll, AlertTriangle, ArrowRight, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Plus, Scroll, ArrowRight, Layers, Sparkles, Image as ImageIcon } from 'lucide-react';
 
 export default function Home() {
   const inProgress = useLiveQuery(
@@ -11,9 +11,9 @@ export default function Home() {
   );
   const allProjects = useLiveQuery(() => db.projects.toArray(), []) || [];
   const yarnStats = useAllYarnStats() || [];
-  const lowStock = yarnStats
-    .filter(s => s.remaining <= Math.max(20, s.yarn.totalGrams * 0.1))
-    .sort((a, b) => a.remaining - b.remaining)
+  const topRemaining = yarnStats
+    .filter(s => s.remaining > 0)
+    .sort((a, b) => b.remaining - a.remaining)
     .slice(0, 4);
 
   const stats = {
