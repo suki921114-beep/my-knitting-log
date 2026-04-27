@@ -75,6 +75,7 @@ export default function ProjectForm() {
         id: l.id,
         yarnId: l.yarnId,
         usedGrams: l.usedGrams,
+        plannedGrams: l.plannedGrams,
         colorNote: l.colorNote || '',
         usageNote: l.usageNote || '',
       }))
