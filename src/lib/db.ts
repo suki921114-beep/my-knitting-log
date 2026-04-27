@@ -182,6 +182,20 @@ class KnitDB extends Dexie {
         }
       }
     });
+    // v3: row counters & gauge presets
+    this.version(3).stores({
+      projects: '++id, status, updatedAt, name',
+      patterns: '++id, name, updatedAt',
+      yarns: '++id, name, brand, updatedAt',
+      needles: '++id, type, updatedAt',
+      notions: '++id, name, updatedAt',
+      projectYarns: '++id, projectId, yarnId',
+      projectPatterns: '++id, projectId, patternId',
+      projectNeedles: '++id, projectId, needleId',
+      projectNotions: '++id, projectId, notionId',
+      rowCounters: '++id, projectId, updatedAt',
+      gaugePresets: '++id, updatedAt',
+    });
   }
 }
 
