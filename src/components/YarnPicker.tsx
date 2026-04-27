@@ -1,12 +1,13 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, Yarn } from '@/lib/db';
-import { Plus, X, Search, Check } from 'lucide-react';
+import { Plus, X, Search, Check, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export interface YarnLink {
   id?: number; // existing projectYarn id
   yarnId: number;
   usedGrams: number;
+  plannedGrams?: number;
   colorNote?: string;
   usageNote?: string;
 }
@@ -14,13 +15,28 @@ export interface YarnLink {
 interface Props {
   links: YarnLink[];
   onChange: (l: YarnLink[]) => void;
+  /** When true (planned project), shows planned-vs-remaining shortage UI instead of usedGrams */
+  showPlanned?: boolean;
+  /** Project id being edited; excluded from "used by other projects" calc */
+  currentProjectId?: number;
 }
 
-export default function YarnPicker({ links, onChange }: Props) {
+export default function YarnPicker({ links, onChange, showPlanned, currentProjectId }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const yarns = useLiveQuery(() => db.yarns.orderBy('updatedAt').reverse().toArray(), []) || [];
   const yarnMap = useMemo(() => new Map(yarns.map(y => [y.id!, y])), [yarns]);
+
+  // Used by *other* projects — for shortage calc when planning
+  const allLinks = useLiveQuery(() => db.projectYarns.toArray(), []) || [];
+  const usedByOthers = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const l of allLinks) {
+      if (currentProjectId && l.projectId === currentProjectId) continue;
+      m.set(l.yarnId, (m.get(l.yarnId) || 0) + (l.usedGrams || 0));
+    }
+    return m;
+  }, [allLinks, currentProjectId]);
 
   function update(idx: number, patch: Partial<YarnLink>) {
     const next = links.slice();
@@ -49,6 +65,9 @@ export default function YarnPicker({ links, onChange }: Props) {
 
       {links.map((l, i) => {
         const y = yarnMap.get(l.yarnId);
+        const remaining = y ? y.totalGrams - (usedByOthers.get(l.yarnId) || 0) : 0;
+        const planned = l.plannedGrams || 0;
+        const shortage = planned > 0 ? planned - remaining : 0;
         return (
           <div key={i} className="card-soft p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -62,24 +81,67 @@ export default function YarnPicker({ links, onChange }: Props) {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={l.usedGrams}
-                onChange={e => update(i, { usedGrams: Number(e.target.value) || 0 })}
-                className="w-24 rounded-lg border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary"
-                placeholder="0"
-              />
-              <span className="text-xs text-muted-foreground">g 사용</span>
-              <input
-                value={l.colorNote || ''}
-                onChange={e => update(i, { colorNote: e.target.value })}
-                placeholder="색상 메모"
-                className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-primary"
-              />
-            </div>
+
+            {showPlanned ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    value={l.plannedGrams ?? ''}
+                    onChange={e => update(i, { plannedGrams: e.target.value === '' ? undefined : Number(e.target.value) || 0 })}
+                    className="w-24 rounded-lg border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary"
+                    placeholder="0"
+                  />
+                  <span className="text-xs text-muted-foreground">g 예상 소요</span>
+                  <input
+                    value={l.colorNote || ''}
+                    onChange={e => update(i, { colorNote: e.target.value })}
+                    placeholder="색상 메모"
+                    className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-primary"
+                  />
+                </div>
+                {y && (
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-secondary/50 px-2.5 py-1.5 text-[11.5px]">
+                    <span className="text-muted-foreground">
+                      잔여 <span className="font-semibold text-foreground tabular-nums">{remaining}g</span>
+                      <span className="opacity-70"> / 총 {y.totalGrams}g</span>
+                    </span>
+                    {planned > 0 && (
+                      shortage > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-destructive">
+                          <AlertTriangle className="h-3 w-3" /> {shortage}g 부족
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-semibold text-primary">
+                          <CheckCircle2 className="h-3 w-3" /> 충분
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={l.usedGrams}
+                  onChange={e => update(i, { usedGrams: Number(e.target.value) || 0 })}
+                  className="w-24 rounded-lg border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary"
+                  placeholder="0"
+                />
+                <span className="text-xs text-muted-foreground">g 사용</span>
+                <input
+                  value={l.colorNote || ''}
+                  onChange={e => update(i, { colorNote: e.target.value })}
+                  placeholder="색상 메모"
+                  className="flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-primary"
+                />
+              </div>
+            )}
           </div>
         );
       })}
