@@ -30,11 +30,13 @@ export default function Home() {
         <h1 className="text-[24px] font-extrabold leading-tight tracking-tight text-foreground">내 작업실</h1>
       </header>
 
-      {/* Mini stats — clickable */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* Mini stats — project status */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatLink to="/projects?status=planned" label="예정" value={stats.planned} tone="neutral" />
         <StatLink to="/projects?status=in_progress" label="진행중" value={stats.inProgress} tone="primary" />
         <StatLink to="/projects?status=done" label="완성" value={stats.done} tone="accent" />
-        <StatLink to="/library/yarns" label="보유 실" value={stats.yarns} tone="neutral" /></div>
+        <StatLink to="/projects?status=on_hold" label="보류" value={stats.onHold} tone="muted" />
+      </div>
 
       {/* Quick actions */}
       <section>
