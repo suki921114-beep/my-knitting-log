@@ -106,10 +106,11 @@ export default function Home() {
   );
 }
 
-function StatLink({ to, label, value, tone }: { to: string; label: string; value: number; tone: 'primary' | 'accent' | 'neutral' }) {
+function StatLink({ to, label, value, tone }: { to: string; label: string; value: number; tone: 'primary' | 'accent' | 'neutral' | 'muted' }) {
   const toneClass =
     tone === 'primary' ? 'bg-primary-soft text-primary' :
     tone === 'accent' ? 'bg-accent-soft text-accent-foreground' :
+    tone === 'muted' ? 'bg-muted text-muted-foreground' :
     'bg-secondary text-foreground';
   return (
     <Link
