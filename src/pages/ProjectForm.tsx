@@ -118,10 +118,12 @@ export default function ProjectForm() {
       projectId: pid!,
       yarnId: l.yarnId,
       usedGrams: l.usedGrams,
+      plannedGrams: l.plannedGrams,
       colorNote: l.colorNote || undefined,
       usageNote: l.usageNote || undefined,
     }), l => ({
       usedGrams: l.usedGrams,
+      plannedGrams: l.plannedGrams,
       colorNote: l.colorNote || undefined,
       usageNote: l.usageNote || undefined,
       updatedAt: t,
