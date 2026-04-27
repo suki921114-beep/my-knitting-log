@@ -17,9 +17,10 @@ export default function Home() {
     .slice(0, 4);
 
   const stats = {
+    planned: allProjects.filter(p => p.status === 'planned').length,
     inProgress: allProjects.filter(p => p.status === 'in_progress').length,
     done: allProjects.filter(p => p.status === 'done').length,
-    yarns: yarnStats.length,
+    onHold: allProjects.filter(p => p.status === 'on_hold').length,
   };
 
   return (
