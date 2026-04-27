@@ -114,6 +114,25 @@ export interface ProjectNotion {
   updatedAt: number;
 }
 
+export interface RowCounter {
+  id?: number;
+  projectId: number;
+  name: string;
+  count: number;
+  goal?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface GaugePreset {
+  id?: number;
+  name: string;
+  stitches: number; // per 10cm
+  rows: number;     // per 10cm
+  createdAt: number;
+  updatedAt: number;
+}
+
 class KnitDB extends Dexie {
   projects!: Table<Project, number>;
   patterns!: Table<Pattern, number>;
@@ -124,6 +143,8 @@ class KnitDB extends Dexie {
   projectPatterns!: Table<ProjectPattern, number>;
   projectNeedles!: Table<ProjectNeedle, number>;
   projectNotions!: Table<ProjectNotion, number>;
+  rowCounters!: Table<RowCounter, number>;
+  gaugePresets!: Table<GaugePreset, number>;
 
   constructor() {
     super('knit-db');
