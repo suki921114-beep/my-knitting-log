@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import { Pencil, Image as ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 import RowCounterSection from '@/components/RowCounterSection';
+import ProjectGaugeSection from '@/components/ProjectGaugeSection';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -57,17 +58,9 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {photos.length > 0 && (
-        <Section title="사진">
-          <div className="grid grid-cols-3 gap-2">
-            {photos.map((src, i) => (
-              <button key={i} onClick={() => setLightbox(src)} className="aspect-square overflow-hidden rounded-xl border bg-muted">
-                <img src={src} alt={`사진 ${i + 1}`} className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
-        </Section>
-      )}
+      <RowCounterSection projectId={pid} />
+
+      <ProjectGaugeSection projectId={pid} />
 
       <Section title="도안">
         {patternLinks.length === 0 ? (
@@ -168,7 +161,17 @@ export default function ProjectDetail() {
         )}
       </Section>
 
-      <RowCounterSection projectId={pid} />
+      {photos.length > 0 && (
+        <Section title="사진">
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((src, i) => (
+              <button key={i} onClick={() => setLightbox(src)} className="aspect-square overflow-hidden rounded-xl border bg-muted">
+                <img src={src} alt={`사진 ${i + 1}`} className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {project.progressNote && (
         <Section title="진행 메모">
