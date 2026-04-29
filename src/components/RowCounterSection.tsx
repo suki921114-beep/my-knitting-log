@@ -25,7 +25,7 @@ export default function RowCounterSection({ projectId }: { projectId: number }) 
   }
 
   return (
-    <section className="space-y-2">
+    <section className="space-y-2.5">
       <h2 className="section-title">단수 카운터</h2>
 
       {counters.length === 0 ? (
@@ -33,7 +33,7 @@ export default function RowCounterSection({ projectId }: { projectId: number }) 
           <p className="text-[12.5px] text-muted-foreground">첫 카운터를 만들어 단수를 세어보세요</p>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
           {counters.map(c => <CounterCard key={c.id} counter={c} />)}
         </div>
       )}
@@ -41,7 +41,7 @@ export default function RowCounterSection({ projectId }: { projectId: number }) 
       <button
         type="button"
         onClick={addCounter}
-        className="flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-border bg-transparent px-4 py-3 text-[13px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/40 hover:text-primary"
+        className="flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-border bg-transparent px-4 py-2.5 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/40 hover:text-primary"
       >
         <Plus className="h-4 w-4" /> 카운터 추가
       </button>
@@ -94,9 +94,9 @@ function CounterCard({ counter }: { counter: RowCounter }) {
     : 0;
 
   return (
-    <div className="card-soft relative p-4">
+    <div className="card-soft relative flex flex-col p-3">
       {/* Header: name + menu */}
-      <div className="mb-3 flex items-start justify-between gap-2">
+      <div className="mb-1.5 flex items-start justify-between gap-1">
         {editing ? (
           <input
             autoFocus
@@ -104,13 +104,13 @@ function CounterCard({ counter }: { counter: RowCounter }) {
             onChange={e => setName(e.target.value)}
             onBlur={saveName}
             onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setName(counter.name); setEditing(false); } }}
-            className="min-w-0 flex-1 rounded-lg border border-input bg-card px-2 py-1 text-[14px] font-semibold text-foreground outline-none focus:border-ring/60"
+            className="min-w-0 flex-1 rounded-md border border-input bg-card px-1.5 py-0.5 text-[12.5px] font-semibold text-foreground outline-none focus:border-ring/60"
           />
         ) : (
           <button
             type="button"
             onClick={() => { setName(counter.name); setEditing(true); }}
-            className="min-w-0 flex-1 truncate text-left text-[14px] font-semibold text-foreground"
+            className="min-w-0 flex-1 truncate text-left text-[12.5px] font-semibold text-foreground"
           >
             {counter.name}
           </button>
@@ -119,13 +119,13 @@ function CounterCard({ counter }: { counter: RowCounter }) {
           <button
             type="button"
             onClick={() => setMenuOpen(v => !v)}
-            className="-m-1 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
+            className="-m-1 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
             aria-label="메뉴"
           >
-            <MoreHorizontal className="h-4 w-4" />
+            <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-pop">
+            <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-pop">
               <MenuItem icon={Pencil} onClick={() => { setMenuOpen(false); setName(counter.name); setEditing(true); }}>이름 수정</MenuItem>
               <MenuItem icon={RotateCcw} onClick={reset}>0으로 초기화</MenuItem>
               <MenuItem icon={Trash2} onClick={remove} danger>삭제</MenuItem>
@@ -134,40 +134,19 @@ function CounterCard({ counter }: { counter: RowCounter }) {
         </div>
       </div>
 
-      {/* Counter row */}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={dec}
-          disabled={counter.count <= 0}
-          aria-label="감소"
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition active:scale-90 disabled:opacity-40"
-        >
-          <Minus className="h-7 w-7" strokeWidth={2.6} />
-        </button>
-
-        <div className="flex min-w-0 flex-1 flex-col items-center justify-center">
-          <div className="text-[44px] font-extrabold leading-none tracking-tight text-foreground tabular-nums">
-            {counter.count}
-            <span className="ml-1 text-[18px] font-bold text-muted-foreground">단</span>
-          </div>
+      {/* Big count */}
+      <div className="text-center">
+        <div className="text-[34px] font-extrabold leading-none tracking-tight text-foreground tabular-nums">
+          {counter.count}
+          <span className="ml-0.5 text-[13px] font-bold text-muted-foreground">단</span>
         </div>
-
-        <button
-          type="button"
-          onClick={inc}
-          aria-label="증가"
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft transition active:scale-90"
-        >
-          <Plus className="h-7 w-7" strokeWidth={2.6} />
-        </button>
       </div>
 
-      {/* Goal */}
-      <div className="mt-3">
+      {/* Goal / progress */}
+      <div className="mt-1.5">
         {editingGoal ? (
-          <div className="flex items-center justify-center gap-1.5">
-            <span className="text-[11.5px] text-muted-foreground">목표</span>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-[10.5px] text-muted-foreground">목표</span>
             <input
               autoFocus
               type="number"
@@ -176,34 +155,55 @@ function CounterCard({ counter }: { counter: RowCounter }) {
               onChange={e => setGoalStr(e.target.value)}
               onBlur={saveGoal}
               onKeyDown={e => { if (e.key === 'Enter') saveGoal(); if (e.key === 'Escape') { setGoalStr(counter.goal?.toString() || ''); setEditingGoal(false); } }}
-              placeholder="없음"
-              className="w-20 rounded-lg border border-input bg-card px-2 py-1 text-center text-[12px] outline-none focus:border-ring/60"
+              placeholder="—"
+              className="w-12 rounded-md border border-input bg-card px-1 py-0.5 text-center text-[11px] outline-none focus:border-ring/60"
             />
-            <span className="text-[11.5px] text-muted-foreground">단</span>
+            <span className="text-[10.5px] text-muted-foreground">단</span>
           </div>
         ) : counter.goal ? (
-          <div>
-            <button
-              type="button"
-              onClick={() => { setGoalStr(counter.goal!.toString()); setEditingGoal(true); }}
-              className="flex w-full items-center justify-between text-[11.5px] text-muted-foreground hover:text-foreground"
-            >
-              <span>목표: {counter.goal}단</span>
+          <button
+            type="button"
+            onClick={() => { setGoalStr(counter.goal!.toString()); setEditingGoal(true); }}
+            className="block w-full text-left"
+          >
+            <div className="flex items-center justify-between text-[10.5px] text-muted-foreground">
+              <span>/ {counter.goal}단</span>
               <span className="font-semibold tabular-nums">{pct}%</span>
-            </button>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-secondary">
+            </div>
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-secondary">
               <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
             </div>
-          </div>
+          </button>
         ) : (
           <button
             type="button"
             onClick={() => { setGoalStr(''); setEditingGoal(true); }}
-            className="block w-full text-center text-[11.5px] text-muted-foreground hover:text-foreground"
+            className="block w-full text-center text-[10.5px] text-muted-foreground hover:text-foreground"
           >
-            + 목표 단수 설정
+            + 목표 설정
           </button>
         )}
+      </div>
+
+      {/* +/- buttons */}
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={dec}
+          disabled={counter.count <= 0}
+          aria-label="감소"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition active:scale-90 disabled:opacity-40"
+        >
+          <Minus className="h-5 w-5" strokeWidth={2.6} />
+        </button>
+        <button
+          type="button"
+          onClick={inc}
+          aria-label="증가"
+          className="flex h-11 flex-1 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft transition active:scale-95"
+        >
+          <Plus className="h-5 w-5" strokeWidth={2.8} />
+        </button>
       </div>
     </div>
   );
