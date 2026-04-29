@@ -133,6 +133,22 @@ export interface GaugePreset {
   updatedAt: number;
 }
 
+export interface ProjectGauge {
+  id?: number;
+  projectId: number;
+  name: string;
+  patternStitches: number; // per 10cm
+  patternRows: number;     // per 10cm
+  myStitches: number;      // per 10cm
+  myRows: number;          // per 10cm
+  targetCm: number;
+  resultStitches: number;
+  resultRows: number;
+  memo?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 class KnitDB extends Dexie {
   projects!: Table<Project, number>;
   patterns!: Table<Pattern, number>;
