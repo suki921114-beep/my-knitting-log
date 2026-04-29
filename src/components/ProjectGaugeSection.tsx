@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, now, ProjectGauge, RowCounter } from '@/lib/db';
+import { db, now, ProjectGauge, RowCounter, GaugeMode } from '@/lib/db';
 import { Plus, Trash2, ChevronDown, Save, Target } from 'lucide-react';
 
 interface Props { projectId: number }
@@ -8,11 +8,14 @@ interface Props { projectId: number }
 const blank = (projectId: number): ProjectGauge => ({
   projectId,
   name: '',
+  mode: 'pattern',
   patternStitches: 0,
   patternRows: 0,
   myStitches: 0,
   myRows: 0,
   targetCm: 0,
+  patternTargetStitches: 0,
+  patternTargetRows: 0,
   resultStitches: 0,
   resultRows: 0,
   memo: '',
@@ -26,7 +29,7 @@ export default function ProjectGaugeSection({ projectId }: Props) {
     [projectId]
   ) || [];
 
-  const [openId, setOpenId] = useState<number | 'new' | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   async function addNew() {
     const t = now();
@@ -46,6 +49,7 @@ export default function ProjectGaugeSection({ projectId }: Props) {
       {items.length === 0 ? (
         <div className="rounded-2xl bg-secondary/60 px-4 py-6 text-center">
           <p className="text-[12.5px] text-muted-foreground">부위별 게이지 계산을 저장해두세요</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">예: 몸통, 왼쪽 소매, 넥밴드</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -78,25 +82,38 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
     [projectId]
   ) || [];
 
+  const [mode, setMode] = useState<GaugeMode>(gauge.mode || 'pattern');
   const [name, setName] = useState(gauge.name);
   const [pSt, setPSt] = useState(str(gauge.patternStitches));
   const [pRows, setPRows] = useState(str(gauge.patternRows));
   const [mSt, setMSt] = useState(str(gauge.myStitches));
   const [mRows, setMRows] = useState(str(gauge.myRows));
+  const [ptSt, setPtSt] = useState(str(gauge.patternTargetStitches || 0));
+  const [ptRows, setPtRows] = useState(str(gauge.patternTargetRows || 0));
   const [tCm, setTCm] = useState(str(gauge.targetCm));
   const [memo, setMemo] = useState(gauge.memo || '');
 
-  const pStN = num(pSt), pRowsN = num(pRows), mStN = num(mSt), mRowsN = num(mRows), tCmN = num(tCm);
-  const resultSt = pStN > 0 && mStN > 0 && tCmN > 0 ? Math.round((tCmN / 10) * mStN) : 0;
-  const resultRows = pRowsN > 0 && mRowsN > 0 && tCmN > 0 ? Math.round((tCmN / 10) * mRowsN) : 0;
+  const pStN = num(pSt), pRowsN = num(pRows), mStN = num(mSt), mRowsN = num(mRows);
+  const ptStN = num(ptSt), ptRowsN = num(ptRows), tCmN = num(tCm);
+
+  const resultSt = mode === 'pattern'
+    ? (pStN > 0 && mStN > 0 && ptStN > 0 ? Math.round(ptStN * (mStN / pStN)) : 0)
+    : (mStN > 0 && tCmN > 0 ? Math.round((tCmN / 10) * mStN) : 0);
+
+  const resultRows = mode === 'pattern'
+    ? (pRowsN > 0 && mRowsN > 0 && ptRowsN > 0 ? Math.round(ptRowsN * (mRowsN / pRowsN)) : 0)
+    : (mRowsN > 0 && tCmN > 0 ? Math.round((tCmN / 10) * mRowsN) : 0);
 
   async function save() {
     await db.projectGauges.update(gauge.id!, {
       name: name.trim() || gauge.name,
+      mode,
       patternStitches: pStN,
       patternRows: pRowsN,
       myStitches: mStN,
       myRows: mRowsN,
+      patternTargetStitches: ptStN || undefined,
+      patternTargetRows: ptRowsN || undefined,
       targetCm: tCmN,
       resultStitches: resultSt,
       resultRows: resultRows,
@@ -111,10 +128,9 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
     }
   }
 
-  async function applyToCounter(counterId: number, target: 'rows' | 'stitches') {
-    const value = target === 'rows' ? resultRows : resultSt;
-    if (value <= 0) return;
-    await db.rowCounters.update(counterId, { goal: value, updatedAt: now() });
+  async function applyToCounter(counterId: number) {
+    if (resultRows <= 0) return;
+    await db.rowCounters.update(counterId, { goal: resultRows, updatedAt: now() });
   }
 
   return (
@@ -128,9 +144,8 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
           <div className="truncate text-[13.5px] font-semibold text-foreground">{gauge.name}</div>
           {(gauge.resultStitches > 0 || gauge.resultRows > 0) && (
             <div className="mt-0.5 truncate text-[11px] text-muted-foreground tabular-nums">
-              {gauge.targetCm > 0 && `${gauge.targetCm}cm · `}
               {gauge.resultStitches > 0 && `${gauge.resultStitches}코`}
-              {gauge.resultStitches > 0 && gauge.resultRows > 0 && ' / '}
+              {gauge.resultStitches > 0 && gauge.resultRows > 0 && ' · '}
               {gauge.resultRows > 0 && `${gauge.resultRows}단`}
             </div>
           )}
@@ -140,59 +155,65 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
 
       {open && (
         <div className="space-y-3 border-t border-border/70 px-3.5 py-3">
+          {/* Name */}
           <Field label="이름">
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="예: 몸통, 소매"
+              placeholder="예: 몸통, 왼쪽 소매"
               className="w-full rounded-lg border border-input bg-card px-2.5 py-2 text-[13px] outline-none focus:border-ring/60"
             />
           </Field>
 
+          {/* Mode toggle */}
+          <div className="flex rounded-full bg-secondary p-0.5">
+            <ModeBtn active={mode === 'pattern'} onClick={() => setMode('pattern')}>도안 수치 기준</ModeBtn>
+            <ModeBtn active={mode === 'cm'} onClick={() => setMode('cm')}>치수(cm) 기준</ModeBtn>
+          </div>
+
+          {/* 2x2 gauge comparison */}
           <div>
-            <div className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">도안 게이지 (10cm)</div>
+            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">게이지 비교 (10cm)</div>
             <div className="grid grid-cols-2 gap-2">
-              <NumField label="코수" value={pSt} onChange={setPSt} />
-              <NumField label="단수" value={pRows} onChange={setPRows} />
+              <SquareInput label="도안 코수" value={pSt} onChange={setPSt} variant="muted" />
+              <SquareInput label="도안 단수" value={pRows} onChange={setPRows} variant="muted" />
+              <SquareInput label="내 코수" value={mSt} onChange={setMSt} variant="primary" />
+              <SquareInput label="내 단수" value={mRows} onChange={setMRows} variant="primary" />
             </div>
           </div>
 
+          {/* Inputs based on mode */}
+          {mode === 'pattern' ? (
+            <div>
+              <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">도안에 적힌 수량</div>
+              <div className="grid grid-cols-2 gap-2">
+                <SquareInput label="도안 코수" value={ptSt} onChange={setPtSt} variant="accent" suffix="코" />
+                <SquareInput label="도안 단수" value={ptRows} onChange={setPtRows} variant="accent" suffix="단" />
+              </div>
+            </div>
+          ) : (
+            <Field label="목표 치수 (cm)">
+              <input
+                type="number"
+                inputMode="decimal"
+                value={tCm}
+                onChange={e => setTCm(e.target.value)}
+                placeholder="예: 50"
+                className="w-full rounded-lg border border-input bg-card px-2.5 py-2 text-center text-[14px] font-semibold tabular-nums outline-none focus:border-ring/60"
+              />
+            </Field>
+          )}
+
+          {/* Result cards */}
           <div>
-            <div className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">내 게이지 (10cm)</div>
+            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">내 게이지 기준 결과</div>
             <div className="grid grid-cols-2 gap-2">
-              <NumField label="코수" value={mSt} onChange={setMSt} />
-              <NumField label="단수" value={mRows} onChange={setMRows} />
+              <ResultCard label="필요 코수" value={resultSt} unit="코" />
+              <ResultCard label="필요 단수" value={resultRows} unit="단" />
             </div>
-          </div>
-
-          <Field label="목표 치수 (cm)">
-            <input
-              type="number"
-              inputMode="decimal"
-              value={tCm}
-              onChange={e => setTCm(e.target.value)}
-              placeholder="예: 50"
-              className="w-full rounded-lg border border-input bg-card px-2.5 py-2 text-center text-[14px] font-semibold tabular-nums outline-none focus:border-ring/60"
-            />
-          </Field>
-
-          <div className="rounded-xl bg-primary-soft px-3 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-primary/70">필요 수량</div>
-            <div className="mt-1 flex items-baseline justify-around gap-2">
-              <div className="text-center">
-                <div className="text-[26px] font-extrabold leading-none tabular-nums text-primary">
-                  {resultSt || '—'}
-                </div>
-                <div className="mt-0.5 text-[10.5px] font-semibold text-primary/70">코</div>
-              </div>
-              <div className="h-8 w-px bg-primary/20" />
-              <div className="text-center">
-                <div className="text-[26px] font-extrabold leading-none tabular-nums text-primary">
-                  {resultRows || '—'}
-                </div>
-                <div className="mt-0.5 text-[10.5px] font-semibold text-primary/70">단</div>
-              </div>
-            </div>
+            <p className="mt-1.5 text-center text-[10.5px] text-muted-foreground">
+              {mode === 'pattern' ? '도안 수치 × (내 게이지 ÷ 도안 게이지)' : '치수 × (내 게이지 ÷ 10cm)'}
+            </p>
           </div>
 
           <Field label="메모 (선택)">
@@ -212,7 +233,7 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {counters.map(c => (
-                  <ApplyButton key={c.id} counter={c} onApply={() => applyToCounter(c.id!, 'rows')} value={resultRows} />
+                  <ApplyButton key={c.id} counter={c} onApply={() => applyToCounter(c.id!)} value={resultRows} />
                 ))}
               </div>
             </div>
@@ -241,6 +262,71 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
   );
 }
 
+function ModeBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition ${
+        active ? 'bg-card text-foreground shadow-soft' : 'text-muted-foreground'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SquareInput({
+  label, value, onChange, variant, suffix,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  variant: 'muted' | 'primary' | 'accent';
+  suffix?: string;
+}) {
+  const styles = {
+    muted: 'bg-secondary/60 border-border',
+    primary: 'bg-primary-soft border-primary/20',
+    accent: 'bg-accent-soft border-accent/30',
+  }[variant];
+  const labelColor = {
+    muted: 'text-muted-foreground',
+    primary: 'text-primary/80',
+    accent: 'text-accent-foreground/80',
+  }[variant];
+  return (
+    <label className={`flex aspect-square flex-col justify-between rounded-2xl border ${styles} p-2.5`}>
+      <span className={`text-[10.5px] font-bold uppercase tracking-wider ${labelColor}`}>{label}</span>
+      <div className="flex items-baseline justify-center gap-0.5">
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="—"
+          className="w-full min-w-0 bg-transparent text-center text-[26px] font-extrabold tabular-nums leading-none text-foreground outline-none placeholder:text-muted-foreground/40"
+        />
+        {suffix && <span className="text-[12px] font-bold text-muted-foreground">{suffix}</span>}
+      </div>
+      <span className="text-center text-[9.5px] text-muted-foreground">10cm</span>
+    </label>
+  );
+}
+
+function ResultCard({ label, value, unit }: { label: string; value: number; unit: string }) {
+  return (
+    <div className="flex aspect-square flex-col items-center justify-center rounded-2xl bg-primary px-3 py-2.5 text-primary-foreground shadow-soft">
+      <div className="text-[10.5px] font-bold uppercase tracking-wider opacity-80">{label}</div>
+      <div className="mt-1 flex items-baseline gap-0.5">
+        <span className="text-[36px] font-extrabold leading-none tabular-nums">{value > 0 ? value : '—'}</span>
+        <span className="text-[14px] font-bold opacity-90">{unit}</span>
+      </div>
+      <div className="mt-1 text-[9.5px] opacity-70">내 게이지 기준</div>
+    </div>
+  );
+}
+
 function ApplyButton({ counter, onApply, value }: { counter: RowCounter; onApply: () => void | Promise<void>; value: number }) {
   const [done, setDone] = useState(false);
   return (
@@ -259,21 +345,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <label className="block">
       <span className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
       {children}
-    </label>
-  );
-}
-
-function NumField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-[10.5px] font-semibold text-muted-foreground">{label}</span>
-      <input
-        type="number"
-        inputMode="decimal"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full rounded-lg border border-input bg-card px-2 py-2 text-center text-[14px] font-semibold tabular-nums outline-none focus:border-ring/60"
-      />
     </label>
   );
 }

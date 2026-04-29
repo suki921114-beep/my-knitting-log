@@ -133,15 +133,24 @@ export interface GaugePreset {
   updatedAt: number;
 }
 
+export type GaugeMode = 'pattern' | 'cm';
+
 export interface ProjectGauge {
   id?: number;
   projectId: number;
   name: string;
+  /** 'pattern' (default): 도안 코수/단수 기준  |  'cm': 목표 치수(cm) 기준 */
+  mode?: GaugeMode;
   patternStitches: number; // per 10cm
   patternRows: number;     // per 10cm
   myStitches: number;      // per 10cm
   myRows: number;          // per 10cm
+  /** 'cm' 모드에서 사용 */
   targetCm: number;
+  /** 'pattern' 모드에서 사용: 도안에 적힌 코수 */
+  patternTargetStitches?: number;
+  /** 'pattern' 모드에서 사용: 도안에 적힌 단수 */
+  patternTargetRows?: number;
   resultStitches: number;
   resultRows: number;
   memo?: string;
