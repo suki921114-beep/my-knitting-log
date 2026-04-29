@@ -133,6 +133,22 @@ export interface GaugePreset {
   updatedAt: number;
 }
 
+export interface ProjectGauge {
+  id?: number;
+  projectId: number;
+  name: string;
+  patternStitches: number; // per 10cm
+  patternRows: number;     // per 10cm
+  myStitches: number;      // per 10cm
+  myRows: number;          // per 10cm
+  targetCm: number;
+  resultStitches: number;
+  resultRows: number;
+  memo?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 class KnitDB extends Dexie {
   projects!: Table<Project, number>;
   patterns!: Table<Pattern, number>;
@@ -145,6 +161,7 @@ class KnitDB extends Dexie {
   projectNotions!: Table<ProjectNotion, number>;
   rowCounters!: Table<RowCounter, number>;
   gaugePresets!: Table<GaugePreset, number>;
+  projectGauges!: Table<ProjectGauge, number>;
 
   constructor() {
     super('knit-db');
@@ -196,6 +213,21 @@ class KnitDB extends Dexie {
       rowCounters: '++id, projectId, updatedAt',
       gaugePresets: '++id, updatedAt',
     });
+    // v4: per-project gauge calculations
+    this.version(4).stores({
+      projects: '++id, status, updatedAt, name',
+      patterns: '++id, name, updatedAt',
+      yarns: '++id, name, brand, updatedAt',
+      needles: '++id, type, updatedAt',
+      notions: '++id, name, updatedAt',
+      projectYarns: '++id, projectId, yarnId',
+      projectPatterns: '++id, projectId, patternId',
+      projectNeedles: '++id, projectId, needleId',
+      projectNotions: '++id, projectId, notionId',
+      rowCounters: '++id, projectId, updatedAt',
+      gaugePresets: '++id, updatedAt',
+      projectGauges: '++id, projectId, updatedAt',
+    });
   }
 }
 
@@ -218,6 +250,7 @@ export async function exportAll() {
     projectNotions: await db.projectNotions.toArray(),
     rowCounters: await db.rowCounters.toArray(),
     gaugePresets: await db.gaugePresets.toArray(),
+    projectGauges: await db.projectGauges.toArray(),
   };
   return data;
 }
@@ -225,7 +258,7 @@ export async function exportAll() {
 export async function importAll(data: any) {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
     async () => {
       if (data.projects) await db.projects.bulkPut(data.projects);
       if (data.patterns) await db.patterns.bulkPut(data.patterns);
@@ -238,6 +271,7 @@ export async function importAll(data: any) {
       if (data.projectNotions) await db.projectNotions.bulkPut(data.projectNotions);
       if (data.rowCounters) await db.rowCounters.bulkPut(data.rowCounters);
       if (data.gaugePresets) await db.gaugePresets.bulkPut(data.gaugePresets);
+      if (data.projectGauges) await db.projectGauges.bulkPut(data.projectGauges);
     }
   );
 }
@@ -245,7 +279,7 @@ export async function importAll(data: any) {
 export async function clearAll() {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
     async () => {
       await Promise.all([
         db.projects.clear(),
@@ -259,6 +293,7 @@ export async function clearAll() {
         db.projectNotions.clear(),
         db.rowCounters.clear(),
         db.gaugePresets.clear(),
+        db.projectGauges.clear(),
       ]);
     }
   );

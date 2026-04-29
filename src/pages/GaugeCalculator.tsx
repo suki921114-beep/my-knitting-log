@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, now, GaugePreset } from '@/lib/db';
+import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
-import { Bookmark, X } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 
 export default function GaugeCalculator() {
-  const presets = useLiveQuery(
-    () => db.gaugePresets.orderBy('updatedAt').reverse().limit(3).toArray(),
+  const projects = useLiveQuery(
+    () => db.projects.orderBy('updatedAt').reverse().toArray(),
     []
   ) || [];
 
@@ -17,82 +17,44 @@ export default function GaugeCalculator() {
   const [targetSt, setTargetSt] = useState('');
   const [targetRows, setTargetRows] = useState('');
 
-  const num = (v: string) => {
-    const n = parseFloat(v);
-    return isNaN(n) ? 0 : n;
-  };
+  const [savePickerOpen, setSavePickerOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const pSt = num(patternSt);
-  const pRows = num(patternRows);
-  const mSt = num(mySt);
-  const mRows = num(myRows);
-  const tSt = num(targetSt);
-  const tRows = num(targetRows);
+  const num = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+  const pSt = num(patternSt), pRows = num(patternRows);
+  const mSt = num(mySt), mRows = num(myRows);
+  const tSt = num(targetSt), tRows = num(targetRows);
 
   const adjStitches = pSt > 0 && mSt > 0 && tSt > 0 ? Math.round(tSt * (mSt / pSt)) : null;
   const adjRows = pRows > 0 && mRows > 0 && tRows > 0 ? Math.round(tRows * (mRows / pRows)) : null;
 
-  function applyPreset(p: GaugePreset) {
-    setMySt(p.stitches.toString());
-    setMyRows(p.rows.toString());
-  }
+  const canSave = pSt > 0 && mSt > 0;
 
-  async function savePreset() {
-    if (mSt <= 0 || mRows <= 0) {
-      alert('내 게이지의 코수와 단수를 모두 입력해주세요.');
-      return;
-    }
-    const name = prompt('이 게이지의 이름을 입력하세요 (예: 구름실 + 5mm)');
-    if (!name?.trim()) return;
+  async function saveToProject(projectId: number) {
     const t = now();
-    const all = await db.gaugePresets.orderBy('updatedAt').reverse().toArray();
-    if (all.length >= 3) {
-      const oldest = all.slice(2);
-      await db.gaugePresets.bulkDelete(oldest.map(o => o.id!));
-    }
-    await db.gaugePresets.add({
-      name: name.trim(),
-      stitches: mSt,
-      rows: mRows,
+    const targetCm = tSt > 0 ? Math.round((tSt / pSt) * 10) : 0;
+    await db.projectGauges.add({
+      projectId,
+      name: '빠른 계산',
+      patternStitches: pSt,
+      patternRows: pRows,
+      myStitches: mSt,
+      myRows: mRows,
+      targetCm,
+      resultStitches: adjStitches || 0,
+      resultRows: adjRows || 0,
       createdAt: t,
       updatedAt: t,
     });
-  }
-
-  async function removePreset(id: number) {
-    await db.gaugePresets.delete(id);
+    setSavePickerOpen(false);
+    setToast('프로젝트에 저장했어요');
+    setTimeout(() => setToast(null), 1800);
   }
 
   return (
     <div className="space-y-5">
-      <PageHeader title="게이지 계산기" back />
-
-      {presets.length > 0 && (
-        <div>
-          <h2 className="section-title mb-2">즐겨찾기</h2>
-          <div className="flex flex-wrap gap-2">
-            {presets.map(p => (
-              <div key={p.id} className="group flex items-center gap-1 rounded-full bg-primary-soft pl-3 pr-1.5 py-1.5">
-                <button
-                  type="button"
-                  onClick={() => applyPreset(p)}
-                  className="text-[12px] font-semibold text-primary"
-                >
-                  {p.name} <span className="ml-1 font-normal opacity-70 tabular-nums">{p.stitches}코·{p.rows}단</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removePreset(p.id!)}
-                  aria-label="삭제"
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-primary/60 hover:bg-primary/15 hover:text-primary"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <PageHeader title="게이지 계산기" subtitle="빠른 계산용 · 저장은 프로젝트 안에서" back />
 
       <GaugeCard
         title="도안 게이지"
@@ -137,12 +99,51 @@ export default function GaugeCalculator() {
 
       <button
         type="button"
-        onClick={savePreset}
-        className="btn-primary w-full justify-center"
+        disabled={!canSave || projects.length === 0}
+        onClick={() => setSavePickerOpen(true)}
+        className="btn-primary w-full justify-center disabled:opacity-50"
       >
-        <Bookmark className="h-4 w-4" /> 이 게이지 저장
+        <Save className="h-4 w-4" /> 프로젝트에 저장
       </button>
-      <p className="text-center text-[11px] text-muted-foreground">즐겨찾기는 최근 3개까지만 보관돼요</p>
+      <p className="text-center text-[11px] text-muted-foreground">
+        {projects.length === 0 ? '프로젝트를 먼저 만들어주세요' : '게이지 기록은 각 프로젝트 안에 저장돼요'}
+      </p>
+
+      {savePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setSavePickerOpen(false)}>
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-md rounded-t-3xl bg-card p-4 sm:rounded-3xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-[15px] font-bold text-foreground">어디에 저장할까요?</h3>
+              <button onClick={() => setSavePickerOpen(false)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <ul className="max-h-[60vh] space-y-1 overflow-y-auto">
+              {projects.map(p => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => saveToProject(p.id!)}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] hover:bg-secondary"
+                  >
+                    <span className="truncate font-semibold text-foreground">{p.name}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{p.status === 'in_progress' ? '진행중' : p.status === 'planned' ? '예정' : p.status === 'done' ? '완성' : '보류'}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-[12px] font-semibold text-background shadow-pop">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
