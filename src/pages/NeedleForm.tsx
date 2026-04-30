@@ -25,8 +25,24 @@ export default function NeedleForm() {
 
   async function save() {
     const t = now();
-    if (editing && nid) await db.needles.update(nid, { ...f, updatedAt: t });
-    else await db.needles.add({ ...f, createdAt: t, updatedAt: t });
+    
+    // 공통 업데이트 필드
+    const payload = { 
+      ...f, 
+      updatedAt: t,
+      isDeleted: false,
+      deletedAt: null
+    };
+    
+    if (editing && nid) {
+      await db.needles.update(nid, payload);
+    } else {
+      await db.needles.add({ 
+        ...payload, 
+        createdAt: t,
+        cloudId: crypto.randomUUID()
+      });
+    }
     nav('/library/needles');
   }
   async function remove() {
