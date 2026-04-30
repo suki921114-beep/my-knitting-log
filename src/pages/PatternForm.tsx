@@ -32,9 +32,25 @@ export default function PatternForm() {
   async function save() {
     if (!f.name.trim()) return alert('도안명을 입력해 주세요.');
     const t = now();
-    const payload = { ...f, imageDataUrl: image, updatedAt: t };
-    if (editing && pid) await db.patterns.update(pid, payload);
-    else await db.patterns.add({ ...payload, createdAt: t });
+    
+    // 공통 업데이트 필드
+    const payload = { 
+      ...f, 
+      imageDataUrl: image, 
+      updatedAt: t,
+      isDeleted: false,
+      deletedAt: null
+    };
+    
+    if (editing && pid) {
+      await db.patterns.update(pid, payload);
+    } else {
+      await db.patterns.add({ 
+        ...payload, 
+        createdAt: t,
+        cloudId: crypto.randomUUID()
+      });
+    }
     nav('/library/patterns');
   }
   async function remove() {

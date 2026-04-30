@@ -5,7 +5,7 @@ import { db, exportAll, importAll, clearAll } from '@/lib/db';
 import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn, Loader2, CloudDownload } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { calculateYarnSyncDiff, executeYarnSync, calculateYarnFetchDiff, executeYarnFetch } from '@/lib/sync';
+import { calculateYarnSyncDiff, executeYarnSync, calculateYarnFetchDiff, executeYarnFetch, calculatePatternSyncDiff, executePatternSync, calculatePatternFetchDiff, executePatternFetch } from '@/lib/sync';
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -25,17 +25,23 @@ export default function Settings() {
     
     setIsFetching(true);
     try {
-      const diff = await calculateYarnFetchDiff(user.uid);
-      const confirmMsg = `클라우드에서 가져오기 (실 데이터):\n\n- 새로 추가됨: ${diff.toAdd.length}건\n- 기존 항목 업데이트: ${diff.toUpdate.length}건\n- 변경 없음 (최신): ${diff.unchanged}건\n\n이 기기로 데이터를 가져오시겠습니까?`;
+      const yarnDiff = await calculateYarnFetchDiff(user.uid);
+      const patternDiff = await calculatePatternFetchDiff(user.uid);
+      
+      const confirmMsg = `클라우드에서 가져오기:\n\n[실]\n- 추가: ${yarnDiff.toAdd.length}건 / 업데이트: ${yarnDiff.toUpdate.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n[도안]\n- 추가: ${patternDiff.toAdd.length}건 / 업데이트: ${patternDiff.toUpdate.length}건 / 변경 없음: ${patternDiff.unchanged}건\n\n이 기기로 데이터를 가져오시겠습니까?`;
       
       if (!confirm(confirmMsg)) {
         setIsFetching(false);
         return;
       }
       
-      const result = await executeYarnFetch(diff);
-      const alertTitle = result.failed > 0 ? "일부 항목 가져오기 실패" : "가져오기 완료!";
-      alert(`${alertTitle}\n\n- 새로 추가 성공: ${result.added}건\n- 업데이트 성공: ${result.updated}건\n- 변경 없음: ${result.unchanged}건\n- 실패: ${result.failed}건`);
+      const yarnResult = await executeYarnFetch(yarnDiff);
+      const patternResult = await executePatternFetch(patternDiff);
+      
+      const failed = yarnResult.failed + patternResult.failed;
+      const alertTitle = failed > 0 ? "일부 항목 가져오기 실패" : "가져오기 완료!";
+      
+      alert(`${alertTitle}\n\n[실]\n- 추가: ${yarnResult.added}건 / 업데이트: ${yarnResult.updated}건 / 변경 없음: ${yarnResult.unchanged}건\n[도안]\n- 추가: ${patternResult.added}건 / 업데이트: ${patternResult.updated}건 / 변경 없음: ${patternResult.unchanged}건`);
     } catch (error) {
       alert("가져오기 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       console.error(error);
@@ -52,17 +58,23 @@ export default function Settings() {
     
     setIsSyncing(true);
     try {
-      const diff = await calculateYarnSyncDiff(user.uid);
-      const confirmMsg = `동기화 대상 (실 데이터) 확인:\n\n- 클라우드로 업로드: ${diff.toUpload.length}건\n- 로컬로 다운로드: ${diff.toDownload.length}건\n- 변경 없음: ${diff.unchanged}건\n\n지금 동기화를 진행하시겠습니까?`;
+      const yarnDiff = await calculateYarnSyncDiff(user.uid);
+      const patternDiff = await calculatePatternSyncDiff(user.uid);
+      
+      const confirmMsg = `동기화 대상 확인:\n\n[실]\n- 업로드: ${yarnDiff.toUpload.length}건 / 다운로드: ${yarnDiff.toDownload.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n[도안]\n- 업로드: ${patternDiff.toUpload.length}건 / 다운로드: ${patternDiff.toDownload.length}건 / 변경 없음: ${patternDiff.unchanged}건\n\n지금 동기화를 진행하시겠습니까?`;
       
       if (!confirm(confirmMsg)) {
         setIsSyncing(false);
         return;
       }
       
-      const result = await executeYarnSync(user.uid, diff);
-      const alertTitle = result.failed > 0 ? "일부 항목 동기화 실패" : "동기화 완료!";
-      alert(`${alertTitle}\n\n- 업로드 성공: ${result.uploaded}건\n- 다운로드 성공: ${result.downloaded}건\n- 변경 없음: ${result.unchanged}건\n- 실패: ${result.failed}건`);
+      const yarnResult = await executeYarnSync(user.uid, yarnDiff);
+      const patternResult = await executePatternSync(user.uid, patternDiff);
+      
+      const failed = yarnResult.failed + patternResult.failed;
+      const alertTitle = failed > 0 ? "일부 항목 동기화 실패" : "동기화 완료!";
+      
+      alert(`${alertTitle}\n\n[실]\n- 업로드: ${yarnResult.uploaded}건 / 다운로드: ${yarnResult.downloaded}건 / 변경 없음: ${yarnResult.unchanged}건\n[도안]\n- 업로드: ${patternResult.uploaded}건 / 다운로드: ${patternResult.downloaded}건 / 변경 없음: ${patternResult.unchanged}건`);
     } catch (error) {
       alert("동기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       console.error(error);
