@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { db, exportAll, importAll, clearAll } from '@/lib/db';
-import { Download, Upload, Trash2, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
+  
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLastBackup(localStorage.getItem('lastBackupAt'));
@@ -42,6 +47,7 @@ export default function Settings() {
       setBusy(false);
     }
   }
+  
   async function handleImport(file: File) {
     setBusy(true);
     try {
@@ -56,6 +62,7 @@ export default function Settings() {
       setBusy(false);
     }
   }
+  
   async function handleClear() {
     if (!confirm('정말 모든 데이터를 삭제할까요?')) return;
     if (!confirm('되돌릴 수 없습니다. 계속할까요?')) return;
@@ -71,27 +78,89 @@ export default function Settings() {
     <div className="space-y-6">
       <PageHeader title="설정" />
 
-      <div className="card-soft p-4">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-            <ShieldCheck className="h-[18px] w-[18px]" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold text-foreground">로컬 저장</div>
-            <p className="text-[11.5px] text-muted-foreground">이 기기에만 저장됨</p>
+      {/* 1. 계정 섹션 추가 */}
+      <Section title="계정">
+        {user ? (
+          <div className="card-soft overflow-hidden">
+            <div className="flex items-center gap-4 p-4 border-b border-border/60 bg-card">
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="h-12 w-12 rounded-full object-cover shadow-sm" />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+                  <UserCircle2 className="h-7 w-7" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-bold text-foreground truncate">{user.displayName || '사용자'}</div>
+                <div className="text-[11.5px] text-muted-foreground truncate mt-0.5">{user.email}</div>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (confirm('로그아웃 하시겠습니까?')) {
+                  await logout();
+                }
+              }}
+              className="flex w-full items-center gap-3 p-4 transition-colors active:bg-muted/50 hover:bg-muted/30"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <LogOut className="h-4 w-4" />
+              </span>
+              <div className="text-[13.5px] font-semibold text-foreground text-left flex-1">로그아웃</div>
+            </button>
           </div>
+        ) : (
+          <div className="card-soft overflow-hidden">
+            <div className="flex items-center gap-4 p-4 border-b border-border/60 bg-card">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <UserCircle2 className="h-7 w-7" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-[14px] font-bold text-foreground">게스트 모드</div>
+                  <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground tracking-wide">OFFLINE</span>
+                </div>
+                <div className="text-[11.5px] text-muted-foreground mt-0.5">데이터를 동기화하려면 로그인하세요</div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="flex w-full items-center gap-3 p-4 transition-colors active:bg-muted/50 hover:bg-muted/30"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <LogIn className="h-4 w-4" />
+              </span>
+              <div className="flex-1 text-left text-[13.5px] font-semibold text-foreground">계정 연결 (로그인)</div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        )}
+      </Section>
+
+      {/* 2. 기존 데이터 관리 섹션 */}
+      <Section title="데이터 관리">
+        <div className="card-soft p-4 bg-card">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+              <ShieldCheck className="h-[18px] w-[18px]" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14px] font-semibold text-foreground">로컬 저장</div>
+              <p className="text-[11.5px] text-muted-foreground mt-0.5 leading-relaxed">현재 모든 기록은 이 기기에 안전하게 보관 중입니다.</p>
+            </div>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-4">
+            <Meta label="저장된 항목" value={`${totalItems}개`} />
+            <Meta label="마지막 백업" value={lastBackupLabel} />
+          </dl>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-4">
-          <Meta label="저장된 항목" value={`${totalItems}개`} />
-          <Meta label="마지막 백업" value={lastBackupLabel} />
-        </dl>
-      </div>
+      </Section>
 
       <Section title="백업">
         <button
           onClick={handleExport}
           disabled={busy}
-          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft disabled:opacity-60"
+          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft disabled:opacity-60 bg-card"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-soft text-primary">
             <Download className="h-4 w-4" />
@@ -105,7 +174,7 @@ export default function Settings() {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={busy}
-          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft disabled:opacity-60"
+          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft disabled:opacity-60 bg-card"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft text-accent-foreground">
             <Upload className="h-4 w-4" />
@@ -123,7 +192,7 @@ export default function Settings() {
       <Section title="위험 영역">
         <button
           onClick={handleClear}
-          className="card-danger flex w-full items-center gap-3 p-4 text-left"
+          className="card-danger flex w-full items-center gap-3 p-4 text-left bg-card"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
             <Trash2 className="h-4 w-4" />
@@ -156,4 +225,3 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </section>
   );
 }
-
