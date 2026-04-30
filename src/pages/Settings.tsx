@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { db, exportAll, importAll, clearAll } from '@/lib/db';
-import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn } from 'lucide-react';
+import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn, Loader2 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/hooks/useAuth';
+import { calculateYarnSyncDiff, executeYarnSync } from '@/lib/sync';
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -13,6 +14,33 @@ export default function Settings() {
   
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    if (!user) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    
+    setIsSyncing(true);
+    try {
+      const diff = await calculateYarnSyncDiff(user.uid);
+      const confirmMsg = `동기화 대상 (실 데이터) 확인:\n\n- 클라우드로 업로드: ${diff.toUpload.length}건\n- 로컬로 다운로드: ${diff.toDownload.length}건\n- 변경 없음: ${diff.unchanged}건\n\n지금 동기화를 진행하시겠습니까?`;
+      
+      if (!confirm(confirmMsg)) {
+        setIsSyncing(false);
+        return;
+      }
+      
+      const result = await executeYarnSync(user.uid, diff);
+      alert(`동기화 완료!\n\n- 업로드 성공: ${result.uploaded}건\n- 다운로드 성공: ${result.downloaded}건\n- 변경 없음: ${result.unchanged}건\n- 실패: ${result.failed}건`);
+    } catch (error) {
+      alert("동기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      console.error(error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     setLastBackup(localStorage.getItem('lastBackupAt'));
@@ -125,10 +153,18 @@ export default function Settings() {
                   이 기기에 저장된 <strong>{totalItems}개</strong>의 뜨개 기록을 내 계정에 안전하게 동기화하시겠습니까?
                 </p>
                 <button
-                  onClick={() => alert('데이터 동기화 기능은 아직 준비 중입니다. (UX 흐름 데모)')}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-60"
                 >
-                  지금 동기화하기
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      동기화 중...
+                    </>
+                  ) : (
+                    "지금 동기화하기"
+                  )}
                 </button>
               </div>
             </div>
