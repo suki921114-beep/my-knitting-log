@@ -27,9 +27,25 @@ export default function NotionForm() {
   async function save() {
     if (!f.name.trim()) return alert('품목명을 입력해 주세요.');
     const t = now();
-    const payload = { ...f, photoDataUrl: photo, updatedAt: t };
-    if (editing && nid) await db.notions.update(nid, payload);
-    else await db.notions.add({ ...payload, createdAt: t });
+    
+    // 공통 업데이트 필드
+    const payload = { 
+      ...f, 
+      photoDataUrl: photo, 
+      updatedAt: t,
+      isDeleted: false,
+      deletedAt: null
+    };
+    
+    if (editing && nid) {
+      await db.notions.update(nid, payload);
+    } else {
+      await db.notions.add({ 
+        ...payload, 
+        createdAt: t,
+        cloudId: crypto.randomUUID()
+      });
+    }
     nav('/library/notions');
   }
   async function remove() {

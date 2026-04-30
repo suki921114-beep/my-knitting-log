@@ -1,4 +1,4 @@
-import { db, Yarn, Pattern, Needle } from './db';
+import { db, Yarn, Pattern, Needle, Notion } from './db';
 import { firestore } from './firebase';
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 

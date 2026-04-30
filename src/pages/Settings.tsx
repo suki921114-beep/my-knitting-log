@@ -5,7 +5,7 @@ import { db, exportAll, importAll, clearAll } from '@/lib/db';
 import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn, Loader2, CloudDownload } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { calculateYarnSyncDiff, executeYarnSync, calculateYarnFetchDiff, executeYarnFetch, calculatePatternSyncDiff, executePatternSync, calculatePatternFetchDiff, executePatternFetch, calculateNeedleSyncDiff, executeNeedleSync, calculateNeedleFetchDiff, executeNeedleFetch } from '@/lib/sync';
+import { calculateYarnSyncDiff, executeYarnSync, calculateYarnFetchDiff, executeYarnFetch, calculatePatternSyncDiff, executePatternSync, calculatePatternFetchDiff, executePatternFetch, calculateNeedleSyncDiff, executeNeedleSync, calculateNeedleFetchDiff, executeNeedleFetch, calculateNotionSyncDiff, executeNotionSync, calculateNotionFetchDiff, executeNotionFetch } from '@/lib/sync';
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -28,8 +28,9 @@ export default function Settings() {
       const yarnDiff = await calculateYarnFetchDiff(user.uid);
       const patternDiff = await calculatePatternFetchDiff(user.uid);
       const needleDiff = await calculateNeedleFetchDiff(user.uid);
+      const notionDiff = await calculateNotionFetchDiff(user.uid);
       
-      const confirmMsg = `클라우드에서 가져오기:\n\n[실]\n- 추가: ${yarnDiff.toAdd.length}건 / 업데이트: ${yarnDiff.toUpdate.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n[도안]\n- 추가: ${patternDiff.toAdd.length}건 / 업데이트: ${patternDiff.toUpdate.length}건 / 변경 없음: ${patternDiff.unchanged}건\n[바늘]\n- 추가: ${needleDiff.toAdd.length}건 / 업데이트: ${needleDiff.toUpdate.length}건 / 변경 없음: ${needleDiff.unchanged}건\n\n이 기기로 데이터를 가져오시겠습니까?`;
+      const confirmMsg = `클라우드에서 가져오기:\n\n[실]\n- 추가: ${yarnDiff.toAdd.length}건 / 업데이트: ${yarnDiff.toUpdate.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n[도안]\n- 추가: ${patternDiff.toAdd.length}건 / 업데이트: ${patternDiff.toUpdate.length}건 / 변경 없음: ${patternDiff.unchanged}건\n[바늘]\n- 추가: ${needleDiff.toAdd.length}건 / 업데이트: ${needleDiff.toUpdate.length}건 / 변경 없음: ${needleDiff.unchanged}건\n[부자재]\n- 추가: ${notionDiff.toAdd.length}건 / 업데이트: ${notionDiff.toUpdate.length}건 / 변경 없음: ${notionDiff.unchanged}건\n\n이 기기로 데이터를 가져오시겠습니까?`;
       
       if (!confirm(confirmMsg)) {
         setIsFetching(false);
@@ -39,11 +40,12 @@ export default function Settings() {
       const yarnResult = await executeYarnFetch(yarnDiff);
       const patternResult = await executePatternFetch(patternDiff);
       const needleResult = await executeNeedleFetch(needleDiff);
+      const notionResult = await executeNotionFetch(notionDiff);
       
-      const failed = yarnResult.failed + patternResult.failed + needleResult.failed;
+      const failed = yarnResult.failed + patternResult.failed + needleResult.failed + notionResult.failed;
       const alertTitle = failed > 0 ? "일부 항목 가져오기 실패" : "가져오기 완료!";
       
-      alert(`${alertTitle}\n\n[실]\n- 추가: ${yarnResult.added}건 / 업데이트: ${yarnResult.updated}건 / 변경 없음: ${yarnResult.unchanged}건\n[도안]\n- 추가: ${patternResult.added}건 / 업데이트: ${patternResult.updated}건 / 변경 없음: ${patternResult.unchanged}건\n[바늘]\n- 추가: ${needleResult.added}건 / 업데이트: ${needleResult.updated}건 / 변경 없음: ${needleResult.unchanged}건`);
+      alert(`${alertTitle}\n\n[실]\n- 추가: ${yarnResult.added}건 / 업데이트: ${yarnResult.updated}건 / 변경 없음: ${yarnResult.unchanged}건\n[도안]\n- 추가: ${patternResult.added}건 / 업데이트: ${patternResult.updated}건 / 변경 없음: ${patternResult.unchanged}건\n[바늘]\n- 추가: ${needleResult.added}건 / 업데이트: ${needleResult.updated}건 / 변경 없음: ${needleResult.unchanged}건\n[부자재]\n- 추가: ${notionResult.added}건 / 업데이트: ${notionResult.updated}건 / 변경 없음: ${notionResult.unchanged}건`);
     } catch (error) {
       alert("가져오기 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       console.error(error);
@@ -63,8 +65,9 @@ export default function Settings() {
       const yarnDiff = await calculateYarnSyncDiff(user.uid);
       const patternDiff = await calculatePatternSyncDiff(user.uid);
       const needleDiff = await calculateNeedleSyncDiff(user.uid);
+      const notionDiff = await calculateNotionSyncDiff(user.uid);
       
-      const confirmMsg = `동기화 대상 확인:\n\n[실]\n- 업로드: ${yarnDiff.toUpload.length}건 / 다운로드: ${yarnDiff.toDownload.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n[도안]\n- 업로드: ${patternDiff.toUpload.length}건 / 다운로드: ${patternDiff.toDownload.length}건 / 변경 없음: ${patternDiff.unchanged}건\n[바늘]\n- 업로드: ${needleDiff.toUpload.length}건 / 다운로드: ${needleDiff.toDownload.length}건 / 변경 없음: ${needleDiff.unchanged}건\n\n지금 동기화를 진행하시겠습니까?`;
+      const confirmMsg = `동기화 대상 확인:\n\n[실]\n- 업로드: ${yarnDiff.toUpload.length}건 / 다운로드: ${yarnDiff.toDownload.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n[도안]\n- 업로드: ${patternDiff.toUpload.length}건 / 다운로드: ${patternDiff.toDownload.length}건 / 변경 없음: ${patternDiff.unchanged}건\n[바늘]\n- 업로드: ${needleDiff.toUpload.length}건 / 다운로드: ${needleDiff.toDownload.length}건 / 변경 없음: ${needleDiff.unchanged}건\n[부자재]\n- 업로드: ${notionDiff.toUpload.length}건 / 다운로드: ${notionDiff.toDownload.length}건 / 변경 없음: ${notionDiff.unchanged}건\n\n지금 동기화를 진행하시겠습니까?`;
       
       if (!confirm(confirmMsg)) {
         setIsSyncing(false);
@@ -74,11 +77,12 @@ export default function Settings() {
       const yarnResult = await executeYarnSync(user.uid, yarnDiff);
       const patternResult = await executePatternSync(user.uid, patternDiff);
       const needleResult = await executeNeedleSync(user.uid, needleDiff);
+      const notionResult = await executeNotionSync(user.uid, notionDiff);
       
-      const failed = yarnResult.failed + patternResult.failed + needleResult.failed;
+      const failed = yarnResult.failed + patternResult.failed + needleResult.failed + notionResult.failed;
       const alertTitle = failed > 0 ? "일부 항목 동기화 실패" : "동기화 완료!";
       
-      alert(`${alertTitle}\n\n[실]\n- 업로드: ${yarnResult.uploaded}건 / 다운로드: ${yarnResult.downloaded}건 / 변경 없음: ${yarnResult.unchanged}건\n[도안]\n- 업로드: ${patternResult.uploaded}건 / 다운로드: ${patternResult.downloaded}건 / 변경 없음: ${patternResult.unchanged}건\n[바늘]\n- 업로드: ${needleResult.uploaded}건 / 다운로드: ${needleResult.downloaded}건 / 변경 없음: ${needleResult.unchanged}건`);
+      alert(`${alertTitle}\n\n[실]\n- 업로드: ${yarnResult.uploaded}건 / 다운로드: ${yarnResult.downloaded}건 / 변경 없음: ${yarnResult.unchanged}건\n[도안]\n- 업로드: ${patternResult.uploaded}건 / 다운로드: ${patternResult.downloaded}건 / 변경 없음: ${patternResult.unchanged}건\n[바늘]\n- 업로드: ${needleResult.uploaded}건 / 다운로드: ${needleResult.downloaded}건 / 변경 없음: ${needleResult.unchanged}건\n[부자재]\n- 업로드: ${notionResult.uploaded}건 / 다운로드: ${notionResult.downloaded}건 / 변경 없음: ${notionResult.unchanged}건`);
     } catch (error) {
       alert("동기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       console.error(error);
