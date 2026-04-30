@@ -88,68 +88,113 @@ export default function ProjectForm() {
     setLinksHydrated(true);
   }, [editing, existingYarnLinks, existingPatternLinks, existingNeedleLinks, existingNotionLinks, linksHydrated]);
 
-  async function save() {
-    if (!name.trim()) {
-      alert('프로젝트명을 입력해 주세요.');
-      return;
-    }
-    const t = now();
-    let pid = projectId;
-    const payload = {
-      name: name.trim(),
-      status,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-      size: size || undefined,
-      gauge: gauge || undefined,
-      progressNote: progressNote || undefined,
-      finishedNote: finishedNote || undefined,
-      photos: photos.length ? photos : undefined,
-      updatedAt: t,
-    };
-    if (editing && pid) {
-      await db.projects.update(pid, payload);
-    } else {
-      pid = (await db.projects.add({ ...payload, createdAt: t })) as number;
-    }
+ async function save() {
+  if (!name.trim()) {
+    alert('프로젝트명을 입력해 주세요.');
+    return;
+  }
 
-    // sync each link table
-    await syncLinks(db.projectYarns, existingYarnLinks || [], yarnLinks, l => ({
+  const t = now();
+  let pid = projectId;
+
+  const projectCloudId = existing?.cloudId || crypto.randomUUID();
+  const projectCreatedAt = existing?.createdAt ?? t;
+
+  const payload = {
+    name: name.trim(),
+    status,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    size: size || undefined,
+    gauge: gauge || undefined,
+    progressNote: progressNote || undefined,
+    finishedNote: finishedNote || undefined,
+    photos: photos.length ? photos : undefined,
+
+    cloudId: projectCloudId,
+    createdAt: projectCreatedAt,
+    updatedAt: t,
+    isDeleted: existing?.isDeleted ?? false,
+    deletedAt: existing?.deletedAt ?? null,
+  };
+
+  if (editing && pid) {
+    await db.projects.update(pid, payload);
+  } else {
+    pid = (await db.projects.add(payload)) as number;
+  }
+
+  // sync each link table
+  await syncLinks(
+    db.projectYarns,
+    existingYarnLinks || [],
+    yarnLinks,
+    l => ({
       projectId: pid!,
       yarnId: l.yarnId,
       usedGrams: l.usedGrams,
       plannedGrams: l.plannedGrams,
       colorNote: l.colorNote || undefined,
       usageNote: l.usageNote || undefined,
-    }), l => ({
+    }),
+    l => ({
       usedGrams: l.usedGrams,
       plannedGrams: l.plannedGrams,
       colorNote: l.colorNote || undefined,
       usageNote: l.usageNote || undefined,
-      updatedAt: t,
-    }), t);
+    }),
+    t
+  );
 
-    await syncLinks(db.projectPatterns, existingPatternLinks || [], patternLinks, l => ({
+  await syncLinks(
+    db.projectPatterns,
+    existingPatternLinks || [],
+    patternLinks,
+    l => ({
       projectId: pid!,
       patternId: l.refId,
       note: l.note || undefined,
-    }), l => ({ note: l.note || undefined, updatedAt: t }), t);
+    }),
+    l => ({
+      note: l.note || undefined,
+    }),
+    t
+  );
 
-    await syncLinks(db.projectNeedles, existingNeedleLinks || [], needleLinks, l => ({
+  await syncLinks(
+    db.projectNeedles,
+    existingNeedleLinks || [],
+    needleLinks,
+    l => ({
       projectId: pid!,
       needleId: l.refId,
       note: l.note || undefined,
-    }), l => ({ note: l.note || undefined, updatedAt: t }), t);
+    }),
+    l => ({
+      note: l.note || undefined,
+    }),
+    t
+  );
 
-    await syncLinks(db.projectNotions, existingNotionLinks || [], notionLinks, l => ({
+  await syncLinks(
+    db.projectNotions,
+    existingNotionLinks || [],
+    notionLinks,
+    l => ({
       projectId: pid!,
       notionId: l.refId,
       quantity: l.quantity,
       note: l.note || undefined,
-    }), l => ({ quantity: l.quantity, note: l.note || undefined, updatedAt: t }), t);
+    }),
+    l => ({
+      quantity: l.quantity,
+      note: l.note || undefined,
+    }),
+    t
+  );
 
-    nav(`/projects/${pid}`);
-  }
+  nav(`/projects/${pid}`);
+}
 
   async function remove() {
     if (!projectId) return;
@@ -260,12 +305,32 @@ async function syncLinks<L extends { id?: number }, E extends { id?: number }>(
   const oldIds = existing.map(l => l.id!).filter(Boolean);
   const keptIds = current.filter(l => l.id).map(l => l.id!);
   const toDelete = oldIds.filter(i => !keptIds.includes(i));
-  if (toDelete.length) await table.bulkDelete(toDelete);
+
+  if (toDelete.length) {
+    await table.bulkDelete(toDelete);
+  }
+
   for (const l of current) {
     if (l.id) {
-      await table.update(l.id, buildUpdate(l));
+      const prev = existing.find(e => e.id === l.id) as any;
+
+      await table.update(l.id, {
+        ...buildUpdate(l),
+        cloudId: prev?.cloudId || crypto.randomUUID(),
+        createdAt: prev?.createdAt ?? t,
+        updatedAt: t,
+        isDeleted: prev?.isDeleted ?? false,
+        deletedAt: prev?.deletedAt ?? null,
+      });
     } else {
-      await table.add({ ...buildAdd(l), createdAt: t, updatedAt: t });
+      await table.add({
+        ...buildAdd(l),
+        cloudId: crypto.randomUUID(),
+        createdAt: t,
+        updatedAt: t,
+        isDeleted: false,
+        deletedAt: null,
+      });
     }
   }
 }
