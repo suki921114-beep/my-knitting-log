@@ -33,7 +33,8 @@ export default function Settings() {
       }
       
       const result = await executeYarnSync(user.uid, diff);
-      alert(`동기화 완료!\n\n- 업로드 성공: ${result.uploaded}건\n- 다운로드 성공: ${result.downloaded}건\n- 변경 없음: ${result.unchanged}건\n- 실패: ${result.failed}건`);
+      const alertTitle = result.failed > 0 ? "일부 항목 동기화 실패" : "동기화 완료!";
+      alert(`${alertTitle}\n\n- 업로드 성공: ${result.uploaded}건\n- 다운로드 성공: ${result.downloaded}건\n- 변경 없음: ${result.unchanged}건\n- 실패: ${result.failed}건`);
     } catch (error) {
       alert("동기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       console.error(error);

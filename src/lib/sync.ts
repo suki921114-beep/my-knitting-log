@@ -49,6 +49,21 @@ export async function calculateYarnSyncDiff(userId: string): Promise<SyncDiff> {
   return diff;
 }
 
+export function sanitizeForFirestore(obj: any): any {
+  const sanitized = { ...obj };
+  for (const key in sanitized) {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    } else if (typeof sanitized[key] === 'number' && Number.isNaN(sanitized[key])) {
+      sanitized[key] = null; // Firestore doesn't support NaN
+    }
+  }
+  // Remove fields that shouldn't be synced to Firestore
+  delete sanitized.photoDataUrl;
+  delete sanitized.id;
+  return sanitized;
+}
+
 export async function executeYarnSync(userId: string, diff: SyncDiff) {
   let uploaded = 0;
   let downloaded = 0;
@@ -59,17 +74,52 @@ export async function executeYarnSync(userId: string, diff: SyncDiff) {
     const batch = writeBatch(firestore);
     for (const local of diff.toUpload) {
       try {
+        let needsLocalUpdate = false;
+        const fixUpdates: any = {};
+
+        // 1-1. 레거시 데이터 보정 (cloudId 누락)
+        if (!local.cloudId) {
+          local.cloudId = crypto.randomUUID();
+          fixUpdates.cloudId = local.cloudId;
+          needsLocalUpdate = true;
+        }
+
+        // 1-2. 타임스탬프 보정 (updatedAt 누락 또는 비정상)
+        if (!local.updatedAt || isNaN(local.updatedAt)) {
+          local.updatedAt = Date.now();
+          fixUpdates.updatedAt = local.updatedAt;
+          needsLocalUpdate = true;
+        }
+
+        // 보정된 데이터가 있으면 로컬 DB 먼저 덮어쓰기
+        if (needsLocalUpdate && local.id) {
+          await db.yarns.update(local.id, fixUpdates);
+        }
+
         const docRef = doc(firestore, `users/${userId}/yarns`, local.cloudId!);
-        const uploadData = { ...local };
-        delete uploadData.photoDataUrl; // 중요: 1차에서 이미지는 동기화 제외
-        delete uploadData.id;           // 클라우드에는 로컬 id 저장 안함
+        const uploadData = sanitizeForFirestore(local);
+        
+        console.log(`[Sync Upload] 대상: ${local.name || 'Unknown'}`);
+        console.log(`  - cloudId: ${local.cloudId}`);
+        console.log(`  - updatedAt: ${local.updatedAt}`);
+        console.log(`  - 최종 Payload:`, uploadData);
+
         batch.set(docRef, uploadData);
         uploaded++;
       } catch (e) {
+        console.error(`[Sync] Yarn 업로드 준비 실패: ${local.name || 'Unknown'} (${local.cloudId})`, e);
         failed++;
       }
     }
-    await batch.commit();
+    
+    try {
+      await batch.commit();
+    } catch (batchError) {
+      console.error("[Sync] Firestore Batch Commit 실패:", batchError);
+      // Batch commit fails entirely if one doc is invalid (usually caught earlier, but just in case)
+      failed += uploaded;
+      uploaded = 0;
+    }
 
     // 2. 로컬(Dexie)로 다운로드 (기존 이미지/id 보존)
     for (const remote of diff.toDownload) {
@@ -89,6 +139,7 @@ export async function executeYarnSync(userId: string, diff: SyncDiff) {
         }
         downloaded++;
       } catch(e) {
+        console.error(`[Sync] Yarn 다운로드/저장 실패: ${remote.name || 'Unknown'} (${remote.cloudId})`, e);
         failed++;
       }
     }

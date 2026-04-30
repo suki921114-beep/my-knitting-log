@@ -34,12 +34,27 @@ export default function YarnForm() {
   async function save() {
     if (!f.name.trim()) return alert('실 이름을 입력해 주세요.');
     const t = now();
-    const payload = { ...f, photoDataUrl: photo, updatedAt: t };
+    
+    // 공통 업데이트 필드
+    const payload = { 
+      ...f, 
+      photoDataUrl: photo, 
+      updatedAt: t,
+      isDeleted: false,
+      deletedAt: null
+    };
+    
     if (editing && yid) {
+      // 수정 시 기존 createdAt, cloudId는 그대로 유지됨 (update 동작)
       await db.yarns.update(yid, payload);
       nav(`/library/yarns/${yid}`);
     } else {
-      const id = (await db.yarns.add({ ...payload, createdAt: t })) as number;
+      // 신규 생성 시 누락된 필수 필드 전부 주입
+      const id = (await db.yarns.add({ 
+        ...payload, 
+        createdAt: t,
+        cloudId: crypto.randomUUID()
+      })) as number;
       nav(`/library/yarns/${id}`);
     }
   }
