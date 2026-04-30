@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { db, exportAll, importAll, clearAll } from '@/lib/db';
-import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn, Loader2 } from 'lucide-react';
+import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn, Loader2, CloudDownload } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { calculateYarnSyncDiff, executeYarnSync } from '@/lib/sync';
+import { calculateYarnSyncDiff, executeYarnSync, calculateYarnFetchDiff, executeYarnFetch } from '@/lib/sync';
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -15,6 +15,34 @@ export default function Settings() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+
+  const handleFetch = async () => {
+    if (!user) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    
+    setIsFetching(true);
+    try {
+      const diff = await calculateYarnFetchDiff(user.uid);
+      const confirmMsg = `클라우드에서 가져오기 (실 데이터):\n\n- 새로 추가됨: ${diff.toAdd.length}건\n- 기존 항목 업데이트: ${diff.toUpdate.length}건\n- 변경 없음 (최신): ${diff.unchanged}건\n\n이 기기로 데이터를 가져오시겠습니까?`;
+      
+      if (!confirm(confirmMsg)) {
+        setIsFetching(false);
+        return;
+      }
+      
+      const result = await executeYarnFetch(diff);
+      const alertTitle = result.failed > 0 ? "일부 항목 가져오기 실패" : "가져오기 완료!";
+      alert(`${alertTitle}\n\n- 새로 추가 성공: ${result.added}건\n- 업데이트 성공: ${result.updated}건\n- 변경 없음: ${result.unchanged}건\n- 실패: ${result.failed}건`);
+    } catch (error) {
+      alert("가져오기 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      console.error(error);
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleSync = async () => {
     if (!user) {
@@ -153,20 +181,34 @@ export default function Settings() {
                 <p className="mt-1.5 text-[12px] text-muted-foreground leading-relaxed">
                   이 기기에 저장된 <strong>{totalItems}개</strong>의 뜨개 기록을 내 계정에 안전하게 동기화하시겠습니까?
                 </p>
-                <button
-                  onClick={handleSync}
-                  disabled={isSyncing}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-60"
-                >
-                  {isSyncing ? (
-                    <>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={handleFetch}
+                    disabled={isFetching || isSyncing}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-[13px] font-semibold text-accent-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-accent/90 disabled:opacity-60"
+                  >
+                    {isFetching ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      동기화 중...
-                    </>
-                  ) : (
-                    "지금 동기화하기"
-                  )}
-                </button>
+                    ) : (
+                      <CloudDownload className="h-4 w-4" />
+                    )}
+                    가져오기
+                  </button>
+                  <button
+                    onClick={handleSync}
+                    disabled={isSyncing || isFetching}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        진행 중...
+                      </>
+                    ) : (
+                      "병합/올리기"
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

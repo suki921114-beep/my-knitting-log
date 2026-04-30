@@ -2,6 +2,12 @@ import { db, Yarn } from './db';
 import { firestore } from './firebase';
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 
+export interface FetchDiff {
+  toAdd: Yarn[];
+  toUpdate: Yarn[];
+  unchanged: number;
+}
+
 export interface SyncDiff {
   toUpload: Yarn[];
   toDownload: Yarn[];
@@ -43,6 +49,37 @@ export async function calculateYarnSyncDiff(userId: string): Promise<SyncDiff> {
   for (const remote of remoteYarns) {
     if (!localMap.has(remote.cloudId!)) {
       diff.toDownload.push(remote);
+    }
+  }
+
+  return diff;
+}
+
+export async function calculateYarnFetchDiff(userId: string): Promise<FetchDiff> {
+  const diff: FetchDiff = { toAdd: [], toUpdate: [], unchanged: 0 };
+  
+  const localYarns = await db.yarns.toArray();
+  const localMap = new Map(localYarns.map(y => [y.cloudId!, y]));
+
+  const yarnsRef = collection(firestore, `users/${userId}/yarns`);
+  const snapshot = await getDocs(yarnsRef);
+  const remoteYarns = snapshot.docs.map(d => d.data() as Yarn);
+
+  for (const remote of remoteYarns) {
+    if (!remote.cloudId) continue;
+    
+    const local = localMap.get(remote.cloudId);
+    if (!local) {
+      // 로컬에 없으면 새로 추가
+      diff.toAdd.push(remote);
+    } else {
+      // 로컬에 있으면 updatedAt 비교
+      if (remote.updatedAt > local.updatedAt) {
+        diff.toUpdate.push(remote);
+      } else if (remote.updatedAt === local.updatedAt) {
+        diff.unchanged++;
+      }
+      // 로컬이 더 최신인 경우 무시 (업데이트 안함)
     }
   }
 
@@ -155,3 +192,44 @@ export async function executeYarnSync(userId: string, diff: SyncDiff) {
     throw error;
   }
 }
+
+export async function executeYarnFetch(diff: FetchDiff) {
+  let added = 0;
+  let updated = 0;
+  let failed = 0;
+
+  // 1. 새 항목 추가
+  for (const remote of diff.toAdd) {
+    try {
+      const { id, ...dataToPut } = remote as any;
+      await db.yarns.add(dataToPut);
+      added++;
+    } catch (e) {
+      console.error(`[Fetch] Yarn 추가 실패: ${remote.name} (${remote.cloudId})`, e);
+      failed++;
+    }
+  }
+
+  // 2. 기존 항목 덮어쓰기 (이미지와 로컬 id 보존)
+  for (const remote of diff.toUpdate) {
+    try {
+      const existing = await db.yarns.where('cloudId').equals(remote.cloudId!).first();
+      if (existing) {
+        await db.yarns.update(existing.id!, {
+          ...remote,
+          id: existing.id,
+          photoDataUrl: existing.photoDataUrl
+        });
+        updated++;
+      } else {
+        failed++;
+      }
+    } catch (e) {
+      console.error(`[Fetch] Yarn 덮어쓰기 실패: ${remote.name} (${remote.cloudId})`, e);
+      failed++;
+    }
+  }
+
+  return { added, updated, unchanged: diff.unchanged, failed };
+}
+
