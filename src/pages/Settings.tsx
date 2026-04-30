@@ -81,36 +81,60 @@ export default function Settings() {
       {/* 1. 계정 섹션 추가 */}
       <Section title="계정">
         {user ? (
-          <div className="card-soft overflow-hidden">
-            <div className="flex items-center gap-4 p-4 border-b border-border/60 bg-card">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="h-12 w-12 rounded-full object-cover shadow-sm" />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
-                  <UserCircle2 className="h-7 w-7" />
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="card-soft overflow-hidden">
+              <div className="flex items-center gap-4 p-4 border-b border-border/60 bg-card">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Profile" className="h-12 w-12 rounded-full object-cover shadow-sm" />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+                    <UserCircle2 className="h-7 w-7" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="text-[14px] font-bold text-foreground truncate">{user.displayName || '사용자'}</div>
+                    <span className="rounded-md bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-[9px] font-bold text-green-700 dark:text-green-400">연결됨</span>
+                  </div>
+                  <div className="text-[11.5px] text-muted-foreground truncate mt-0.5">{user.email}</div>
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-bold text-foreground truncate">{user.displayName || '사용자'}</div>
-                <div className="text-[11.5px] text-muted-foreground truncate mt-0.5">{user.email}</div>
+              </div>
+              <button
+                onClick={async () => {
+                  if (confirm('로그아웃 하시겠습니까?')) {
+                    await logout();
+                  }
+                }}
+                className="flex w-full items-center gap-3 p-4 transition-colors active:bg-muted/50 hover:bg-muted/30"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <LogOut className="h-4 w-4" />
+                </span>
+                <div className="text-[13.5px] font-semibold text-foreground text-left flex-1">로그아웃</div>
+              </button>
+            </div>
+
+            {/* 동기화 안내 배너 (준비 상태) */}
+            <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
+              <div className="p-4">
+                <h3 className="text-[14px] font-bold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  클라우드 연결 준비 완료
+                </h3>
+                <p className="mt-1.5 text-[12px] text-muted-foreground leading-relaxed">
+                  이 기기에 저장된 <strong>{totalItems}개</strong>의 뜨개 기록을 내 계정에 안전하게 동기화하시겠습니까?
+                </p>
+                <button
+                  onClick={() => alert('데이터 동기화 기능은 아직 준비 중입니다. (UX 흐름 데모)')}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90"
+                >
+                  지금 동기화하기
+                </button>
               </div>
             </div>
-            <button
-              onClick={async () => {
-                if (confirm('로그아웃 하시겠습니까?')) {
-                  await logout();
-                }
-              }}
-              className="flex w-full items-center gap-3 p-4 transition-colors active:bg-muted/50 hover:bg-muted/30"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <LogOut className="h-4 w-4" />
-              </span>
-              <div className="text-[13.5px] font-semibold text-foreground text-left flex-1">로그아웃</div>
-            </button>
           </div>
         ) : (
-          <div className="card-soft overflow-hidden">
+          <div className="card-soft overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex items-center gap-4 p-4 border-b border-border/60 bg-card">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <UserCircle2 className="h-7 w-7" />

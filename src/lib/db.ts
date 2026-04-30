@@ -2,7 +2,13 @@ import Dexie, { Table } from 'dexie';
 
 export type ProjectStatus = 'planned' | 'in_progress' | 'done' | 'on_hold';
 
-export interface Project {
+export interface SyncMetadata {
+  cloudId?: string;
+  isDeleted?: boolean;
+  deletedAt?: number | null;
+}
+
+export interface Project extends SyncMetadata {
   id?: number;
   name: string;
   status: ProjectStatus;
@@ -18,7 +24,7 @@ export interface Project {
   updatedAt: number;
 }
 
-export interface Pattern {
+export interface Pattern extends SyncMetadata {
   id?: number;
   name: string;
   designer?: string;
@@ -33,7 +39,7 @@ export interface Pattern {
   updatedAt: number;
 }
 
-export interface Yarn {
+export interface Yarn extends SyncMetadata {
   id?: number;
   name: string;
   brand?: string;
@@ -49,7 +55,7 @@ export interface Yarn {
   updatedAt: number;
 }
 
-export interface Needle {
+export interface Needle extends SyncMetadata {
   id?: number;
   type: string;
   sizeMm?: string;
@@ -61,7 +67,7 @@ export interface Needle {
   updatedAt: number;
 }
 
-export interface Notion {
+export interface Notion extends SyncMetadata {
   id?: number;
   name: string;
   kind?: string;
@@ -73,7 +79,7 @@ export interface Notion {
   updatedAt: number;
 }
 
-export interface ProjectYarn {
+export interface ProjectYarn extends SyncMetadata {
   id?: number;
   projectId: number;
   yarnId: number;
@@ -86,7 +92,7 @@ export interface ProjectYarn {
   updatedAt: number;
 }
 
-export interface ProjectPattern {
+export interface ProjectPattern extends SyncMetadata {
   id?: number;
   projectId: number;
   patternId: number;
@@ -95,7 +101,7 @@ export interface ProjectPattern {
   updatedAt: number;
 }
 
-export interface ProjectNeedle {
+export interface ProjectNeedle extends SyncMetadata {
   id?: number;
   projectId: number;
   needleId: number;
@@ -104,7 +110,7 @@ export interface ProjectNeedle {
   updatedAt: number;
 }
 
-export interface ProjectNotion {
+export interface ProjectNotion extends SyncMetadata {
   id?: number;
   projectId: number;
   notionId: number;
@@ -114,7 +120,7 @@ export interface ProjectNotion {
   updatedAt: number;
 }
 
-export interface RowCounter {
+export interface RowCounter extends SyncMetadata {
   id?: number;
   projectId: number;
   name: string;
@@ -124,7 +130,7 @@ export interface RowCounter {
   updatedAt: number;
 }
 
-export interface GaugePreset {
+export interface GaugePreset extends SyncMetadata {
   id?: number;
   name: string;
   stitches: number; // per 10cm
@@ -135,7 +141,7 @@ export interface GaugePreset {
 
 export type GaugeMode = 'pattern' | 'cm';
 
-export interface ProjectGauge {
+export interface ProjectGauge extends SyncMetadata {
   id?: number;
   projectId: number;
   name: string;
@@ -237,6 +243,42 @@ class KnitDB extends Dexie {
       gaugePresets: '++id, updatedAt',
       projectGauges: '++id, projectId, updatedAt',
     });
+    // v5: cloudId & isDeleted for cloud sync
+    this.version(5).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+    }).upgrade(async tx => {
+      const tables = [
+        'projects', 'patterns', 'yarns', 'needles', 'notions',
+        'projectYarns', 'projectPatterns', 'projectNeedles', 'projectNotions',
+        'rowCounters', 'gaugePresets', 'projectGauges'
+      ];
+      for (const tableName of tables) {
+        const table = tx.table(tableName);
+        const records = await table.toArray();
+        for (const record of records) {
+          if (!record.cloudId) {
+            record.cloudId = crypto.randomUUID();
+            record.isDeleted = false;
+            record.deletedAt = null;
+            // createdAt과 updatedAt이 혹시라도 없는 예전 데이터를 위한 폴백
+            if (!record.createdAt) record.createdAt = Date.now();
+            if (!record.updatedAt) record.updatedAt = Date.now();
+            await table.put(record);
+          }
+        }
+      }
+    });
   }
 }
 
@@ -246,7 +288,7 @@ export const now = () => Date.now();
 
 export async function exportAll() {
   const data = {
-    version: 3,
+    version: 5,
     exportedAt: new Date().toISOString(),
     projects: await db.projects.toArray(),
     patterns: await db.patterns.toArray(),
@@ -269,18 +311,31 @@ export async function importAll(data: any) {
     'rw',
     [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
     async () => {
-      if (data.projects) await db.projects.bulkPut(data.projects);
-      if (data.patterns) await db.patterns.bulkPut(data.patterns);
-      if (data.yarns) await db.yarns.bulkPut(data.yarns);
-      if (data.needles) await db.needles.bulkPut(data.needles);
-      if (data.notions) await db.notions.bulkPut(data.notions);
-      if (data.projectYarns) await db.projectYarns.bulkPut(data.projectYarns);
-      if (data.projectPatterns) await db.projectPatterns.bulkPut(data.projectPatterns);
-      if (data.projectNeedles) await db.projectNeedles.bulkPut(data.projectNeedles);
-      if (data.projectNotions) await db.projectNotions.bulkPut(data.projectNotions);
-      if (data.rowCounters) await db.rowCounters.bulkPut(data.rowCounters);
-      if (data.gaugePresets) await db.gaugePresets.bulkPut(data.gaugePresets);
-      if (data.projectGauges) await db.projectGauges.bulkPut(data.projectGauges);
+      // 만약 낡은 버전의 백업을 불러올 경우 cloudId가 없을 수 있으므로 import시 부여
+      const ensureMeta = (items: any[] | undefined) => {
+        if (!items) return [];
+        return items.map(item => ({
+          ...item,
+          cloudId: item.cloudId || crypto.randomUUID(),
+          isDeleted: item.isDeleted || false,
+          deletedAt: item.deletedAt || null,
+          createdAt: item.createdAt || Date.now(),
+          updatedAt: item.updatedAt || Date.now(),
+        }));
+      };
+
+      if (data.projects) await db.projects.bulkPut(ensureMeta(data.projects));
+      if (data.patterns) await db.patterns.bulkPut(ensureMeta(data.patterns));
+      if (data.yarns) await db.yarns.bulkPut(ensureMeta(data.yarns));
+      if (data.needles) await db.needles.bulkPut(ensureMeta(data.needles));
+      if (data.notions) await db.notions.bulkPut(ensureMeta(data.notions));
+      if (data.projectYarns) await db.projectYarns.bulkPut(ensureMeta(data.projectYarns));
+      if (data.projectPatterns) await db.projectPatterns.bulkPut(ensureMeta(data.projectPatterns));
+      if (data.projectNeedles) await db.projectNeedles.bulkPut(ensureMeta(data.projectNeedles));
+      if (data.projectNotions) await db.projectNotions.bulkPut(ensureMeta(data.projectNotions));
+      if (data.rowCounters) await db.rowCounters.bulkPut(ensureMeta(data.rowCounters));
+      if (data.gaugePresets) await db.gaugePresets.bulkPut(ensureMeta(data.gaugePresets));
+      if (data.projectGauges) await db.projectGauges.bulkPut(ensureMeta(data.projectGauges));
     }
   );
 }
@@ -307,4 +362,3 @@ export async function clearAll() {
     }
   );
 }
-

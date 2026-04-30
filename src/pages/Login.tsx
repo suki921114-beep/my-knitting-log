@@ -9,10 +9,10 @@ export default function Login() {
   const navigate = useNavigate();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // 이미 로그인되어 있다면 홈으로 이동시킵니다.
+  // 로그인에 성공하면 설정(동기화 안내) 페이지로 이동시킵니다.
   useEffect(() => {
     if (user) {
-      navigate(-1); // 이전 페이지로 돌아가기 (또는 '/' 홈으로 이동)
+      navigate('/settings', { replace: true });
     }
   }, [user, navigate]);
 
