@@ -1,35 +1,51 @@
 // ----------------------------------------------------------------------------
-// syncDirty — "백업 필요" 상태 추적
+// syncDirty — "백업 필요" 상태 추적 (reason + dirtyAt)
 // ----------------------------------------------------------------------------
-// 사용자가 로컬 데이터를 변경하면 dirty=true 로 표시하고,
-// useAutoSync 가 이걸 구독해서 debounce 후 자동 백업을 트리거한다.
+// 사용자가 로컬 데이터를 변경하면 dirty=true 로 표시하고, useAutoSync 가
+// reason 에 따라 debounce / maxWait 를 다르게 적용해 자동 백업을 트리거한다.
+//
+// reason 별 권장 일정 (useAutoSync 에서 사용):
+//   - 'rowCounter'  : 빠르게 자주 바뀜 → debounce 3s, maxWait 15s
+//   - 그 외          : 일반 entity     → debounce 15s, maxWait 60s
 //
 // 자동/수동 백업이나 가져오기 실행 중에 발생하는 내부 write 는 dirty 로 잡지
 // 않도록 syncRunner.beginSyncRun() 이 자동으로 pauseDirtyTracking() 을 호출한다.
-//
-// import 방향: syncDirty → db (hook 등록만), 다른 모듈은 syncDirty 만 import.
 
 import type Dexie from 'dexie';
 import type { Table } from 'dexie';
 
 const DIRTY_KEY = 'syncDirty.v1';
+const DIRTY_AT_KEY = 'syncDirtyAt.v1';
 const LAST_AUTO_BACKUP_KEY = 'lastAutoBackupAt.v1';
 
+export type DirtyReason = 'rowCounter' | 'projectGauge' | 'project' | 'library';
+
 let _dirty = false;
-let _pauseDepth = 0; // pause/resume 중첩 카운터
+let _dirtyAt = 0; // 처음 dirty 가 켜진 시각 (Date.now()) — maxWait 계산용
+let _latestReason: DirtyReason | null = null;
+let _pauseDepth = 0;
 const _listeners = new Set<(dirty: boolean) => void>();
 
 // ---- 초기 상태 복원 ----
 try {
   _dirty = localStorage.getItem(DIRTY_KEY) === '1';
+  if (_dirty) {
+    const raw = localStorage.getItem(DIRTY_AT_KEY);
+    _dirtyAt = raw ? Number(raw) || Date.now() : Date.now();
+  }
 } catch {
   // ignore
 }
 
-function persistDirty(value: boolean) {
+function persistDirty(value: boolean, atMs: number) {
   try {
-    if (value) localStorage.setItem(DIRTY_KEY, '1');
-    else localStorage.removeItem(DIRTY_KEY);
+    if (value) {
+      localStorage.setItem(DIRTY_KEY, '1');
+      localStorage.setItem(DIRTY_AT_KEY, String(atMs));
+    } else {
+      localStorage.removeItem(DIRTY_KEY);
+      localStorage.removeItem(DIRTY_AT_KEY);
+    }
   } catch {
     // ignore
   }
@@ -53,19 +69,42 @@ export function hasSyncDirty(): boolean {
   return _dirty;
 }
 
-export function markSyncDirty(reason?: string) {
+/**
+ * dirty 가 처음 켜진 시각. clear 시 0.
+ * useAutoSync 에서 maxWait 잔여 시간 계산에 사용.
+ */
+export function getDirtyAt(): number {
+  return _dirtyAt;
+}
+
+/**
+ * 가장 최근에 mark 된 reason. clear 시 null.
+ * useAutoSync 에서 reason 별 debounce/maxWait 선택에 사용.
+ */
+export function getLatestDirtyReason(): DirtyReason | null {
+  return _latestReason;
+}
+
+export function markSyncDirty(reason: DirtyReason) {
   if (_pauseDepth > 0) return; // 백업/가져오기 중에는 무시
-  if (_dirty) return; // 이미 표시됨
+  _latestReason = reason;
+  if (_dirty) {
+    // 이미 dirty — listener 통지만 (reason 갱신 알림 효과)
+    notify();
+    return;
+  }
   _dirty = true;
-  persistDirty(true);
-  if (reason) console.debug(`[syncDirty] mark (${reason})`);
+  _dirtyAt = Date.now();
+  persistDirty(true, _dirtyAt);
   notify();
 }
 
 export function clearSyncDirty() {
-  if (!_dirty) return;
+  if (!_dirty && _latestReason === null) return;
   _dirty = false;
-  persistDirty(false);
+  _dirtyAt = 0;
+  _latestReason = null;
+  persistDirty(false, 0);
   notify();
 }
 
@@ -109,26 +148,26 @@ export function setLastAutoBackupAt(iso: string) {
 }
 
 // ============================================================================
-// Dexie hooks 등록
-// ----------------------------------------------------------------------------
-// db.ts 의 KnitDB 인스턴스에 한 번만 호출.
-// 동기화 대상 테이블에 creating/updating/deleting 후크를 달아
-// 사용자 변경을 감지한다 (pause 중이면 무시됨).
+// Dexie hooks 등록 — 테이블별 reason 매핑
 // ============================================================================
 
-const TARGET_TABLES = [
-  'yarns',
-  'patterns',
-  'needles',
-  'notions',
-  'projects',
-  'projectYarns',
-  'projectPatterns',
-  'projectNeedles',
-  'projectNotions',
-  'rowCounters',
-  'projectGauges',
-] as const;
+const TABLE_REASON: Record<string, DirtyReason> = {
+  // 자주 바뀜 (단수 카운터)
+  rowCounters: 'rowCounter',
+  // 프로젝트의 게이지
+  projectGauges: 'projectGauge',
+  // 프로젝트 본문 + 연결 테이블
+  projects: 'project',
+  projectYarns: 'project',
+  projectPatterns: 'project',
+  projectNeedles: 'project',
+  projectNotions: 'project',
+  // 라이브러리 (실/도안/바늘/부자재)
+  yarns: 'library',
+  patterns: 'library',
+  needles: 'library',
+  notions: 'library',
+};
 
 let _hooksAttached = false;
 
@@ -136,18 +175,12 @@ export function attachDirtyHooks(db: Dexie) {
   if (_hooksAttached) return;
   _hooksAttached = true;
 
-  for (const name of TARGET_TABLES) {
+  for (const [name, reason] of Object.entries(TABLE_REASON)) {
     const table: Table<any> | undefined = (db as any)[name];
     if (!table || typeof table.hook !== 'function') continue;
 
-    table.hook('creating', () => {
-      markSyncDirty(`${name}:create`);
-    });
-    table.hook('updating', () => {
-      markSyncDirty(`${name}:update`);
-    });
-    table.hook('deleting', () => {
-      markSyncDirty(`${name}:delete`);
-    });
+    table.hook('creating', () => { markSyncDirty(reason); });
+    table.hook('updating', () => { markSyncDirty(reason); });
+    table.hook('deleting', () => { markSyncDirty(reason); });
   }
 }
