@@ -79,18 +79,28 @@ export default function ProjectDetail() {
           <ul className="space-y-2">
             {patternLinks.map(l => {
               const p = patternMap.get(l.patternId);
+              const deleted = !!p?.isDeleted;
               return (
                 <li key={l.id}>
-                  <Link to={`/library/patterns/${l.patternId}/edit`} className="card-soft flex items-center gap-3 p-3">
+                  <MaybeLink
+                    to={`/library/patterns/${l.patternId}/edit`}
+                    isDeleted={deleted}
+                    className="card-soft flex items-center gap-3 p-3"
+                  >
                     <Thumb src={p?.imageDataUrl} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-ink">{p?.name || '도안'}</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`truncate text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                          {p?.name || '도안'}
+                        </div>
+                        {deleted && <DeletedBadge label="도안" />}
+                      </div>
                       <div className="truncate text-[11px] text-muted-foreground">
                         {[p?.designer, p?.difficulty].filter(Boolean).join(' · ')}
                       </div>
                       {l.note && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.note}</div>}
                     </div>
-                  </Link>
+                  </MaybeLink>
                 </li>
               );
             })}
@@ -105,17 +115,27 @@ export default function ProjectDetail() {
           <ul className="space-y-2">
             {yarnLinks.map(l => {
               const y = yarnMap.get(l.yarnId);
+              const deleted = !!y?.isDeleted;
               return (
                 <li key={l.id}>
-                  <Link to={`/library/yarns/${l.yarnId}`} className="card-soft flex items-center gap-3 p-3">
+                  <MaybeLink
+                    to={`/library/yarns/${l.yarnId}`}
+                    isDeleted={deleted}
+                    className="card-soft flex items-center gap-3 p-3"
+                  >
                     <Thumb src={y?.photoDataUrl} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-ink">{y?.name || '실'}</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`truncate text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                          {y?.name || '실'}
+                        </div>
+                        {deleted && <DeletedBadge label="실" />}
+                      </div>
                       <div className="truncate text-[11px] text-muted-foreground">{y?.brand} {y?.colorName && `· ${y.colorName}`}</div>
                       {l.colorNote && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.colorNote}</div>}
                     </div>
-                    <div className="text-sm font-semibold text-primary">{l.usedGrams}g</div>
-                  </Link>
+                    <div className={`text-sm font-semibold ${deleted ? 'text-muted-foreground' : 'text-primary'}`}>{l.usedGrams}g</div>
+                  </MaybeLink>
                 </li>
               );
             })}
@@ -130,15 +150,25 @@ export default function ProjectDetail() {
           <ul className="space-y-2">
             {needleLinks.map(l => {
               const n = needleMap.get(l.needleId);
+              const deleted = !!n?.isDeleted;
               return (
                 <li key={l.id}>
-                  <Link to={`/library/needles/${l.needleId}/edit`} className="card-soft block p-3">
-                    <div className="text-sm font-medium text-ink">{n?.type} {n?.sizeMm && `· ${n.sizeMm}`}</div>
+                  <MaybeLink
+                    to={`/library/needles/${l.needleId}/edit`}
+                    isDeleted={deleted}
+                    className="card-soft block p-3"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={`text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                        {n?.type} {n?.sizeMm && `· ${n.sizeMm}`}
+                      </div>
+                      {deleted && <DeletedBadge label="바늘" />}
+                    </div>
                     <div className="text-[11px] text-muted-foreground">
                       {[n?.brand, n?.material, n?.length].filter(Boolean).join(' · ')}
                     </div>
                     {l.note && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.note}</div>}
-                  </Link>
+                  </MaybeLink>
                 </li>
               );
             })}
@@ -153,17 +183,27 @@ export default function ProjectDetail() {
           <ul className="space-y-2">
             {notionLinks.map(l => {
               const n = notionMap.get(l.notionId);
+              const deleted = !!n?.isDeleted;
               return (
                 <li key={l.id}>
-                  <Link to={`/library/notions/${l.notionId}/edit`} className="card-soft flex items-center gap-3 p-3">
+                  <MaybeLink
+                    to={`/library/notions/${l.notionId}/edit`}
+                    isDeleted={deleted}
+                    className="card-soft flex items-center gap-3 p-3"
+                  >
                     <Thumb src={n?.photoDataUrl} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-ink">{n?.name}</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`truncate text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                          {n?.name}
+                        </div>
+                        {deleted && <DeletedBadge label="부자재" />}
+                      </div>
                       <div className="truncate text-[11px] text-muted-foreground">{[n?.kind, n?.shop].filter(Boolean).join(' · ')}</div>
                       {l.note && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.note}</div>}
                     </div>
-                    {typeof l.quantity === 'number' && <div className="text-sm font-semibold text-primary">{l.quantity}개</div>}
-                  </Link>
+                    {typeof l.quantity === 'number' && <div className={`text-sm font-semibold ${deleted ? 'text-muted-foreground' : 'text-primary'}`}>{l.quantity}개</div>}
+                  </MaybeLink>
                 </li>
               );
             })}
@@ -232,3 +272,41 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Empty({ text }: { text: string }) {
   return <p className="rounded-2xl bg-secondary/60 px-3 py-4 text-center text-[12px] text-muted-foreground">{text}</p>;
 }
+
+function MaybeLink({
+  to,
+  isDeleted,
+  className,
+  children,
+}: {
+  to: string;
+  isDeleted: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  // 삭제된 항목은 클릭 비활성, dim 스타일
+  if (isDeleted) {
+    return (
+      <div
+        className={`${className ?? ''} cursor-default opacity-60`}
+        aria-disabled="true"
+      >
+        {children}
+      </div>
+    );
+  }
+  return (
+    <Link to={to} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+function DeletedBadge({ label }: { label: string }) {
+  return (
+    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+      삭제된 {label}
+    </span>
+  );
+}
+
