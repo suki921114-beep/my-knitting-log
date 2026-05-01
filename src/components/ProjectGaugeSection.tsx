@@ -38,6 +38,7 @@ export default function ProjectGaugeSection({ projectId }: Props) {
       name: `계산 ${items.length + 1}`,
       createdAt: t,
       updatedAt: t,
+      cloudId: crypto.randomUUID(),
     });
     setOpenId(id);
   }

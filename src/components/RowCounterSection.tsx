@@ -21,6 +21,7 @@ export default function RowCounterSection({ projectId }: { projectId: number }) 
       count: 0,
       createdAt: t,
       updatedAt: t,
+      cloudId: crypto.randomUUID(),
     });
   }
 

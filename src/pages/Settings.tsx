@@ -53,6 +53,8 @@ import {
   setAutoSyncMode as persistAutoSyncMode,
   loadLastResult,
   saveLastResult,
+  beginSyncRun,
+  endSyncRun,
 } from '@/lib/syncRunner';
 
 // 토스트 한 줄 라벨 도우미
@@ -109,6 +111,10 @@ export default function Settings() {
   const handleFetch = async () => {
     if (!user) {
       toast.error('로그인이 필요합니다.');
+      return;
+    }
+    if (!beginSyncRun()) {
+      toast.info('다른 동기화가 진행 중이에요. 끝난 뒤 다시 눌러주세요.');
       return;
     }
 
@@ -200,6 +206,7 @@ export default function Settings() {
       });
     } finally {
       setIsFetching(false);
+      endSyncRun();
     }
   };
 
@@ -209,6 +216,10 @@ export default function Settings() {
   const handleSync = async () => {
     if (!user) {
       toast.error('로그인이 필요합니다.');
+      return;
+    }
+    if (!beginSyncRun()) {
+      toast.info('다른 동기화가 진행 중이에요. 끝난 뒤 다시 눌러주세요.');
       return;
     }
 
@@ -300,6 +311,7 @@ export default function Settings() {
       });
     } finally {
       setIsSyncing(false);
+      endSyncRun();
     }
   };
 

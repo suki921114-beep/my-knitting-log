@@ -46,6 +46,7 @@ export default function GaugeCalculator() {
       resultRows: adjRows || 0,
       createdAt: t,
       updatedAt: t,
+      cloudId: crypto.randomUUID(),
     });
     setSavePickerOpen(false);
     setToast('프로젝트에 저장했어요');

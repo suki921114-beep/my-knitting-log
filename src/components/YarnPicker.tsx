@@ -279,6 +279,7 @@ function QuickAddYarn({
       note: note || undefined,
       createdAt: t,
       updatedAt: t,
+      cloudId: crypto.randomUUID(),
     })) as number;
     const y = await db.yarns.get(id);
     if (y) onCreated(y);

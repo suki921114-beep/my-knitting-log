@@ -20,6 +20,8 @@ import {
   shouldAutoSync,
   runFullSync,
   saveLastResult,
+  beginSyncRun,
+  endSyncRun,
 } from '@/lib/syncRunner';
 
 // 앱이 안정된 뒤에 트리거 (UI 렌더 직후 무거운 네트워크 작업 회피)
@@ -40,6 +42,8 @@ export function useAutoSync() {
     triggered.current = true;
 
     const timer = setTimeout(async () => {
+      // 사용자가 막 [백업] 버튼을 눌렀거나 다른 동기화가 도는 중이면 스킵
+      if (!beginSyncRun()) return;
       try {
         const { result, failed } = await runFullSync(user.uid);
         saveLastResult(result);
@@ -67,6 +71,8 @@ export function useAutoSync() {
         toast.error('자동 백업 실패', {
           description: '네트워크 또는 권한 문제일 수 있어요.',
         });
+      } finally {
+        endSyncRun();
       }
     }, AUTO_DELAY_MS);
 

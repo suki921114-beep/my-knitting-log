@@ -274,6 +274,7 @@ function QuickAdd({
         note: note || undefined,
         createdAt: t,
         updatedAt: t,
+        cloudId: crypto.randomUUID(),
       })) as number;
     } else if (kind === 'needle') {
       const type = name.trim() || '대바늘';
@@ -284,6 +285,7 @@ function QuickAdd({
         note: note || undefined,
         createdAt: t,
         updatedAt: t,
+        cloudId: crypto.randomUUID(),
       })) as number;
     } else {
       if (!name.trim()) return;
@@ -294,6 +296,7 @@ function QuickAdd({
         note: note || undefined,
         createdAt: t,
         updatedAt: t,
+        cloudId: crypto.randomUUID(),
       })) as number;
     }
     onCreated(id);
@@ -354,5 +357,3 @@ function QuickAdd({
     </div>
   );
 }
-
-const qaInput = 'w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary';

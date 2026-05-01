@@ -91,6 +91,37 @@ export function shouldAutoSync(mode: AutoSyncMode): boolean {
 }
 
 // ============================================================================
+// 동시 실행 방지 lock
+// ----------------------------------------------------------------------------
+// 자동 백업과 수동 [백업]/[가져오기] 가 거의 동시에 트리거될 때 한 entity 를
+// 두 흐름이 동시에 처리하면 중복/덮어쓰기 위험이 있다. 모듈 스코프 단순 플래그로
+// 같은 탭 안의 동시 실행을 막는다 (탭 간 동기화는 별도 레이어 — 향후 BroadcastChannel).
+// ============================================================================
+
+let _syncRunning = false;
+
+export function isSyncRunning(): boolean {
+  return _syncRunning;
+}
+
+/**
+ * 동기화 흐름의 시작/끝을 알린다.
+ * 사용 패턴:
+ *   if (!beginSyncRun()) return;
+ *   try { ... } finally { endSyncRun(); }
+ */
+export function beginSyncRun(): boolean {
+  if (_syncRunning) return false;
+  _syncRunning = true;
+  return true;
+}
+
+export function endSyncRun() {
+  _syncRunning = false;
+}
+
+
+// ============================================================================
 // 마지막 동기화/가져오기 결과 저장
 // ============================================================================
 
