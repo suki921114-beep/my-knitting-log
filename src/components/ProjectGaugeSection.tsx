@@ -176,7 +176,7 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
       </button>
 
       {open && (
-        <div className="space-y-3 border-t border-border/70 px-3.5 py-3">
+        <div className="space-y-2.5 border-t border-border/70 px-3.5 py-2.5">
           {/* Name */}
           <Field label="이름">
             <input
@@ -233,7 +233,7 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
               <ResultCard label="필요 코수" value={resultSt} unit="코" />
               <ResultCard label="필요 단수" value={resultRows} unit="단" />
             </div>
-            <p className="mt-1.5 text-center text-[10.5px] text-muted-foreground">
+            <p className="mt-1 text-center text-[10px] text-muted-foreground">
               {mode === 'pattern' ? '도안 수치 × (내 게이지 ÷ 도안 게이지)' : '치수 × (내 게이지 ÷ 10cm)'}
             </p>
           </div>
@@ -318,8 +318,8 @@ function SquareInput({
     accent: 'text-accent-foreground/80',
   }[variant];
   return (
-    <label className={`flex aspect-square flex-col justify-between rounded-2xl border ${styles} p-2.5`}>
-      <span className={`text-[10.5px] font-bold uppercase tracking-wider ${labelColor}`}>{label}</span>
+    <label className={`flex min-h-[96px] flex-col justify-between rounded-xl border ${styles} px-3 py-2`}>
+      <span className={`text-[10px] font-bold uppercase tracking-wider ${labelColor}`}>{label}</span>
       <div className="flex items-baseline justify-center gap-0.5">
         <input
           type="number"
@@ -327,24 +327,24 @@ function SquareInput({
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder="—"
-          className="w-full min-w-0 bg-transparent text-center text-[26px] font-extrabold tabular-nums leading-none text-foreground outline-none placeholder:text-muted-foreground/40"
+          className="w-full min-w-0 bg-transparent text-center text-[22px] font-extrabold tabular-nums leading-none text-foreground outline-none placeholder:text-muted-foreground/40"
         />
-        {suffix && <span className="text-[12px] font-bold text-muted-foreground">{suffix}</span>}
+        {suffix && <span className="text-[11px] font-bold text-muted-foreground">{suffix}</span>}
       </div>
-      <span className="text-center text-[9.5px] text-muted-foreground">10cm</span>
+      <span className="text-center text-[9px] text-muted-foreground">10cm</span>
     </label>
   );
 }
 
 function ResultCard({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
-    <div className="flex aspect-square flex-col items-center justify-center rounded-2xl bg-primary px-3 py-2.5 text-primary-foreground shadow-soft">
-      <div className="text-[10.5px] font-bold uppercase tracking-wider opacity-80">{label}</div>
-      <div className="mt-1 flex items-baseline gap-0.5">
-        <span className="text-[36px] font-extrabold leading-none tabular-nums">{value > 0 ? value : '—'}</span>
-        <span className="text-[14px] font-bold opacity-90">{unit}</span>
+    <div className="flex min-h-[96px] flex-col items-center justify-center rounded-xl bg-primary px-3 py-2 text-primary-foreground shadow-soft">
+      <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">{label}</div>
+      <div className="mt-0.5 flex items-baseline gap-0.5">
+        <span className="text-[28px] font-extrabold leading-none tabular-nums">{value > 0 ? value : '—'}</span>
+        <span className="text-[12px] font-bold opacity-90">{unit}</span>
       </div>
-      <div className="mt-1 text-[9.5px] opacity-70">내 게이지 기준</div>
+      <div className="mt-0.5 text-[9px] opacity-70">내 게이지 기준</div>
     </div>
   );
 }
