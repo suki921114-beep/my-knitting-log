@@ -56,6 +56,11 @@ import {
   beginSyncRun,
   endSyncRun,
 } from '@/lib/syncRunner';
+import {
+  clearSyncDirty,
+  subscribeSyncDirty,
+  getLastAutoBackupAt,
+} from '@/lib/syncDirty';
 
 // 토스트 한 줄 라벨 도우미
 function syncToastDetail(stat: EntitySyncStat) {
@@ -80,12 +85,18 @@ export default function Settings() {
   const [isFetching, setIsFetching] = useState(false);
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
   const [autoMode, setAutoMode] = useState<AutoSyncMode>('off');
+  const [dirty, setDirty] = useState(false);
+  const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
 
   // 페이지 로드 시 마지막 결과 + 자동 백업 모드 복원
   useEffect(() => {
     setLastBackup(localStorage.getItem('lastBackupAt'));
     setLastResult(loadLastResult());
     setAutoMode(getAutoSyncMode());
+    setLastAutoBackup(getLastAutoBackupAt());
+    // dirty 상태 구독 (마운트 즉시 1회 + 이후 변경 시마다)
+    const unsub = subscribeSyncDirty(setDirty);
+    return unsub;
   }, []);
 
   function persistResult(result: LastResult) {
@@ -294,6 +305,11 @@ export default function Settings() {
       };
       persistResult(result);
 
+      if (failedTotal === 0) {
+        // 수동 백업 성공 → dirty clear (다음 자동 백업 트리거 방지)
+        clearSyncDirty();
+      }
+
       if (failedTotal > 0) {
         toast.warning(`백업 완료 · 실패 ${failedTotal}건`, {
           description: '아래 결과 카드를 확인하세요.',
@@ -454,7 +470,12 @@ export default function Settings() {
             </div>
 
             {/* 자동 백업 설정 */}
-            <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} />
+            <AutoSyncSection
+              mode={autoMode}
+              onChange={handleAutoModeChange}
+              dirty={dirty}
+              lastAutoBackup={lastAutoBackup}
+            />
 
             {/* 마지막 백업 결과 카드 */}
             {lastResult && <LastResultCard result={lastResult} />}
@@ -619,17 +640,42 @@ const AUTO_OPTIONS: {
 function AutoSyncSection({
   mode,
   onChange,
+  dirty,
+  lastAutoBackup,
 }: {
   mode: AutoSyncMode;
   onChange: (next: AutoSyncMode) => void;
+  dirty: boolean;
+  lastAutoBackup: string | null;
 }) {
+  const lastLabel = lastAutoBackup
+    ? new Date(lastAutoBackup).toLocaleString('ko-KR', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '없음';
   return (
     <div className="card-soft overflow-hidden bg-card">
       <div className="p-4 border-b border-border/60">
         <h3 className="text-[14px] font-bold text-foreground">자동 백업</h3>
         <p className="mt-1 text-[11.5px] text-muted-foreground leading-relaxed">
-          앱을 열 때 조건이 맞으면 자동으로 클라우드에 백업합니다.
+          로컬 데이터가 변경되면 자동으로 클라우드에 백업합니다.
         </p>
+        <div className="mt-2.5 flex items-center gap-2 text-[11px] tabular-nums">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-semibold ${
+              dirty
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${dirty ? 'bg-amber-500' : 'bg-green-500'}`} />
+            {dirty ? '백업 대기 중' : '최신'}
+          </span>
+          <span className="text-muted-foreground">· 마지막 자동 백업 {lastLabel}</span>
+        </div>
       </div>
       <div role="radiogroup" aria-label="자동 백업 모드" className="divide-y divide-border/60">
         {AUTO_OPTIONS.map((opt) => {

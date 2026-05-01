@@ -21,6 +21,7 @@ import {
   calculateNotionFetchDiff, executeNotionFetch,
   calculateProjectFetchDiff, executeProjectFetch,
 } from './sync';
+import { pauseDirtyTracking, resumeDirtyTracking } from './syncDirty';
 
 // ============================================================================
 // 자동 동기화 모드
@@ -113,11 +114,15 @@ export function isSyncRunning(): boolean {
 export function beginSyncRun(): boolean {
   if (_syncRunning) return false;
   _syncRunning = true;
+  // 백업/가져오기 중 발생하는 내부 write 는 dirty 로 잡지 않는다
+  pauseDirtyTracking();
   return true;
 }
 
 export function endSyncRun() {
+  if (!_syncRunning) return;
   _syncRunning = false;
+  resumeDirtyTracking();
 }
 
 

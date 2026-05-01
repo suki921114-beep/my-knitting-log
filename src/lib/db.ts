@@ -362,3 +362,10 @@ export async function clearAll() {
     }
   );
 }
+
+// ============================================================================
+// 사용자 변경 감지 — syncDirty 모듈에 hook 등록
+// ============================================================================
+
+import { attachDirtyHooks } from './syncDirty';
+attachDirtyHooks(db);
