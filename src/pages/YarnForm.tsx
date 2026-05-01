@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { ImageInput } from '@/components/ImageInput';
+import { toast } from '@/components/ui/sonner';
 import { Save, Trash2 } from 'lucide-react';
 
 export default function YarnForm() {
@@ -72,6 +73,7 @@ export default function YarnForm() {
     } as any);
     nav('/library/yarns');
     toast.success('실을 삭제했어요', {
+      duration: 8000,
       action: {
         label: '되돌리기',
         onClick: async () => {
