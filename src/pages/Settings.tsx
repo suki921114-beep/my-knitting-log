@@ -15,6 +15,9 @@ import {
   CloudDownload,
   CheckCircle2,
   AlertCircle,
+  Wifi,
+  PauseCircle,
+  Globe,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,59 +44,25 @@ import {
   calculateProjectFetchDiff,
   executeProjectFetch,
 } from '@/lib/sync';
+import {
+  type AutoSyncMode,
+  type EntitySyncStat,
+  type EntityFetchStat,
+  type LastResult,
+  getAutoSyncMode,
+  setAutoSyncMode as persistAutoSyncMode,
+  loadLastResult,
+  saveLastResult,
+} from '@/lib/syncRunner';
 
-// ----------------------------------------------------------------------------
-// 결과 요약용 타입
-// ----------------------------------------------------------------------------
-
-type EntitySyncStat = {
-  uploaded: number;
-  downloaded: number;
-  unchanged: number;
-  failed: number;
-};
-
-type EntityFetchStat = {
-  added: number;
-  updated: number;
-  unchanged: number;
-  failed: number;
-};
-
-type LastResult =
-  | {
-      mode: 'sync';
-      at: string;
-      entries: { label: string; stat: EntitySyncStat }[];
-    }
-  | {
-      mode: 'fetch';
-      at: string;
-      entries: { label: string; stat: EntityFetchStat }[];
-    };
-
-const LAST_RESULT_KEY = 'lastSyncResult.v1';
-
-// ----------------------------------------------------------------------------
-// 토스트 라벨 도우미
-// ----------------------------------------------------------------------------
-
+// 토스트 한 줄 라벨 도우미
 function syncToastDetail(stat: EntitySyncStat) {
-  const parts = [
-    `↑ ${stat.uploaded}`,
-    `↓ ${stat.downloaded}`,
-    `· ${stat.unchanged}`,
-  ];
+  const parts = [`↑ ${stat.uploaded}`, `↓ ${stat.downloaded}`, `· ${stat.unchanged}`];
   if (stat.failed > 0) parts.push(`× ${stat.failed}`);
   return parts.join(' / ');
 }
-
 function fetchToastDetail(stat: EntityFetchStat) {
-  const parts = [
-    `+ ${stat.added}`,
-    `↻ ${stat.updated}`,
-    `· ${stat.unchanged}`,
-  ];
+  const parts = [`+ ${stat.added}`, `↻ ${stat.updated}`, `· ${stat.unchanged}`];
   if (stat.failed > 0) parts.push(`× ${stat.failed}`);
   return parts.join(' / ');
 }
@@ -108,26 +77,29 @@ export default function Settings() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
+  const [autoMode, setAutoMode] = useState<AutoSyncMode>('off');
 
-  // 페이지 로드 시 마지막 결과 복원
+  // 페이지 로드 시 마지막 결과 + 자동 백업 모드 복원
   useEffect(() => {
     setLastBackup(localStorage.getItem('lastBackupAt'));
-    const raw = localStorage.getItem(LAST_RESULT_KEY);
-    if (raw) {
-      try {
-        setLastResult(JSON.parse(raw) as LastResult);
-      } catch {
-        // ignore
-      }
-    }
+    setLastResult(loadLastResult());
+    setAutoMode(getAutoSyncMode());
   }, []);
 
   function persistResult(result: LastResult) {
     setLastResult(result);
-    try {
-      localStorage.setItem(LAST_RESULT_KEY, JSON.stringify(result));
-    } catch {
-      // localStorage 가득 찼거나 비공개 모드일 수 있음 — 무시
+    saveLastResult(result);
+  }
+
+  function handleAutoModeChange(next: AutoSyncMode) {
+    setAutoMode(next);
+    persistAutoSyncMode(next);
+    if (next === 'off') {
+      toast.info('자동 백업을 껐어요. 필요할 때 [백업] 버튼으로 진행하세요.');
+    } else if (next === 'wifi') {
+      toast.success('자동 백업: Wi-Fi 환경에서만 실행돼요.');
+    } else {
+      toast.success('자동 백업: Wi-Fi와 데이터 모두에서 실행돼요.');
     }
   }
 
@@ -167,7 +139,6 @@ export default function Settings() {
         return;
       }
 
-      // 단계별 실행 + 토스트
       toast.loading('실 가져오는 중…', { id: tid });
       const yarnResult = await executeYarnFetch(yarnDiff);
       toast.success(`실 가져오기 완료 · ${fetchToastDetail(yarnResult)}`, { id: tid });
@@ -233,7 +204,7 @@ export default function Settings() {
   };
 
   // --------------------------------------------------------------------------
-  // 동기화 (로컬 ↔ 클라우드 양방향)
+  // 백업 (양방향 동기화: 로컬 ↔ 클라우드)
   // --------------------------------------------------------------------------
   const handleSync = async () => {
     if (!user) {
@@ -244,7 +215,7 @@ export default function Settings() {
     setIsSyncing(true);
     const tid = 'sync-progress';
     try {
-      toast.loading('동기화 대상 분석 중…', { id: tid });
+      toast.loading('백업 대상 분석 중…', { id: tid });
 
       const yarnDiff = await calculateYarnSyncDiff(user.uid);
       const patternDiff = await calculatePatternSyncDiff(user.uid);
@@ -255,43 +226,42 @@ export default function Settings() {
       toast.dismiss(tid);
 
       const confirmMsg =
-        '동기화 대상 확인:\n\n' +
+        '백업 대상 확인 (로컬 ↔ 클라우드):\n\n' +
         `[실] 업로드 ${yarnDiff.toUpload.length} / 다운로드 ${yarnDiff.toDownload.length} / 변경없음 ${yarnDiff.unchanged}\n` +
         `[도안] 업로드 ${patternDiff.toUpload.length} / 다운로드 ${patternDiff.toDownload.length} / 변경없음 ${patternDiff.unchanged}\n` +
         `[바늘] 업로드 ${needleDiff.toUpload.length} / 다운로드 ${needleDiff.toDownload.length} / 변경없음 ${needleDiff.unchanged}\n` +
         `[부자재] 업로드 ${notionDiff.toUpload.length} / 다운로드 ${notionDiff.toDownload.length} / 변경없음 ${notionDiff.unchanged}\n` +
         `[프로젝트] 업로드 ${projectDiff.toUpload.length} / 다운로드 ${projectDiff.toDownload.length} / 변경없음 ${projectDiff.unchanged}\n\n` +
-        '지금 동기화를 진행하시겠습니까?';
+        '지금 백업을 진행하시겠습니까?';
 
       if (!confirm(confirmMsg)) {
         setIsSyncing(false);
         return;
       }
 
-      // entity별로 토스트 한 번씩
-      toast.loading('실 동기화 중…', { id: tid });
+      toast.loading('실 백업 중…', { id: tid });
       const yarnResult = await executeYarnSync(user.uid, yarnDiff);
-      toast.success(`실 동기화 완료 · ${syncToastDetail(yarnResult)}`, { id: tid });
+      toast.success(`실 백업 완료 · ${syncToastDetail(yarnResult)}`, { id: tid });
 
       const ptid = 'sync-pattern';
-      toast.loading('도안 동기화 중…', { id: ptid });
+      toast.loading('도안 백업 중…', { id: ptid });
       const patternResult = await executePatternSync(user.uid, patternDiff);
-      toast.success(`도안 동기화 완료 · ${syncToastDetail(patternResult)}`, { id: ptid });
+      toast.success(`도안 백업 완료 · ${syncToastDetail(patternResult)}`, { id: ptid });
 
       const ntid = 'sync-needle';
-      toast.loading('바늘 동기화 중…', { id: ntid });
+      toast.loading('바늘 백업 중…', { id: ntid });
       const needleResult = await executeNeedleSync(user.uid, needleDiff);
-      toast.success(`바늘 동기화 완료 · ${syncToastDetail(needleResult)}`, { id: ntid });
+      toast.success(`바늘 백업 완료 · ${syncToastDetail(needleResult)}`, { id: ntid });
 
       const notid = 'sync-notion';
-      toast.loading('부자재 동기화 중…', { id: notid });
+      toast.loading('부자재 백업 중…', { id: notid });
       const notionResult = await executeNotionSync(user.uid, notionDiff);
-      toast.success(`부자재 동기화 완료 · ${syncToastDetail(notionResult)}`, { id: notid });
+      toast.success(`부자재 백업 완료 · ${syncToastDetail(notionResult)}`, { id: notid });
 
       const prtid = 'sync-project';
-      toast.loading('프로젝트(연결관계·카운터·게이지) 동기화 중…', { id: prtid });
+      toast.loading('프로젝트(연결관계·카운터·게이지) 백업 중…', { id: prtid });
       const projectResult = await executeProjectSync(user.uid, projectDiff);
-      toast.success(`프로젝트 동기화 완료 · ${syncToastDetail(projectResult)}`, { id: prtid });
+      toast.success(`프로젝트 백업 완료 · ${syncToastDetail(projectResult)}`, { id: prtid });
 
       const failedTotal =
         yarnResult.failed +
@@ -314,17 +284,17 @@ export default function Settings() {
       persistResult(result);
 
       if (failedTotal > 0) {
-        toast.warning(`동기화 완료 · 실패 ${failedTotal}건`, {
+        toast.warning(`백업 완료 · 실패 ${failedTotal}건`, {
           description: '아래 결과 카드를 확인하세요.',
         });
       } else {
-        toast.success('동기화 완료', {
+        toast.success('백업 완료', {
           description: '아래 결과 카드에서 항목별 수치를 확인할 수 있어요.',
         });
       }
     } catch (error) {
       console.error(error);
-      toast.error('동기화 중 오류가 발생했습니다', {
+      toast.error('백업 중 오류가 발생했습니다', {
         id: tid,
         description: '잠시 후 다시 시도해주세요.',
       });
@@ -430,15 +400,15 @@ export default function Settings() {
               </button>
             </div>
 
-            {/* 동기화 안내 + 액션 */}
+            {/* 클라우드 백업 액션 */}
             <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
               <div className="p-4">
                 <h3 className="text-[14px] font-bold text-foreground flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />
-                  클라우드 연결 준비 완료
+                  클라우드 백업
                 </h3>
                 <p className="mt-1.5 text-[12px] text-muted-foreground leading-relaxed">
-                  이 기기에 저장된 <strong>{totalItems}개</strong>의 뜨개 기록을 내 계정에 안전하게 동기화하시겠습니까?
+                  이 기기에 저장된 <strong>{totalItems}개</strong>의 뜨개 기록을 클라우드와 양방향으로 동기화합니다.
                 </p>
                 <div className="mt-4 flex gap-2">
                   <button
@@ -464,14 +434,17 @@ export default function Settings() {
                         진행 중...
                       </>
                     ) : (
-                      '병합/올리기'
+                      '백업'
                     )}
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* 마지막 동기화 결과 카드 */}
+            {/* 자동 백업 설정 */}
+            <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} />
+
+            {/* 마지막 백업 결과 카드 */}
             {lastResult && <LastResultCard result={lastResult} />}
           </div>
         ) : (
@@ -485,7 +458,7 @@ export default function Settings() {
                   <div className="text-[14px] font-bold text-foreground">게스트 모드</div>
                   <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground tracking-wide">OFFLINE</span>
                 </div>
-                <div className="text-[11.5px] text-muted-foreground mt-0.5">데이터를 동기화하려면 로그인하세요</div>
+                <div className="text-[11.5px] text-muted-foreground mt-0.5">데이터를 백업하려면 로그인하세요</div>
               </div>
             </div>
             <button
@@ -516,12 +489,13 @@ export default function Settings() {
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-4">
             <Meta label="저장된 항목" value={`${totalItems}개`} />
-            <Meta label="마지막 백업" value={lastBackupLabel} />
+            <Meta label="마지막 파일 백업" value={lastBackupLabel} />
           </dl>
         </div>
       </Section>
 
-      <Section title="백업">
+      {/* 3. 로컬 파일 백업 */}
+      <Section title="로컬 파일 백업">
         <button
           onClick={handleExport}
           disabled={busy}
@@ -531,8 +505,8 @@ export default function Settings() {
             <Download className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1 text-left">
-            <div className="text-[13.5px] font-semibold text-foreground">내보내기</div>
-            <div className="text-[11.5px] text-muted-foreground">JSON 파일로 저장</div>
+            <div className="text-[13.5px] font-semibold text-foreground">JSON 파일로 내보내기</div>
+            <div className="text-[11.5px] text-muted-foreground">기기에 백업 파일을 저장</div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -545,8 +519,8 @@ export default function Settings() {
             <Upload className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1 text-left">
-            <div className="text-[13.5px] font-semibold text-foreground">가져오기</div>
-            <div className="text-[11.5px] text-muted-foreground">JSON 파일 선택</div>
+            <div className="text-[13.5px] font-semibold text-foreground">JSON 파일에서 가져오기</div>
+            <div className="text-[11.5px] text-muted-foreground">백업 파일을 현재 데이터에 병합</div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -604,6 +578,94 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+const AUTO_OPTIONS: {
+  value: AutoSyncMode;
+  label: string;
+  desc: string;
+  Icon: typeof Wifi;
+}[] = [
+  {
+    value: 'off',
+    label: '자동 백업 끔',
+    desc: '필요할 때만 [백업] 버튼으로 직접 진행',
+    Icon: PauseCircle,
+  },
+  {
+    value: 'wifi',
+    label: 'Wi-Fi에서만 자동 백업',
+    desc: '데이터 사용 없이 Wi-Fi 환경에서만 자동 실행',
+    Icon: Wifi,
+  },
+  {
+    value: 'always',
+    label: '항상 자동 백업',
+    desc: 'Wi-Fi와 모바일 데이터 모두에서 자동 실행',
+    Icon: Globe,
+  },
+];
+
+function AutoSyncSection({
+  mode,
+  onChange,
+}: {
+  mode: AutoSyncMode;
+  onChange: (next: AutoSyncMode) => void;
+}) {
+  return (
+    <div className="card-soft overflow-hidden bg-card">
+      <div className="p-4 border-b border-border/60">
+        <h3 className="text-[14px] font-bold text-foreground">자동 백업</h3>
+        <p className="mt-1 text-[11.5px] text-muted-foreground leading-relaxed">
+          앱을 열 때 조건이 맞으면 자동으로 클라우드에 백업합니다.
+        </p>
+      </div>
+      <div role="radiogroup" aria-label="자동 백업 모드" className="divide-y divide-border/60">
+        {AUTO_OPTIONS.map((opt) => {
+          const active = mode === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(opt.value)}
+              className={`flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-muted/30 active:bg-muted/50 ${
+                active ? 'bg-primary/5' : ''
+              }`}
+            >
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                  active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                <opt.Icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className={`text-[13px] font-semibold ${active ? 'text-primary' : 'text-foreground'}`}>
+                  {opt.label}
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{opt.desc}</div>
+              </div>
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                  active ? 'border-primary bg-primary' : 'border-border'
+                }`}
+              >
+                {active && <span className="h-2 w-2 rounded-full bg-primary-foreground" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="px-4 py-3 bg-muted/20 border-t border-border/60">
+        <p className="text-[10.5px] text-muted-foreground leading-relaxed">
+          ※ 일부 브라우저는 Wi-Fi 여부를 정확히 확인하지 못해요. 그런 경우 'Wi-Fi에서만'은 안전을 위해 자동 백업을 건너뜁니다.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function LastResultCard({ result }: { result: LastResult }) {
   const totalFailed = result.entries.reduce((acc, e) => acc + e.stat.failed, 0);
   const at = new Date(result.at).toLocaleString('ko-KR', {
@@ -612,7 +674,7 @@ function LastResultCard({ result }: { result: LastResult }) {
     hour: 'numeric',
     minute: '2-digit',
   });
-  const title = result.mode === 'sync' ? '마지막 동기화 결과' : '마지막 가져오기 결과';
+  const title = result.mode === 'sync' ? '마지막 백업 결과' : '마지막 가져오기 결과';
 
   return (
     <div className="card-soft p-4 bg-card animate-in fade-in slide-in-from-bottom-2 duration-300">

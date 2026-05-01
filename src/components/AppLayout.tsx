@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, Notebook, Package, Settings } from 'lucide-react';
+import { useAutoSync } from '@/hooks/useAutoSync';
 
 const tabs = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -9,6 +10,9 @@ const tabs = [
 ];
 
 export default function AppLayout() {
+  // 로그인 + 모드/네트워크 조건 충족 시 앱 진입 직후 한 번 자동 백업
+  useAutoSync();
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-1 mx-auto w-full max-w-2xl px-4 pb-28 pt-6 animate-fade-in">
