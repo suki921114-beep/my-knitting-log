@@ -24,7 +24,7 @@ interface Props {
 export default function YarnPicker({ links, onChange, showPlanned, currentProjectId }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const yarns = useLiveQuery(() => db.yarns.orderBy('updatedAt').reverse().toArray(), []) || [];
+  const yarns = useLiveQuery(() => db.yarns.orderBy('updatedAt').reverse().filter(y => !y.isDeleted).toArray(), []) || [];
   const yarnMap = useMemo(() => new Map(yarns.map(y => [y.id!, y])), [yarns]);
 
   // Used by *other* projects — for shortage calc when planning

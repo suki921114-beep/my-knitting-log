@@ -7,7 +7,7 @@ import { Layers, Scroll, Ruler, Sparkles, ChevronRight, Calculator } from 'lucid
 
 export default function LibraryHub() {
   const counts = useLiveQuery(async () => ({
-    yarns: await db.yarns.count(),
+    yarns: await db.yarns.filter(y => !y.isDeleted).count(),
     patterns: await db.patterns.count(),
     needles: await db.needles.count(),
     notions: await db.notions.count(),

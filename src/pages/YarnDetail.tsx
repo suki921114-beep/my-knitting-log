@@ -15,6 +15,16 @@ export default function YarnDetail() {
   const pmap = new Map(projects.map(p => [p.id!, p]));
 
   if (!yarn) return <p className="p-8 text-center text-sm text-muted-foreground">불러오는 중…</p>;
+  if (yarn.isDeleted) {
+    return (
+      <div className="space-y-3">
+        <PageHeader title="삭제된 실" back />
+        <p className="card-soft p-8 text-center text-sm text-muted-foreground">
+          이 실은 삭제된 상태입니다. 라이브러리에서는 보이지 않아요.
+        </p>
+      </div>
+    );
+  }
 
   const total = stats?.total ?? yarn.totalGrams;
   const used = stats?.used ?? 0;

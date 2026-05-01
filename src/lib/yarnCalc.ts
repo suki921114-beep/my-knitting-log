@@ -5,7 +5,7 @@ export function useYarnRemaining(yarnId?: number) {
   return useLiveQuery(async () => {
     if (!yarnId) return null;
     const yarn = await db.yarns.get(yarnId);
-    if (!yarn) return null;
+    if (!yarn || yarn.isDeleted) return null;
     const links = await db.projectYarns.where('yarnId').equals(yarnId).toArray();
     const used = links.reduce((s, l) => s + (l.usedGrams || 0), 0);
     return { total: yarn.totalGrams, used, remaining: yarn.totalGrams - used };
@@ -14,7 +14,7 @@ export function useYarnRemaining(yarnId?: number) {
 
 export function useAllYarnStats() {
   return useLiveQuery(async () => {
-    const yarns = await db.yarns.toArray();
+    const yarns = (await db.yarns.toArray()).filter(y => !y.isDeleted);
     const links = await db.projectYarns.toArray();
     const usedByYarn = new Map<number, number>();
     for (const l of links) usedByYarn.set(l.yarnId, (usedByYarn.get(l.yarnId) || 0) + (l.usedGrams || 0));

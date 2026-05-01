@@ -61,10 +61,30 @@ export default function YarnForm() {
 
   async function remove() {
     if (!yid) return;
-    if (!confirm('이 실을 삭제할까요? 프로젝트의 사용 기록도 함께 사라집니다.')) return;
-    await db.projectYarns.where('yarnId').equals(yid).delete();
-    await db.yarns.delete(yid);
+    if (!confirm('이 실을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    const t = Date.now();
+    // soft delete — 실제 row 는 보존하고 isDeleted 만 켠다.
+    // 프로젝트의 연결관계(projectYarns)는 다음 단계에서 cascade 처리 예정이라 지금은 그대로 둔다.
+    await db.yarns.update(yid, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
     nav('/library/yarns');
+    toast.success('실을 삭제했어요', {
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const now = Date.now();
+          await db.yarns.update(yid, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: now,
+          } as any);
+          toast.success('실을 다시 살렸어요');
+        },
+      },
+    });
   }
 
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: k === 'totalGrams' ? Number(e.target.value) || 0 : e.target.value });
