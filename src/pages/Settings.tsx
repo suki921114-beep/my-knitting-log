@@ -2,9 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { db, exportAll, importAll, clearAll } from '@/lib/db';
-import { Download, Upload, Trash2, ShieldCheck, ChevronRight, UserCircle2, LogOut, LogIn, Loader2, CloudDownload } from 'lucide-react';
+import {
+  Download,
+  Upload,
+  Trash2,
+  ShieldCheck,
+  ChevronRight,
+  UserCircle2,
+  LogOut,
+  LogIn,
+  Loader2,
+  CloudDownload,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/components/ui/sonner';
 import {
   calculateYarnSyncDiff,
   executeYarnSync,
@@ -28,137 +42,296 @@ import {
   executeProjectFetch,
 } from '@/lib/sync';
 
+// ----------------------------------------------------------------------------
+// 결과 요약용 타입
+// ----------------------------------------------------------------------------
+
+type EntitySyncStat = {
+  uploaded: number;
+  downloaded: number;
+  unchanged: number;
+  failed: number;
+};
+
+type EntityFetchStat = {
+  added: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+};
+
+type LastResult =
+  | {
+      mode: 'sync';
+      at: string;
+      entries: { label: string; stat: EntitySyncStat }[];
+    }
+  | {
+      mode: 'fetch';
+      at: string;
+      entries: { label: string; stat: EntityFetchStat }[];
+    };
+
+const LAST_RESULT_KEY = 'lastSyncResult.v1';
+
+// ----------------------------------------------------------------------------
+// 토스트 라벨 도우미
+// ----------------------------------------------------------------------------
+
+function syncToastDetail(stat: EntitySyncStat) {
+  const parts = [
+    `↑ ${stat.uploaded}`,
+    `↓ ${stat.downloaded}`,
+    `· ${stat.unchanged}`,
+  ];
+  if (stat.failed > 0) parts.push(`× ${stat.failed}`);
+  return parts.join(' / ');
+}
+
+function fetchToastDetail(stat: EntityFetchStat) {
+  const parts = [
+    `+ ${stat.added}`,
+    `↻ ${stat.updated}`,
+    `· ${stat.unchanged}`,
+  ];
+  if (stat.failed > 0) parts.push(`× ${stat.failed}`);
+  return parts.join(' / ');
+}
+
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
-  
+
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [lastResult, setLastResult] = useState<LastResult | null>(null);
 
-  const handleFetch = async () => {
-  if (!user) {
-    alert("로그인이 필요합니다.");
-    return;
-  }
-
-  setIsFetching(true);
-  try {
-    const yarnDiff = await calculateYarnFetchDiff(user.uid);
-    const patternDiff = await calculatePatternFetchDiff(user.uid);
-    const needleDiff = await calculateNeedleFetchDiff(user.uid);
-    const notionDiff = await calculateNotionFetchDiff(user.uid);
-    const projectDiff = await calculateProjectFetchDiff(user.uid);
-
-    const confirmMsg =
-      `클라우드에서 가져오기:\n\n` +
-      `[실]\n- 추가: ${yarnDiff.toAdd.length}건 / 업데이트: ${yarnDiff.toUpdate.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n` +
-      `[도안]\n- 추가: ${patternDiff.toAdd.length}건 / 업데이트: ${patternDiff.toUpdate.length}건 / 변경 없음: ${patternDiff.unchanged}건\n` +
-      `[바늘]\n- 추가: ${needleDiff.toAdd.length}건 / 업데이트: ${needleDiff.toUpdate.length}건 / 변경 없음: ${needleDiff.unchanged}건\n` +
-      `[부자재]\n- 추가: ${notionDiff.toAdd.length}건 / 업데이트: ${notionDiff.toUpdate.length}건 / 변경 없음: ${notionDiff.unchanged}건\n` +
-      `[프로젝트]\n- 추가: ${projectDiff.toAdd.length}건 / 업데이트: ${projectDiff.toUpdate.length}건 / 변경 없음: ${projectDiff.unchanged}건\n\n` +
-      `이 기기로 데이터를 가져오시겠습니까?`;
-
-    if (!confirm(confirmMsg)) {
-      setIsFetching(false);
-      return;
-    }
-
-    const yarnResult = await executeYarnFetch(yarnDiff);
-    const patternResult = await executePatternFetch(patternDiff);
-    const needleResult = await executeNeedleFetch(needleDiff);
-    const notionResult = await executeNotionFetch(notionDiff);
-    const projectResult = await executeProjectFetch(projectDiff);
-
-    const failed =
-      yarnResult.failed +
-      patternResult.failed +
-      needleResult.failed +
-      notionResult.failed +
-      projectResult.failed;
-
-    const alertTitle = failed > 0 ? "일부 항목 가져오기 실패" : "가져오기 완료!";
-
-    alert(
-      `${alertTitle}\n\n` +
-      `[실]\n- 추가: ${yarnResult.added}건 / 업데이트: ${yarnResult.updated}건 / 변경 없음: ${yarnResult.unchanged}건 / 실패: ${yarnResult.failed}건\n` +
-      `[도안]\n- 추가: ${patternResult.added}건 / 업데이트: ${patternResult.updated}건 / 변경 없음: ${patternResult.unchanged}건 / 실패: ${patternResult.failed}건\n` +
-      `[바늘]\n- 추가: ${needleResult.added}건 / 업데이트: ${needleResult.updated}건 / 변경 없음: ${needleResult.unchanged}건 / 실패: ${needleResult.failed}건\n` +
-      `[부자재]\n- 추가: ${notionResult.added}건 / 업데이트: ${notionResult.updated}건 / 변경 없음: ${notionResult.unchanged}건 / 실패: ${notionResult.failed}건\n` +
-      `[프로젝트]\n- 추가: ${projectResult.added}건 / 업데이트: ${projectResult.updated}건 / 변경 없음: ${projectResult.unchanged}건 / 실패: ${projectResult.failed}건`
-    );
-  } catch (error) {
-    alert("가져오기 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-    console.error(error);
-  } finally {
-    setIsFetching(false);
-  }
-};
-
- const handleSync = async () => {
-  if (!user) {
-    alert("로그인이 필요합니다.");
-    return;
-  }
-
-  setIsSyncing(true);
-  try {
-    const yarnDiff = await calculateYarnSyncDiff(user.uid);
-    const patternDiff = await calculatePatternSyncDiff(user.uid);
-    const needleDiff = await calculateNeedleSyncDiff(user.uid);
-    const notionDiff = await calculateNotionSyncDiff(user.uid);
-    const projectDiff = await calculateProjectSyncDiff(user.uid);
-
-    const confirmMsg =
-      `동기화 대상 확인:\n\n` +
-      `[실]\n- 업로드: ${yarnDiff.toUpload.length}건 / 다운로드: ${yarnDiff.toDownload.length}건 / 변경 없음: ${yarnDiff.unchanged}건\n` +
-      `[도안]\n- 업로드: ${patternDiff.toUpload.length}건 / 다운로드: ${patternDiff.toDownload.length}건 / 변경 없음: ${patternDiff.unchanged}건\n` +
-      `[바늘]\n- 업로드: ${needleDiff.toUpload.length}건 / 다운로드: ${needleDiff.toDownload.length}건 / 변경 없음: ${needleDiff.unchanged}건\n` +
-      `[부자재]\n- 업로드: ${notionDiff.toUpload.length}건 / 다운로드: ${notionDiff.toDownload.length}건 / 변경 없음: ${notionDiff.unchanged}건\n` +
-      `[프로젝트]\n- 업로드: ${projectDiff.toUpload.length}건 / 다운로드: ${projectDiff.toDownload.length}건 / 변경 없음: ${projectDiff.unchanged}건\n\n` +
-      `지금 동기화를 진행하시겠습니까?`;
-
-    if (!confirm(confirmMsg)) {
-      setIsSyncing(false);
-      return;
-    }
-
-    const yarnResult = await executeYarnSync(user.uid, yarnDiff);
-    const patternResult = await executePatternSync(user.uid, patternDiff);
-    const needleResult = await executeNeedleSync(user.uid, needleDiff);
-    const notionResult = await executeNotionSync(user.uid, notionDiff);
-    const projectResult = await executeProjectSync(user.uid, projectDiff);
-
-    const failed =
-      yarnResult.failed +
-      patternResult.failed +
-      needleResult.failed +
-      notionResult.failed +
-      projectResult.failed;
-
-    const alertTitle = failed > 0 ? "일부 항목 동기화 실패" : "동기화 완료!";
-
-    alert(
-      `${alertTitle}\n\n` +
-      `[실]\n- 업로드: ${yarnResult.uploaded}건 / 다운로드: ${yarnResult.downloaded}건 / 변경 없음: ${yarnResult.unchanged}건 / 실패: ${yarnResult.failed}건\n` +
-      `[도안]\n- 업로드: ${patternResult.uploaded}건 / 다운로드: ${patternResult.downloaded}건 / 변경 없음: ${patternResult.unchanged}건 / 실패: ${patternResult.failed}건\n` +
-      `[바늘]\n- 업로드: ${needleResult.uploaded}건 / 다운로드: ${needleResult.downloaded}건 / 변경 없음: ${needleResult.unchanged}건 / 실패: ${needleResult.failed}건\n` +
-      `[부자재]\n- 업로드: ${notionResult.uploaded}건 / 다운로드: ${notionResult.downloaded}건 / 변경 없음: ${notionResult.unchanged}건 / 실패: ${notionResult.failed}건\n` +
-      `[프로젝트]\n- 업로드: ${projectResult.uploaded}건 / 다운로드: ${projectResult.downloaded}건 / 변경 없음: ${projectResult.unchanged}건 / 실패: ${projectResult.failed}건`
-    );
-  } catch (error) {
-    alert("동기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-    console.error(error);
-  } finally {
-    setIsSyncing(false);
-  }
-};
-
+  // 페이지 로드 시 마지막 결과 복원
   useEffect(() => {
     setLastBackup(localStorage.getItem('lastBackupAt'));
+    const raw = localStorage.getItem(LAST_RESULT_KEY);
+    if (raw) {
+      try {
+        setLastResult(JSON.parse(raw) as LastResult);
+      } catch {
+        // ignore
+      }
+    }
   }, []);
+
+  function persistResult(result: LastResult) {
+    setLastResult(result);
+    try {
+      localStorage.setItem(LAST_RESULT_KEY, JSON.stringify(result));
+    } catch {
+      // localStorage 가득 찼거나 비공개 모드일 수 있음 — 무시
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 가져오기 (클라우드 → 로컬)
+  // --------------------------------------------------------------------------
+  const handleFetch = async () => {
+    if (!user) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
+
+    setIsFetching(true);
+    const tid = 'fetch-progress';
+    try {
+      toast.loading('클라우드 데이터 분석 중…', { id: tid });
+
+      const yarnDiff = await calculateYarnFetchDiff(user.uid);
+      const patternDiff = await calculatePatternFetchDiff(user.uid);
+      const needleDiff = await calculateNeedleFetchDiff(user.uid);
+      const notionDiff = await calculateNotionFetchDiff(user.uid);
+      const projectDiff = await calculateProjectFetchDiff(user.uid);
+
+      toast.dismiss(tid);
+
+      const confirmMsg =
+        '클라우드에서 가져오기:\n\n' +
+        `[실] 추가 ${yarnDiff.toAdd.length} / 업데이트 ${yarnDiff.toUpdate.length} / 변경없음 ${yarnDiff.unchanged}\n` +
+        `[도안] 추가 ${patternDiff.toAdd.length} / 업데이트 ${patternDiff.toUpdate.length} / 변경없음 ${patternDiff.unchanged}\n` +
+        `[바늘] 추가 ${needleDiff.toAdd.length} / 업데이트 ${needleDiff.toUpdate.length} / 변경없음 ${needleDiff.unchanged}\n` +
+        `[부자재] 추가 ${notionDiff.toAdd.length} / 업데이트 ${notionDiff.toUpdate.length} / 변경없음 ${notionDiff.unchanged}\n` +
+        `[프로젝트] 추가 ${projectDiff.toAdd.length} / 업데이트 ${projectDiff.toUpdate.length} / 변경없음 ${projectDiff.unchanged}\n\n` +
+        '이 기기로 데이터를 가져오시겠습니까?';
+
+      if (!confirm(confirmMsg)) {
+        setIsFetching(false);
+        return;
+      }
+
+      // 단계별 실행 + 토스트
+      toast.loading('실 가져오는 중…', { id: tid });
+      const yarnResult = await executeYarnFetch(yarnDiff);
+      toast.success(`실 가져오기 완료 · ${fetchToastDetail(yarnResult)}`, { id: tid });
+
+      const ptid = 'fetch-pattern';
+      toast.loading('도안 가져오는 중…', { id: ptid });
+      const patternResult = await executePatternFetch(patternDiff);
+      toast.success(`도안 가져오기 완료 · ${fetchToastDetail(patternResult)}`, { id: ptid });
+
+      const ntid = 'fetch-needle';
+      toast.loading('바늘 가져오는 중…', { id: ntid });
+      const needleResult = await executeNeedleFetch(needleDiff);
+      toast.success(`바늘 가져오기 완료 · ${fetchToastDetail(needleResult)}`, { id: ntid });
+
+      const notid = 'fetch-notion';
+      toast.loading('부자재 가져오는 중…', { id: notid });
+      const notionResult = await executeNotionFetch(notionDiff);
+      toast.success(`부자재 가져오기 완료 · ${fetchToastDetail(notionResult)}`, { id: notid });
+
+      const prtid = 'fetch-project';
+      toast.loading('프로젝트(연결관계·카운터·게이지) 가져오는 중…', { id: prtid });
+      const projectResult = await executeProjectFetch(projectDiff);
+      toast.success(`프로젝트 가져오기 완료 · ${fetchToastDetail(projectResult)}`, { id: prtid });
+
+      const failedTotal =
+        yarnResult.failed +
+        patternResult.failed +
+        needleResult.failed +
+        notionResult.failed +
+        projectResult.failed;
+
+      const result: LastResult = {
+        mode: 'fetch',
+        at: new Date().toISOString(),
+        entries: [
+          { label: '실', stat: yarnResult },
+          { label: '도안', stat: patternResult },
+          { label: '바늘', stat: needleResult },
+          { label: '부자재', stat: notionResult },
+          { label: '프로젝트', stat: projectResult },
+        ],
+      };
+      persistResult(result);
+
+      if (failedTotal > 0) {
+        toast.warning(`가져오기 완료 · 실패 ${failedTotal}건`, {
+          description: '아래 결과 카드를 확인하세요.',
+        });
+      } else {
+        toast.success('가져오기 완료', {
+          description: '아래 결과 카드에서 항목별 수치를 확인할 수 있어요.',
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('가져오기 중 오류가 발생했습니다', {
+        id: tid,
+        description: '잠시 후 다시 시도해주세요.',
+      });
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // 동기화 (로컬 ↔ 클라우드 양방향)
+  // --------------------------------------------------------------------------
+  const handleSync = async () => {
+    if (!user) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
+
+    setIsSyncing(true);
+    const tid = 'sync-progress';
+    try {
+      toast.loading('동기화 대상 분석 중…', { id: tid });
+
+      const yarnDiff = await calculateYarnSyncDiff(user.uid);
+      const patternDiff = await calculatePatternSyncDiff(user.uid);
+      const needleDiff = await calculateNeedleSyncDiff(user.uid);
+      const notionDiff = await calculateNotionSyncDiff(user.uid);
+      const projectDiff = await calculateProjectSyncDiff(user.uid);
+
+      toast.dismiss(tid);
+
+      const confirmMsg =
+        '동기화 대상 확인:\n\n' +
+        `[실] 업로드 ${yarnDiff.toUpload.length} / 다운로드 ${yarnDiff.toDownload.length} / 변경없음 ${yarnDiff.unchanged}\n` +
+        `[도안] 업로드 ${patternDiff.toUpload.length} / 다운로드 ${patternDiff.toDownload.length} / 변경없음 ${patternDiff.unchanged}\n` +
+        `[바늘] 업로드 ${needleDiff.toUpload.length} / 다운로드 ${needleDiff.toDownload.length} / 변경없음 ${needleDiff.unchanged}\n` +
+        `[부자재] 업로드 ${notionDiff.toUpload.length} / 다운로드 ${notionDiff.toDownload.length} / 변경없음 ${notionDiff.unchanged}\n` +
+        `[프로젝트] 업로드 ${projectDiff.toUpload.length} / 다운로드 ${projectDiff.toDownload.length} / 변경없음 ${projectDiff.unchanged}\n\n` +
+        '지금 동기화를 진행하시겠습니까?';
+
+      if (!confirm(confirmMsg)) {
+        setIsSyncing(false);
+        return;
+      }
+
+      // entity별로 토스트 한 번씩
+      toast.loading('실 동기화 중…', { id: tid });
+      const yarnResult = await executeYarnSync(user.uid, yarnDiff);
+      toast.success(`실 동기화 완료 · ${syncToastDetail(yarnResult)}`, { id: tid });
+
+      const ptid = 'sync-pattern';
+      toast.loading('도안 동기화 중…', { id: ptid });
+      const patternResult = await executePatternSync(user.uid, patternDiff);
+      toast.success(`도안 동기화 완료 · ${syncToastDetail(patternResult)}`, { id: ptid });
+
+      const ntid = 'sync-needle';
+      toast.loading('바늘 동기화 중…', { id: ntid });
+      const needleResult = await executeNeedleSync(user.uid, needleDiff);
+      toast.success(`바늘 동기화 완료 · ${syncToastDetail(needleResult)}`, { id: ntid });
+
+      const notid = 'sync-notion';
+      toast.loading('부자재 동기화 중…', { id: notid });
+      const notionResult = await executeNotionSync(user.uid, notionDiff);
+      toast.success(`부자재 동기화 완료 · ${syncToastDetail(notionResult)}`, { id: notid });
+
+      const prtid = 'sync-project';
+      toast.loading('프로젝트(연결관계·카운터·게이지) 동기화 중…', { id: prtid });
+      const projectResult = await executeProjectSync(user.uid, projectDiff);
+      toast.success(`프로젝트 동기화 완료 · ${syncToastDetail(projectResult)}`, { id: prtid });
+
+      const failedTotal =
+        yarnResult.failed +
+        patternResult.failed +
+        needleResult.failed +
+        notionResult.failed +
+        projectResult.failed;
+
+      const result: LastResult = {
+        mode: 'sync',
+        at: new Date().toISOString(),
+        entries: [
+          { label: '실', stat: yarnResult },
+          { label: '도안', stat: patternResult },
+          { label: '바늘', stat: needleResult },
+          { label: '부자재', stat: notionResult },
+          { label: '프로젝트', stat: projectResult },
+        ],
+      };
+      persistResult(result);
+
+      if (failedTotal > 0) {
+        toast.warning(`동기화 완료 · 실패 ${failedTotal}건`, {
+          description: '아래 결과 카드를 확인하세요.',
+        });
+      } else {
+        toast.success('동기화 완료', {
+          description: '아래 결과 카드에서 항목별 수치를 확인할 수 있어요.',
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('동기화 중 오류가 발생했습니다', {
+        id: tid,
+        description: '잠시 후 다시 시도해주세요.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const totals = useLiveQuery(async () => ({
     p: await db.projects.count(),
@@ -185,11 +358,12 @@ export default function Settings() {
       const now = new Date().toISOString();
       localStorage.setItem('lastBackupAt', now);
       setLastBackup(now);
+      toast.success('백업 파일을 저장했습니다');
     } finally {
       setBusy(false);
     }
   }
-  
+
   async function handleImport(file: File) {
     setBusy(true);
     try {
@@ -197,19 +371,19 @@ export default function Settings() {
       const data = JSON.parse(text);
       if (!confirm('가져온 데이터를 현재 데이터에 병합할까요?')) return;
       await importAll(data);
-      alert('가져오기 완료');
+      toast.success('백업 파일을 가져왔습니다');
     } catch (e: any) {
-      alert('가져오기 실패: ' + e.message);
+      toast.error('가져오기 실패', { description: e.message });
     } finally {
       setBusy(false);
     }
   }
-  
+
   async function handleClear() {
     if (!confirm('정말 모든 데이터를 삭제할까요?')) return;
     if (!confirm('되돌릴 수 없습니다. 계속할까요?')) return;
     await clearAll();
-    alert('삭제 완료');
+    toast.success('전체 데이터가 삭제되었습니다');
   }
 
   const lastBackupLabel = lastBackup
@@ -220,7 +394,7 @@ export default function Settings() {
     <div className="space-y-6">
       <PageHeader title="설정" />
 
-      {/* 1. 계정 섹션 추가 */}
+      {/* 1. 계정 섹션 */}
       <Section title="계정">
         {user ? (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -256,7 +430,7 @@ export default function Settings() {
               </button>
             </div>
 
-            {/* 동기화 안내 배너 (준비 상태) */}
+            {/* 동기화 안내 + 액션 */}
             <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
               <div className="p-4">
                 <h3 className="text-[14px] font-bold text-foreground flex items-center gap-2">
@@ -290,12 +464,15 @@ export default function Settings() {
                         진행 중...
                       </>
                     ) : (
-                      "병합/올리기"
+                      '병합/올리기'
                     )}
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* 마지막 동기화 결과 카드 */}
+            {lastResult && <LastResultCard result={lastResult} />}
           </div>
         ) : (
           <div className="card-soft overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -325,7 +502,7 @@ export default function Settings() {
         )}
       </Section>
 
-      {/* 2. 기존 데이터 관리 섹션 */}
+      {/* 2. 데이터 관리 */}
       <Section title="데이터 관리">
         <div className="card-soft p-4 bg-card">
           <div className="flex items-center gap-3">
@@ -373,8 +550,17 @@ export default function Settings() {
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
-        <input ref={fileRef} type="file" accept="application/json" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ''; }} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleImport(f);
+            e.target.value = '';
+          }}
+        />
       </Section>
 
       <Section title="위험 영역">
@@ -396,6 +582,10 @@ export default function Settings() {
   );
 }
 
+// ----------------------------------------------------------------------------
+// 보조 컴포넌트
+// ----------------------------------------------------------------------------
+
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -411,5 +601,94 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="section-title">{title}</h2>
       <div className="space-y-2">{children}</div>
     </section>
+  );
+}
+
+function LastResultCard({ result }: { result: LastResult }) {
+  const totalFailed = result.entries.reduce((acc, e) => acc + e.stat.failed, 0);
+  const at = new Date(result.at).toLocaleString('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const title = result.mode === 'sync' ? '마지막 동기화 결과' : '마지막 가져오기 결과';
+
+  return (
+    <div className="card-soft p-4 bg-card animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[13.5px] font-bold text-foreground flex items-center gap-2">
+          {totalFailed > 0 ? (
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+          )}
+          {title}
+        </h3>
+        <span className="text-[10.5px] text-muted-foreground tabular-nums">{at}</span>
+      </div>
+      <div className="space-y-1.5 border-t border-border/60 pt-3">
+        {result.entries.map((entry) => (
+          <ResultRow key={entry.label} label={entry.label} stat={entry.stat} mode={result.mode} />
+        ))}
+      </div>
+      {totalFailed > 0 && (
+        <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
+          실패 {totalFailed}건 — 콘솔 로그에서 자세한 원인을 확인할 수 있어요.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ResultRow({
+  label,
+  stat,
+  mode,
+}: {
+  label: string;
+  stat: EntitySyncStat | EntityFetchStat;
+  mode: 'sync' | 'fetch';
+}) {
+  const items =
+    mode === 'sync'
+      ? [
+          { k: '↑', v: (stat as EntitySyncStat).uploaded, tone: 'primary' },
+          { k: '↓', v: (stat as EntitySyncStat).downloaded, tone: 'accent' },
+          { k: '·', v: stat.unchanged, tone: 'muted' },
+        ]
+      : [
+          { k: '+', v: (stat as EntityFetchStat).added, tone: 'primary' },
+          { k: '↻', v: (stat as EntityFetchStat).updated, tone: 'accent' },
+          { k: '·', v: stat.unchanged, tone: 'muted' },
+        ];
+
+  return (
+    <div className="flex items-center justify-between text-[12px]">
+      <span className="font-semibold text-foreground">{label}</span>
+      <div className="flex items-center gap-3 tabular-nums">
+        {items.map((item) => (
+          <span
+            key={item.k}
+            className={
+              item.tone === 'muted'
+                ? 'text-muted-foreground'
+                : item.tone === 'accent'
+                ? 'text-accent-foreground'
+                : 'text-primary'
+            }
+          >
+            <span className="opacity-60 mr-0.5">{item.k}</span>
+            {item.v}
+          </span>
+        ))}
+        {stat.failed > 0 && (
+          <span className="text-destructive">
+            <span className="opacity-60 mr-0.5">×</span>
+            {stat.failed}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
