@@ -124,6 +124,12 @@ export default function Settings() {
       toast.error('로그인이 필요합니다.');
       return;
     }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('오프라인 상태예요', {
+        description: '인터넷 연결 후 다시 시도해주세요.',
+      });
+      return;
+    }
     if (!beginSyncRun()) {
       toast.info('다른 동기화가 진행 중이에요. 끝난 뒤 다시 눌러주세요.');
       return;
@@ -227,6 +233,12 @@ export default function Settings() {
   const handleSync = async () => {
     if (!user) {
       toast.error('로그인이 필요합니다.');
+      return;
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('오프라인 상태예요', {
+        description: '인터넷 연결 후 다시 시도해주세요.',
+      });
       return;
     }
     if (!beginSyncRun()) {

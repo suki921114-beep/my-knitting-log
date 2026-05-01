@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, Notebook, Package, Settings } from 'lucide-react';
 import { useAutoSync } from '@/hooks/useAutoSync';
+import OfflineBanner from '@/components/OfflineBanner';
 
 const tabs = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -15,6 +16,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <OfflineBanner />
       <main className="flex-1 mx-auto w-full max-w-2xl px-4 pb-28 pt-6 animate-fade-in">
         <Outlet />
       </main>
