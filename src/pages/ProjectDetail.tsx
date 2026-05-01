@@ -55,18 +55,34 @@ export default function ProjectDetail() {
           </Link>
         }
       />
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`chip ${statusColor(project.status)}`}>{statusLabel(project.status)}</span>
-        {project.startDate && <span className="text-xs text-muted-foreground">시작 {project.startDate}</span>}
-        {project.endDate && <span className="text-xs text-muted-foreground">완료 {project.endDate}</span>}
-      </div>
-
-      {(project.size || project.gauge) && (
-        <div className="card-soft p-4 text-sm">
-          {project.size && <div><span className="text-muted-foreground">사이즈 </span>{project.size}</div>}
-          {project.gauge && <div><span className="text-muted-foreground">게이지 </span>{project.gauge}</div>}
+      {/* Hero — 상태 / 일자 / 사이즈 / 게이지를 한 카드로 묶음 */}
+      <div className="card-soft overflow-hidden bg-card">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-4 py-3">
+          <span className={`chip ${statusColor(project.status)}`}>{statusLabel(project.status)}</span>
+          {project.startDate && (
+            <span className="text-[11.5px] text-muted-foreground">시작 {project.startDate}</span>
+          )}
+          {project.endDate && (
+            <span className="text-[11.5px] text-muted-foreground">완료 {project.endDate}</span>
+          )}
         </div>
-      )}
+        {(project.size || project.gauge) && (
+          <dl className="grid grid-cols-2 gap-3 px-4 py-3 text-[12.5px]">
+            {project.size && (
+              <div className="min-w-0">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">사이즈</dt>
+                <dd className="mt-0.5 truncate font-semibold text-foreground">{project.size}</dd>
+              </div>
+            )}
+            {project.gauge && (
+              <div className="min-w-0">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">게이지</dt>
+                <dd className="mt-0.5 truncate font-semibold text-foreground">{project.gauge}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </div>
 
       <RowCounterSection projectId={pid} />
 
@@ -74,7 +90,7 @@ export default function ProjectDetail() {
 
       <Section title="도안">
         {patternLinks.length === 0 ? (
-          <Empty text="연결된 도안이 없습니다." />
+          <Empty text="아직 연결된 도안이 없어요" />
         ) : (
           <ul className="space-y-2">
             {patternLinks.map(l => {
@@ -110,7 +126,7 @@ export default function ProjectDetail() {
 
       <Section title="사용한 실">
         {yarnLinks.length === 0 ? (
-          <Empty text="연결된 실이 없습니다." />
+          <Empty text="아직 연결된 실이 없어요" />
         ) : (
           <ul className="space-y-2">
             {yarnLinks.map(l => {
@@ -145,7 +161,7 @@ export default function ProjectDetail() {
 
       <Section title="바늘">
         {needleLinks.length === 0 ? (
-          <Empty text="연결된 바늘이 없습니다." />
+          <Empty text="아직 연결된 바늘이 없어요" />
         ) : (
           <ul className="space-y-2">
             {needleLinks.map(l => {
@@ -178,7 +194,7 @@ export default function ProjectDetail() {
 
       <Section title="부자재">
         {notionLinks.length === 0 ? (
-          <Empty text="연결된 부자재가 없습니다." />
+          <Empty text="아직 연결된 부자재가 없어요" />
         ) : (
           <ul className="space-y-2">
             {notionLinks.map(l => {
@@ -213,9 +229,6 @@ export default function ProjectDetail() {
 
       {photos.filter((p: any) => !p.isDeleted).length > 0 && (
         <Section title="사진">
-          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
-            ※ 사진은 이 기기에만 저장됩니다. 무료 백업에는 포함되지 않아요.
-          </p>
           <div className="grid grid-cols-3 gap-2">
             {photos
               .filter((p: any) => !p.isDeleted)
@@ -236,17 +249,24 @@ export default function ProjectDetail() {
                 </button>
               ))}
           </div>
+          <p className="mt-2 text-[10.5px] text-muted-foreground/80">
+            사진은 이 기기에만 저장돼요 · 무료 백업 미포함
+          </p>
         </Section>
       )}
 
       {project.progressNote && (
         <Section title="진행 메모">
-          <div className="card-soft whitespace-pre-wrap p-4 text-sm leading-relaxed text-ink">{project.progressNote}</div>
+          <div className="card-soft whitespace-pre-wrap rounded-r-2xl border-l-4 border-primary/40 bg-primary-soft/30 px-4 py-3.5 text-[13px] leading-relaxed text-ink">
+            {project.progressNote}
+          </div>
         </Section>
       )}
       {project.finishedNote && (
         <Section title="완성 소감">
-          <div className="card-soft whitespace-pre-wrap p-4 text-sm leading-relaxed text-ink">{project.finishedNote}</div>
+          <div className="card-soft whitespace-pre-wrap rounded-r-2xl border-l-4 border-accent/40 bg-accent-soft/30 px-4 py-3.5 text-[13px] leading-relaxed text-ink">
+            {project.finishedNote}
+          </div>
         </Section>
       )}
 
@@ -286,7 +306,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-2xl bg-secondary/60 px-3 py-4 text-center text-[12px] text-muted-foreground">{text}</p>;
+  return (
+    <p className="rounded-2xl bg-secondary/40 px-3 py-5 text-center text-[12px] text-muted-foreground">
+      {text}
+    </p>
+  );
 }
 
 function MaybeLink({
