@@ -325,8 +325,8 @@ export default function ProjectForm() {
           onChange={(urls) => setPhotos(reconcilePhotos(photos, urls))}
         />
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          ※ 사진은 현재 이 기기에만 저장됩니다. 다른 기기에서는 보이지 않을 수 있어요.
-          (사진 클라우드 동기화는 준비 중)
+          ※ 사진은 현재 이 기기에만 저장됩니다. 무료 백업에는 사진이 포함되지 않아요.
+          (사진 클라우드 백업은 추후 프리미엄 기능으로 제공 예정)
         </p>
       </Field>
 

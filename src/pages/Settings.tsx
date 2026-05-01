@@ -464,6 +464,9 @@ export default function Settings() {
                 <p className="mt-1.5 text-[12px] text-muted-foreground leading-relaxed">
                   이 기기에 저장된 <strong>{totalItems}개</strong>의 뜨개 기록을 클라우드와 양방향으로 동기화합니다.
                 </p>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  ※ 무료 백업에는 사진이 포함되지 않습니다. 사진 클라우드 백업은 추후 프리미엄 기능으로 제공될 예정입니다.
+                </p>
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={handleFetch}
@@ -613,6 +616,22 @@ export default function Settings() {
               {trashCount}
             </span>
           )}
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </Section>
+
+      <Section title="정보">
+        <button
+          onClick={() => navigate('/privacy')}
+          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft bg-card"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="text-[13.5px] font-semibold text-foreground">개인정보처리방침</div>
+            <div className="text-[11.5px] text-muted-foreground">데이터 저장 위치, 보관 기간, 탈퇴 요청</div>
+          </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
       </Section>

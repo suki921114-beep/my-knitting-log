@@ -20,6 +20,7 @@ import Notions from "./pages/Notions";
 import NotionForm from "./pages/NotionForm";
 import Settings from "./pages/Settings";
 import Trash from "./pages/Trash";
+import Privacy from "./pages/Privacy";
 import GaugeCalculator from "./pages/GaugeCalculator";
 import NotFound from "./pages/NotFound.tsx";
 import Login from "./pages/Login";
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/library/notions/:id/edit" element={<NotionForm />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/trash" element={<Trash />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/tools/gauge" element={<GaugeCalculator />} />
           </Route>
           <Route path="*" element={<NotFound />} />
