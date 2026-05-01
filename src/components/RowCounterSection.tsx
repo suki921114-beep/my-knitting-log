@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, RowCounter } from '@/lib/db';
 import { Plus, Minus, MoreHorizontal, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 function vibrate(ms = 10) {
   try { (navigator as any).vibrate?.(ms); } catch {}
@@ -9,7 +10,7 @@ function vibrate(ms = 10) {
 
 export default function RowCounterSection({ projectId }: { projectId: number }) {
   const counters = useLiveQuery(
-    () => db.rowCounters.where('projectId').equals(projectId).sortBy('createdAt'),
+    () => db.rowCounters.where('projectId').equals(projectId).filter(c => !c.isDeleted).sortBy('createdAt'),
     [projectId]
   ) || [];
 
@@ -74,9 +75,29 @@ function CounterCard({ counter }: { counter: RowCounter }) {
   async function reset() { setMenuOpen(false); await update({ count: 0 }); }
   async function remove() {
     setMenuOpen(false);
-    if (confirm(`"${counter.name}" 카운터를 삭제할까요?`)) {
-      await db.rowCounters.delete(counter.id!);
-    }
+    if (!confirm(`"${counter.name}" 카운터를 삭제할까요?`)) return;
+    const t = now();
+    // soft delete — DB 에는 보존, isDeleted 만 켠다.
+    await db.rowCounters.update(counter.id!, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
+    toast.success(`"${counter.name}" 카운터를 삭제했어요`, {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = now();
+          await db.rowCounters.update(counter.id!, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: n,
+          } as any);
+          toast.success('카운터를 다시 살렸어요');
+        },
+      },
+    });
   }
   async function saveName() {
     const trimmed = name.trim() || counter.name;

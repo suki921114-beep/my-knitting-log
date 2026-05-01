@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, ProjectGauge, RowCounter, GaugeMode } from '@/lib/db';
 import { Plus, Trash2, ChevronDown, Save, Target } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 interface Props { projectId: number }
 
@@ -25,7 +26,7 @@ const blank = (projectId: number): ProjectGauge => ({
 
 export default function ProjectGaugeSection({ projectId }: Props) {
   const items = useLiveQuery(
-    () => db.projectGauges.where('projectId').equals(projectId).sortBy('createdAt'),
+    () => db.projectGauges.where('projectId').equals(projectId).filter(g => !g.isDeleted).sortBy('createdAt'),
     [projectId]
   ) || [];
 
@@ -79,7 +80,7 @@ export default function ProjectGaugeSection({ projectId }: Props) {
 
 function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; projectId: number; open: boolean; onToggle: () => void }) {
   const counters = useLiveQuery(
-    () => db.rowCounters.where('projectId').equals(projectId).toArray(),
+    () => db.rowCounters.where('projectId').equals(projectId).filter(c => !c.isDeleted).toArray(),
     [projectId]
   ) || [];
 
@@ -124,9 +125,29 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
   }
 
   async function remove() {
-    if (confirm(`"${gauge.name}" 계산을 삭제할까요?`)) {
-      await db.projectGauges.delete(gauge.id!);
-    }
+    if (!confirm(`"${gauge.name}" 계산을 삭제할까요?`)) return;
+    const t = now();
+    // soft delete — DB 에는 보존, isDeleted 만 켠다.
+    await db.projectGauges.update(gauge.id!, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
+    toast.success(`"${gauge.name}" 계산을 삭제했어요`, {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = now();
+          await db.projectGauges.update(gauge.id!, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: n,
+          } as any);
+          toast.success('게이지 계산을 다시 살렸어요');
+        },
+      },
+    });
   }
 
   async function applyToCounter(counterId: number) {
