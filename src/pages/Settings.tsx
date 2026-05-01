@@ -331,6 +331,20 @@ export default function Settings() {
     }
   };
 
+  // 휴지통 카운트 (7개 entity 합산)
+  const trashCount = useLiveQuery(async () => {
+    const [y, p, n, no, pr, rc, pg] = await Promise.all([
+      db.yarns.filter(x => x.isDeleted === true).count(),
+      db.patterns.filter(x => x.isDeleted === true).count(),
+      db.needles.filter(x => x.isDeleted === true).count(),
+      db.notions.filter(x => x.isDeleted === true).count(),
+      db.projects.filter(x => x.isDeleted === true).count(),
+      db.rowCounters.filter(x => x.isDeleted === true).count(),
+      db.projectGauges.filter(x => x.isDeleted === true).count(),
+    ]);
+    return y + p + n + no + pr + rc + pg;
+  }, []) ?? 0;
+
   const totals = useLiveQuery(async () => ({
     p: await db.projects.filter(p => !p.isDeleted).count(),
     y: await db.yarns.filter(y => !y.isDeleted).count(),
@@ -568,6 +582,27 @@ export default function Settings() {
             e.target.value = '';
           }}
         />
+      </Section>
+
+      <Section title="휴지통">
+        <button
+          onClick={() => navigate('/settings/trash')}
+          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft bg-card"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <Trash2 className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="text-[13.5px] font-semibold text-foreground">삭제된 항목</div>
+            <div className="text-[11.5px] text-muted-foreground">복원하거나 영구 삭제할 수 있어요</div>
+          </div>
+          {trashCount > 0 && (
+            <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 tabular-nums">
+              {trashCount}
+            </span>
+          )}
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </button>
       </Section>
 
       <Section title="위험 영역">
