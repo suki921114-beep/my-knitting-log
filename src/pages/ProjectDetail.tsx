@@ -211,14 +211,27 @@ export default function ProjectDetail() {
         )}
       </Section>
 
-      {photos.length > 0 && (
+      {photos.filter((p: any) => !p.isDeleted).length > 0 && (
         <Section title="사진">
           <div className="grid grid-cols-3 gap-2">
-            {photos.map((src, i) => (
-              <button key={i} onClick={() => setLightbox(src)} className="aspect-square overflow-hidden rounded-xl border bg-muted">
-                <img src={src} alt={`사진 ${i + 1}`} className="h-full w-full object-cover" />
-              </button>
-            ))}
+            {photos
+              .filter((p: any) => !p.isDeleted)
+              .map((p: any, i: number) => (
+                <button
+                  key={p.cloudId || i}
+                  onClick={() => p.dataUrl && setLightbox(p.dataUrl)}
+                  disabled={!p.dataUrl}
+                  className="aspect-square overflow-hidden rounded-xl border bg-muted disabled:cursor-default"
+                >
+                  {p.dataUrl ? (
+                    <img src={p.dataUrl} alt={`사진 ${i + 1}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <ImageIcon className="h-5 w-5" />
+                    </div>
+                  )}
+                </button>
+              ))}
           </div>
         </Section>
       )}

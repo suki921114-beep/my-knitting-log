@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, now, ProjectStatus } from '@/lib/db';
+import { db, now, ProjectStatus, ProjectPhoto} from '@/lib/db';
 import { statusLabel } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import PrivacyNote from '@/components/PrivacyNote';
@@ -12,6 +12,36 @@ import { Save, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
 const STATUSES: ProjectStatus[] = ['planned', 'in_progress', 'done', 'on_hold'];
+
+
+function extractDataUrlContentType(dataUrl: string): string | undefined {
+  if (typeof dataUrl !== 'string') return undefined;
+  const m = dataUrl.match(/^data:([^;]+);/);
+  return m ? m[1] : undefined;
+}
+
+function reconcilePhotos(prev: ProjectPhoto[], dataUrls: string[]): ProjectPhoto[] {
+  // 기존 photos 중 dataUrl 매칭으로 같은 사진은 객체 재사용 (cloudId/storagePath 보존)
+  const byUrl = new Map<string, ProjectPhoto>();
+  for (const p of prev) {
+    if (!p.dataUrl || p.isDeleted) continue;
+    byUrl.set(p.dataUrl, p);
+  }
+  const now = Date.now();
+  return dataUrls.map((url) => {
+    const existing = byUrl.get(url);
+    if (existing) return existing;
+    return {
+      cloudId: crypto.randomUUID(),
+      dataUrl: url,
+      contentType: extractDataUrlContentType(url) ?? 'image/jpeg',
+      createdAt: now,
+      updatedAt: now,
+      isDeleted: false,
+      deletedAt: null,
+    };
+  });
+}
 
 export default function ProjectForm() {
   const { id } = useParams();
@@ -45,13 +75,19 @@ export default function ProjectForm() {
   const [gauge, setGauge] = useState('');
   const [progressNote, setProgressNote] = useState('');
   const [finishedNote, setFinishedNote] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<ProjectPhoto[]>([]);
   const [yarnLinks, setYarnLinks] = useState<YarnLink[]>([]);
   const [patternLinks, setPatternLinks] = useState<PatternLink[]>([]);
   const [needleLinks, setNeedleLinks] = useState<NeedleLink[]>([]);
   const [notionLinks, setNotionLinks] = useState<NotionLink[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [linksHydrated, setLinksHydrated] = useState(false);
+
+  // MultiImageInput 은 string[] 을 받으므로 photos 객체 배열에서 dataUrl 만 추출
+  const photoUrls = useMemo(
+    () => photos.filter((p) => !p.isDeleted && p.dataUrl).map((p) => p.dataUrl!),
+    [photos],
+  );
 
   useEffect(() => {
     if (editing && existing && !hydrated) {
@@ -63,7 +99,7 @@ export default function ProjectForm() {
       setGauge(existing.gauge || '');
       setProgressNote(existing.progressNote || '');
       setFinishedNote(existing.finishedNote || '');
-      setPhotos(existing.photos || []);
+      setPhotos((existing.photos as ProjectPhoto[]) || []);
       setHydrated(true);
     }
   }, [editing, existing, hydrated]);
@@ -284,7 +320,10 @@ export default function ProjectForm() {
       </Field>
 
       <Field label="사진">
-        <MultiImageInput values={photos} onChange={setPhotos} />
+        <MultiImageInput
+          values={photoUrls}
+          onChange={(urls) => setPhotos(reconcilePhotos(photos, urls))}
+        />
       </Field>
 
       <Field label="진행 메모">

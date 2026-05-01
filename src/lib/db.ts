@@ -8,6 +8,27 @@ export interface SyncMetadata {
   deletedAt?: number | null;
 }
 
+/**
+ * Project 사진 한 장 — Firebase Storage 동기화 + 로컬 dataUrl 캐시.
+ *
+ * - cloudId: 사진 식별자 (Storage path 안에 들어가는 UUID)
+ * - dataUrl: 로컬 캐시. Firestore/Storage payload 에는 절대 안 보냄.
+ * - storagePath: Storage 업로드 후 채워짐. 비어 있으면 '아직 업로드 안 됨'.
+ *
+ * sync/project.ts 의 buildProjectSyncPayload 가 storagePath 가 비어 있는 사진을
+ * 자동으로 Storage 에 업로드하고 메타를 갱신.
+ */
+export interface ProjectPhoto {
+  cloudId: string;
+  dataUrl?: string;
+  storagePath?: string;
+  contentType?: string;
+  createdAt: number;
+  updatedAt: number;
+  isDeleted: boolean;
+  deletedAt: number | null;
+}
+
 export interface Project extends SyncMetadata {
   id?: number;
   name: string;
@@ -19,7 +40,11 @@ export interface Project extends SyncMetadata {
   gauge?: string;
   progressNote?: string;
   finishedNote?: string;
-  photos?: string[]; // dataURL (legacy + new multi-photo)
+  /**
+   * 사진. v6 부터 ProjectPhoto[] 객체 배열.
+   * v5 이하의 string[] (dataURL 만) 데이터는 v6 upgrade 에서 자동 변환됨.
+   */
+  photos?: ProjectPhoto[];
   createdAt: number;
   updatedAt: number;
 }
@@ -279,6 +304,45 @@ class KnitDB extends Dexie {
         }
       }
     });
+
+    // v6: 프로젝트 사진을 string[] (dataURL 배열) 에서 ProjectPhoto[] (객체 배열) 로
+    // 마이그레이션. Firebase Storage 동기화를 위해 cloudId/storagePath 등의 메타가 필요.
+    this.version(6).stores({
+      // 인덱스 변경 없음 — 같은 stores 선언 유지 (Dexie 는 version bump 만으로 upgrade 호출)
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+    }).upgrade(async (tx) => {
+      const projects = await tx.table('projects').toArray();
+      const now = Date.now();
+      for (const p of projects) {
+        if (!p || !Array.isArray(p.photos)) continue;
+        // 이미 객체 배열이면 통과
+        if (p.photos.length === 0 || typeof p.photos[0] === 'object') continue;
+        // string[] (dataURL) → ProjectPhoto[] 변환
+        const converted = (p.photos as string[]).map((url: string) => ({
+          cloudId: crypto.randomUUID(),
+          dataUrl: url,
+          storagePath: undefined,
+          contentType: extractDataUrlContentType(url) ?? 'image/jpeg',
+          createdAt: p.createdAt ?? now,
+          updatedAt: now,
+          isDeleted: false,
+          deletedAt: null,
+        }));
+        await tx.table('projects').put({ ...p, photos: converted });
+      }
+    });
+
   }
 }
 
@@ -369,3 +433,11 @@ export async function clearAll() {
 
 import { attachDirtyHooks } from './syncDirty';
 attachDirtyHooks(db);
+
+
+// dataURL 의 'data:image/png;base64,...' 에서 contentType 추출
+function extractDataUrlContentType(dataUrl: string): string | undefined {
+  if (typeof dataUrl !== 'string') return undefined;
+  const m = dataUrl.match(/^data:([^;]+);/);
+  return m ? m[1] : undefined;
+}

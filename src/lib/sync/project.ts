@@ -7,7 +7,8 @@
 import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { firestore } from '../firebase';
 import { db } from '@/lib/db';
-import type { GaugeMode, Project } from '@/lib/db';
+import type { GaugeMode, Project, ProjectPhoto } from '@/lib/db';
+import { uploadPhotoDataUrl, downloadPhotoAsDataUrl } from './photoStorage';
 import {
   sanitizeForFirestore,
   type FetchResult,
@@ -103,6 +104,21 @@ type ProjectSyncPayload = {
     isDeleted: boolean;
     deletedAt: number | null;
   }>;
+
+  /**
+   * 사진 메타데이터. 원본 이미지(dataUrl) 는 Firestore 에 절대 안 들어가고
+   * Firebase Storage 의 storagePath 만 보낸다. 다른 기기에서 가져오기 시 이
+   * storagePath 로 Storage 에서 다운로드 후 로컬 dataUrl 캐시.
+   */
+  photos: Array<{
+    cloudId: string;
+    storagePath: string;
+    contentType?: string;
+    createdAt: number;
+    updatedAt: number;
+    isDeleted: boolean;
+    deletedAt: number | null;
+  }>;
 };
 
 function cleanProjectText(value?: string) {
@@ -121,7 +137,7 @@ export type ProjectFetchDiff = {
   unchanged: number;
 };
 
-export async function buildProjectSyncPayload(projectId: number): Promise<ProjectSyncPayload> {
+export async function buildProjectSyncPayload(projectId: number, userId: string): Promise<ProjectSyncPayload> {
   const project = await db.projects.get(projectId);
   if (!project) {
     throw new Error(`Project not found: ${projectId}`);
@@ -308,6 +324,59 @@ export async function buildProjectSyncPayload(projectId: number): Promise<Projec
     });
   }
 
+
+  // ---- 사진 처리 ----
+  // 로컬 photos 중 storagePath 가 비어 있는 사진을 Storage 에 업로드하고
+  // 메타를 갱신. 이미 업로드된 사진(storagePath 있음) 은 재업로드하지 않음.
+  const localPhotos: ProjectPhoto[] = (project.photos as any) || [];
+  const updatedPhotos: ProjectPhoto[] = [];
+  const photoPayloads: ProjectSyncPayload["photos"] = [];
+
+  for (const ph of localPhotos) {
+    const photo: ProjectPhoto = {
+      cloudId: ph.cloudId || crypto.randomUUID(),
+      dataUrl: ph.dataUrl,
+      storagePath: ph.storagePath,
+      contentType: ph.contentType,
+      createdAt: ph.createdAt || Date.now(),
+      updatedAt: ph.updatedAt || Date.now(),
+      isDeleted: ph.isDeleted ?? false,
+      deletedAt: ph.deletedAt ?? null,
+    };
+
+    // 신규 사진 — Storage 업로드
+    if (!photo.storagePath && photo.dataUrl) {
+      try {
+        photo.storagePath = await uploadPhotoDataUrl(userId, project.cloudId!, photo);
+        photo.updatedAt = Date.now();
+      } catch (e) {
+        console.error('[Project Sync] 사진 업로드 실패:', e);
+        // storagePath 없는 채로 보존 — 다음 백업 때 재시도
+      }
+    }
+
+    updatedPhotos.push(photo);
+
+    // Firestore payload 에는 storagePath 가 있는 (= 클라우드에 올라간) 사진만 포함
+    if (photo.storagePath) {
+      photoPayloads.push({
+        cloudId: photo.cloudId,
+        storagePath: photo.storagePath,
+        contentType: photo.contentType,
+        createdAt: photo.createdAt,
+        updatedAt: photo.updatedAt,
+        isDeleted: photo.isDeleted ?? false,
+        deletedAt: photo.deletedAt ?? null,
+      });
+    }
+  }
+
+  // 로컬 DB 의 photos 메타 갱신 (cloudId / storagePath 가 채워진 상태로)
+  if (updatedPhotos.length || (project.photos && project.photos.length)) {
+    await db.projects.update(projectId, { photos: updatedPhotos } as any);
+  }
+
+
   const projectPayloadUpdatedAt = Math.max(
     project.updatedAt ?? 0,
     ...projectYarns.map(x => x.updatedAt ?? 0),
@@ -338,6 +407,7 @@ export async function buildProjectSyncPayload(projectId: number): Promise<Projec
     notionLinks,
     rowCounters: rowCounterPayloads,
     gauges: gaugePayloads,
+    photos: photoPayloads,
   };
 }
 
@@ -387,17 +457,49 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
   };
 
   let projectId: number;
+  // 기존 로컬 사진 (dataUrl 캐시 보존용 — 이미 받은 사진 재다운로드 방지)
+  const existingPhotos: ProjectPhoto[] = (existing?.photos as any) || [];
+  const existingByCloudId = new Map<string, ProjectPhoto>(
+    existingPhotos.filter(p => p.cloudId).map(p => [p.cloudId, p]),
+  );
+
+  // remote.photos 메타 + 로컬 캐시 병합
+  const mergedPhotos: ProjectPhoto[] = [];
+  for (const remotePh of remote.photos || []) {
+    const cached = existingByCloudId.get(remotePh.cloudId);
+    let dataUrl = cached?.dataUrl;
+    // 로컬에 dataUrl 캐시 없으면 Storage 에서 다운로드
+    if (!dataUrl && remotePh.storagePath) {
+      try {
+        dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath);
+      } catch (e) {
+        console.error('[Project Fetch] 사진 다운로드 실패:', remotePh.storagePath, e);
+        // 실패해도 메타는 보존 — placeholder 표시 + 다음 가져오기 때 재시도
+      }
+    }
+    mergedPhotos.push({
+      cloudId: remotePh.cloudId,
+      dataUrl,
+      storagePath: remotePh.storagePath,
+      contentType: remotePh.contentType,
+      createdAt: remotePh.createdAt,
+      updatedAt: remotePh.updatedAt,
+      isDeleted: remotePh.isDeleted ?? false,
+      deletedAt: remotePh.deletedAt ?? null,
+    });
+  }
+
   if (existing) {
     await db.projects.update(existing.id!, {
       ...baseProjectData,
       id: existing.id,
-      photos: existing.photos,
+      photos: mergedPhotos,
     } as any);
     projectId = existing.id!;
   } else {
     projectId = await db.projects.add({
       ...baseProjectData,
-      photos: undefined,
+      photos: mergedPhotos.length ? mergedPhotos : undefined,
     } as any);
   }
 
@@ -628,7 +730,7 @@ export async function executeProjectSync(userId: string, diff: ProjectSyncDiff):
         if (needsLocalUpdate) {
           await db.projects.update(localProjectId, fixUpdates);
         }
-        const payload = await buildProjectSyncPayload(localProjectId);
+        const payload = await buildProjectSyncPayload(localProjectId, userId);
         const docRef = doc(firestore, `users/${userId}/projects`, payload.cloudId);
         const safePayload = sanitizeForFirestore(payload);
         console.log(`[Project Sync Upload] ${payload.name}`);
