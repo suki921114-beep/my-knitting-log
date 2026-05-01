@@ -213,6 +213,9 @@ export default function ProjectDetail() {
 
       {photos.filter((p: any) => !p.isDeleted).length > 0 && (
         <Section title="사진">
+          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+            ※ 사진은 현재 이 기기에만 저장됩니다. 다른 기기에서는 보이지 않을 수 있어요.
+          </p>
           <div className="grid grid-cols-3 gap-2">
             {photos
               .filter((p: any) => !p.isDeleted)

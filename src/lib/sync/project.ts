@@ -9,6 +9,7 @@ import { firestore } from '../firebase';
 import { db } from '@/lib/db';
 import type { GaugeMode, Project, ProjectPhoto } from '@/lib/db';
 import { uploadPhotoDataUrl, downloadPhotoAsDataUrl } from './photoStorage';
+import { ENABLE_CLOUD_PHOTO_SYNC } from '@/lib/featureFlags';
 import {
   sanitizeForFirestore,
   type FetchResult,
@@ -326,13 +327,13 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
 
 
   // ---- 사진 처리 ----
-  // 로컬 photos 중 storagePath 가 비어 있는 사진을 Storage 에 업로드하고
-  // 메타를 갱신. 이미 업로드된 사진(storagePath 있음) 은 재업로드하지 않음.
+  // 플래그 ENABLE_CLOUD_PHOTO_SYNC 가 false 면 Storage 업로드/메타 빌드를 모두
+  // 스킵하고 photoPayloads 를 빈 배열로 둔다. 로컬 photos 는 그대로 보존.
   const localPhotos: ProjectPhoto[] = (project.photos as any) || [];
   const updatedPhotos: ProjectPhoto[] = [];
   const photoPayloads: ProjectSyncPayload["photos"] = [];
 
-  for (const ph of localPhotos) {
+  if (ENABLE_CLOUD_PHOTO_SYNC) for (const ph of localPhotos) {
     const photo: ProjectPhoto = {
       cloudId: ph.cloudId || crypto.randomUUID(),
       dataUrl: ph.dataUrl,
@@ -372,7 +373,8 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
   }
 
   // 로컬 DB 의 photos 메타 갱신 (cloudId / storagePath 가 채워진 상태로)
-  if (updatedPhotos.length || (project.photos && project.photos.length)) {
+  // 플래그 false 면 updatedPhotos 가 비어 있으므로 update 하지 않는다 (로컬 보존)
+  if (ENABLE_CLOUD_PHOTO_SYNC && (updatedPhotos.length || (project.photos && project.photos.length))) {
     await db.projects.update(projectId, { photos: updatedPhotos } as any);
   }
 
@@ -438,6 +440,36 @@ async function getProjectLocalSyncUpdatedAt(projectId: number, fallback = 0) {
   );
 }
 
+
+async function mergeRemotePhotos(
+  remotePhotos: ProjectSyncPayload['photos'],
+  existingByCloudId: Map<string, ProjectPhoto>,
+): Promise<ProjectPhoto[]> {
+  const merged: ProjectPhoto[] = [];
+  for (const remotePh of remotePhotos) {
+    const cached = existingByCloudId.get(remotePh.cloudId);
+    let dataUrl = cached?.dataUrl;
+    if (!dataUrl && remotePh.storagePath) {
+      try {
+        dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath);
+      } catch (e) {
+        console.error('[Project Fetch] 사진 다운로드 실패:', remotePh.storagePath, e);
+      }
+    }
+    merged.push({
+      cloudId: remotePh.cloudId,
+      dataUrl,
+      storagePath: remotePh.storagePath,
+      contentType: remotePh.contentType,
+      createdAt: remotePh.createdAt,
+      updatedAt: remotePh.updatedAt,
+      isDeleted: remotePh.isDeleted ?? false,
+      deletedAt: remotePh.deletedAt ?? null,
+    });
+  }
+  return merged;
+}
+
 async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
   const existing = await db.projects.where("cloudId").equals(remote.cloudId).first();
   const baseProjectData = {
@@ -464,30 +496,11 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
   );
 
   // remote.photos 메타 + 로컬 캐시 병합
-  const mergedPhotos: ProjectPhoto[] = [];
-  for (const remotePh of remote.photos || []) {
-    const cached = existingByCloudId.get(remotePh.cloudId);
-    let dataUrl = cached?.dataUrl;
-    // 로컬에 dataUrl 캐시 없으면 Storage 에서 다운로드
-    if (!dataUrl && remotePh.storagePath) {
-      try {
-        dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath);
-      } catch (e) {
-        console.error('[Project Fetch] 사진 다운로드 실패:', remotePh.storagePath, e);
-        // 실패해도 메타는 보존 — placeholder 표시 + 다음 가져오기 때 재시도
-      }
-    }
-    mergedPhotos.push({
-      cloudId: remotePh.cloudId,
-      dataUrl,
-      storagePath: remotePh.storagePath,
-      contentType: remotePh.contentType,
-      createdAt: remotePh.createdAt,
-      updatedAt: remotePh.updatedAt,
-      isDeleted: remotePh.isDeleted ?? false,
-      deletedAt: remotePh.deletedAt ?? null,
-    });
-  }
+  // 플래그 false 면 remote.photos 무시하고 기존 로컬 photos 그대로 보존
+  // (가져오기 때문에 사진이 사라지는 일 방지)
+  const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
+    ? await mergeRemotePhotos(remote.photos || [], existingByCloudId)
+    : existingPhotos;
 
   if (existing) {
     await db.projects.update(existing.id!, {
