@@ -5,6 +5,7 @@ import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 const TYPES = ['대바늘', '코바늘', '줄바늘', '장갑바늘', '기타'];
 
@@ -46,9 +47,29 @@ export default function NeedleForm() {
     nav('/library/needles');
   }
   async function remove() {
-    if (!nid || !confirm('이 바늘을 삭제할까요?')) return;
-    await db.projectNeedles.where('needleId').equals(nid).delete();
-    await db.needles.delete(nid); nav('/library/needles');
+    if (!nid || !confirm('이 바늘을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    const t = Date.now();
+    await db.needles.update(nid, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
+    nav('/library/needles');
+    toast.success('바늘을 삭제했어요', {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = Date.now();
+          await db.needles.update(nid, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: n,
+          } as any);
+          toast.success('바늘을 다시 살렸어요');
+        },
+      },
+    });
   }
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
 

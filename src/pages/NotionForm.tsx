@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 export default function NotionForm() {
   const { id } = useParams();
@@ -49,9 +50,29 @@ export default function NotionForm() {
     nav('/library/notions');
   }
   async function remove() {
-    if (!nid || !confirm('이 부자재를 삭제할까요?')) return;
-    await db.projectNotions.where('notionId').equals(nid).delete();
-    await db.notions.delete(nid); nav('/library/notions');
+    if (!nid || !confirm('이 부자재를 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    const t = Date.now();
+    await db.notions.update(nid, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
+    nav('/library/notions');
+    toast.success('부자재를 삭제했어요', {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = Date.now();
+          await db.notions.update(nid, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: n,
+          } as any);
+          toast.success('부자재를 다시 살렸어요');
+        },
+      },
+    });
   }
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: k === 'quantity' ? Number(e.target.value) || 0 : e.target.value });
 

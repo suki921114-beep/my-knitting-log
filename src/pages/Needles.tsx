@@ -6,7 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import { Plus, Search, Ruler } from 'lucide-react';
 
 export default function Needles() {
-  const items = useLiveQuery(() => db.needles.orderBy('updatedAt').reverse().toArray(), []) || [];
+  const items = useLiveQuery(() => db.needles.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
   const [q, setQ] = useState('');
   const filtered = items.filter(n => !q || [n.type, n.brand, n.material, n.sizeMm].filter(Boolean).some(v => v!.toLowerCase().includes(q.toLowerCase())));
 

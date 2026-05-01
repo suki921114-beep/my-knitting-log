@@ -8,7 +8,7 @@ import { useViewMode } from '@/hooks/useViewMode';
 import { Plus, Search, Image as ImageIcon } from 'lucide-react';
 
 export default function Patterns() {
-  const items = useLiveQuery(() => db.patterns.orderBy('updatedAt').reverse().toArray(), []) || [];
+  const items = useLiveQuery(() => db.patterns.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
   const [q, setQ] = useState('');
   const [view, setView] = useViewMode('patterns', 'grid');
   const filtered = items.filter(p => !q || [p.name, p.designer, p.source].filter(Boolean).some(v => v!.toLowerCase().includes(q.toLowerCase())));

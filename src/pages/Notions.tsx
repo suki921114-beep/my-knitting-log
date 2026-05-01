@@ -8,7 +8,7 @@ import { useViewMode } from '@/hooks/useViewMode';
 import { Plus, Search, Image as ImageIcon } from 'lucide-react';
 
 export default function Notions() {
-  const items = useLiveQuery(() => db.notions.orderBy('updatedAt').reverse().toArray(), []) || [];
+  const items = useLiveQuery(() => db.notions.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
   const [q, setQ] = useState('');
   const [view, setView] = useViewMode('notions', 'list');
   const filtered = items.filter(n => !q || [n.name, n.kind, n.shop].filter(Boolean).some(v => v!.toLowerCase().includes(q.toLowerCase())));

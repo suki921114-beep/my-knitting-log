@@ -334,9 +334,9 @@ export default function Settings() {
   const totals = useLiveQuery(async () => ({
     p: await db.projects.count(),
     y: await db.yarns.filter(y => !y.isDeleted).count(),
-    pat: await db.patterns.count(),
-    n: await db.needles.count(),
-    no: await db.notions.count(),
+    pat: await db.patterns.filter(x => !x.isDeleted).count(),
+    n: await db.needles.filter(x => !x.isDeleted).count(),
+    no: await db.notions.filter(x => !x.isDeleted).count(),
   }), []) || { p: 0, y: 0, pat: 0, n: 0, no: 0 };
 
   const totalItems = totals.p + totals.y + totals.pat + totals.n + totals.no;

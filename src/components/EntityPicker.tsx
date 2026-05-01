@@ -51,9 +51,9 @@ export default function EntityPicker<T extends BaseLink>({ kind, links, onChange
   const meta = META[kind];
 
   const items = useLiveQuery(async () => {
-    if (kind === 'pattern') return db.patterns.orderBy('updatedAt').reverse().toArray();
-    if (kind === 'needle') return db.needles.orderBy('updatedAt').reverse().toArray();
-    return db.notions.orderBy('updatedAt').reverse().toArray();
+    if (kind === 'pattern') return db.patterns.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray();
+    if (kind === 'needle') return db.needles.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray();
+    return db.notions.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray();
   }, [kind]) || [];
 
   const map = useMemo(() => new Map<number, any>((items as any[]).map(it => [it.id as number, it])), [items]);

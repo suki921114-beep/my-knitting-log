@@ -8,9 +8,9 @@ import { Layers, Scroll, Ruler, Sparkles, ChevronRight, Calculator } from 'lucid
 export default function LibraryHub() {
   const counts = useLiveQuery(async () => ({
     yarns: await db.yarns.filter(y => !y.isDeleted).count(),
-    patterns: await db.patterns.count(),
-    needles: await db.needles.count(),
-    notions: await db.notions.count(),
+    patterns: await db.patterns.filter(x => !x.isDeleted).count(),
+    needles: await db.needles.filter(x => !x.isDeleted).count(),
+    notions: await db.notions.filter(x => !x.isDeleted).count(),
   }), []) || { yarns: 0, patterns: 0, needles: 0, notions: 0 };
 
   const yarnStats = useAllYarnStats() || [];

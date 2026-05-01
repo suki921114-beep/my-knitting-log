@@ -7,6 +7,7 @@ import PrivacyNote from '@/components/PrivacyNote';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 export default function PatternForm() {
   const { id } = useParams();
@@ -55,10 +56,29 @@ export default function PatternForm() {
   }
   async function remove() {
     if (!pid) return;
-    if (!confirm('이 도안을 삭제할까요?')) return;
-    await db.projectPatterns.where('patternId').equals(pid).delete();
-    await db.patterns.delete(pid);
+    if (!confirm('이 도안을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    const t = Date.now();
+    await db.patterns.update(pid, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
     nav('/library/patterns');
+    toast.success('도안을 삭제했어요', {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = Date.now();
+          await db.patterns.update(pid, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: n,
+          } as any);
+          toast.success('도안을 다시 살렸어요');
+        },
+      },
+    });
   }
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
 
