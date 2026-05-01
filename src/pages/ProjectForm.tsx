@@ -9,6 +9,7 @@ import YarnPicker, { YarnLink } from '@/components/YarnPicker';
 import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
 import { MultiImageInput } from '@/components/ImageInput';
 import { Save, Trash2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 const STATUSES: ProjectStatus[] = ['planned', 'in_progress', 'done', 'on_hold'];
 
@@ -198,13 +199,32 @@ export default function ProjectForm() {
 
   async function remove() {
     if (!projectId) return;
-    if (!confirm('이 프로젝트를 삭제할까요? 사용한 실 기록도 함께 사라집니다.')) return;
-    await db.projectYarns.where('projectId').equals(projectId).delete();
-    await db.projectPatterns.where('projectId').equals(projectId).delete();
-    await db.projectNeedles.where('projectId').equals(projectId).delete();
-    await db.projectNotions.where('projectId').equals(projectId).delete();
-    await db.projects.delete(projectId);
+    if (!confirm('이 프로젝트를 삭제할까요? 연결된 실/도안/바늘/부자재, 단수 카운터, 게이지는 그대로 보존되어 되돌릴 수 있어요.')) return;
+    const t = Date.now();
+    // soft delete — 프로젝트 본문만 isDeleted 처리.
+    // 연결관계(projectYarns/Patterns/Needles/Notions), rowCounters, projectGauges
+    // 는 그대로 두어서 복원 시 자동으로 같이 살아난다.
+    await db.projects.update(projectId, {
+      isDeleted: true,
+      deletedAt: t,
+      updatedAt: t,
+    } as any);
     nav('/projects');
+    toast.success('프로젝트를 삭제했어요', {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = Date.now();
+          await db.projects.update(projectId, {
+            isDeleted: false,
+            deletedAt: null,
+            updatedAt: n,
+          } as any);
+          toast.success('프로젝트를 다시 살렸어요');
+        },
+      },
+    });
   }
 
   return (

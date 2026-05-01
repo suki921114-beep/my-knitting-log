@@ -6,10 +6,10 @@ import { Plus, Scroll, ArrowRight, Layers, Sparkles, Image as ImageIcon, Calcula
 
 export default function Home() {
   const inProgress = useLiveQuery(
-    () => db.projects.where('status').equals('in_progress').reverse().sortBy('updatedAt'),
+    () => db.projects.where('status').equals('in_progress').filter(p => !p.isDeleted).reverse().sortBy('updatedAt'),
     []
   );
-  const allProjects = useLiveQuery(() => db.projects.toArray(), []) || [];
+  const allProjects = useLiveQuery(() => db.projects.filter(p => !p.isDeleted).toArray(), []) || [];
   const yarnStats = useAllYarnStats() || [];
   const topRemaining = yarnStats
     .filter(s => s.remaining > 0)

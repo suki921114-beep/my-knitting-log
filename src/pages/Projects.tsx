@@ -23,7 +23,7 @@ export default function Projects() {
     initial && VALID.includes(initial as ProjectStatus) ? (initial as ProjectStatus) : 'all'
   );
   const [q, setQ] = useState('');
-  const projects = useLiveQuery(() => db.projects.orderBy('updatedAt').reverse().toArray(), []);
+  const projects = useLiveQuery(() => db.projects.orderBy('updatedAt').reverse().filter(p => !p.isDeleted).toArray(), []);
 
   useEffect(() => {
     const s = searchParams.get('status');

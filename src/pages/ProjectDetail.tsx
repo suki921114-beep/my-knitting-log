@@ -31,6 +31,16 @@ export default function ProjectDetail() {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   if (!project) return <p className="p-8 text-center text-sm text-muted-foreground">불러오는 중…</p>;
+  if (project.isDeleted) {
+    return (
+      <div className="space-y-3">
+        <PageHeader title="삭제된 프로젝트" back />
+        <p className="card-soft p-8 text-center text-sm text-muted-foreground">
+          이 프로젝트는 삭제된 상태입니다. 목록에서는 보이지 않아요.
+        </p>
+      </div>
+    );
+  }
 
   const photos = project.photos || [];
 

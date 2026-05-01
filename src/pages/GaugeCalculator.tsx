@@ -6,7 +6,7 @@ import { Save, X } from 'lucide-react';
 
 export default function GaugeCalculator() {
   const projects = useLiveQuery(
-    () => db.projects.orderBy('updatedAt').reverse().toArray(),
+    () => db.projects.orderBy('updatedAt').reverse().filter(p => !p.isDeleted).toArray(),
     []
   ) || [];
 

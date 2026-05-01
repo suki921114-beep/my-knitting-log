@@ -14,7 +14,7 @@ export default function ReverseProjectsSection({ kind, refId }: { kind: Kind; re
     return db.projectYarns.where('yarnId').equals(refId).toArray();
   }, [kind, refId]) || [];
 
-  const projects = useLiveQuery(() => db.projects.toArray(), []) || [];
+  const projects = useLiveQuery(() => db.projects.filter(p => !p.isDeleted).toArray(), []) || [];
   const pmap = new Map(projects.map(p => [p.id!, p]));
 
   if (!refId) return null;

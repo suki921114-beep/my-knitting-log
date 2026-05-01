@@ -11,7 +11,7 @@ export default function YarnDetail() {
   const yarn = useLiveQuery(() => db.yarns.get(yid), [yid]);
   const stats = useYarnRemaining(yid);
   const links = useLiveQuery(() => db.projectYarns.where('yarnId').equals(yid).toArray(), [yid]) || [];
-  const projects = useLiveQuery(() => db.projects.toArray(), []) || [];
+  const projects = useLiveQuery(() => db.projects.filter(p => !p.isDeleted).toArray(), []) || [];
   const pmap = new Map(projects.map(p => [p.id!, p]));
 
   if (!yarn) return <p className="p-8 text-center text-sm text-muted-foreground">불러오는 중…</p>;
