@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogIn, Loader2 } from "lucide-react";
+import { LogIn, Loader2, AlertTriangle } from "lucide-react";
+import { detectInAppBrowser } from "@/lib/inAppBrowser";
 import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "@/components/PageHeader";
 
@@ -8,6 +9,7 @@ export default function Login() {
   const { signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const inApp = detectInAppBrowser();
 
   // 로그인에 성공하면 설정(동기화 안내) 페이지로 이동시킵니다.
   useEffect(() => {
@@ -30,6 +32,29 @@ export default function Login() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="로그인" showBack />
+
+      {inApp.detected && (
+        <div className="mx-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12.5px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="flex-1 leading-relaxed">
+              <strong>
+                {inApp.name === '인앱 브라우저'
+                  ? '인앱 브라우저에서 열린 것 같아요'
+                  : `${inApp.name} 앱 내부 브라우저에서 열렸어요`}
+              </strong>
+              <p className="mt-1">
+                Google 로그인 보안 정책상 인앱 브라우저에서는 로그인이 막힐 수 있어요.{' '}
+                <strong>Chrome</strong> 또는 <strong>Safari</strong> 에서 열어주세요.
+              </p>
+              <p className="mt-1.5 text-[11.5px] opacity-80">
+                상단 메뉴 (⋯/⋮) → "Chrome으로 열기" 또는 "Safari로 열기" 를 선택하거나,
+                주소창의 URL 을 길게 눌러 복사한 뒤 Chrome/Safari 주소창에 붙여넣어 주세요.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
         <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-soft text-primary">
