@@ -322,24 +322,33 @@ class KnitDB extends Dexie {
       gaugePresets: '++id, cloudId, isDeleted, updatedAt',
       projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
     }).upgrade(async (tx) => {
-      const projects = await tx.table('projects').toArray();
-      const now = Date.now();
-      for (const p of projects) {
-        if (!p || !Array.isArray(p.photos)) continue;
-        // 이미 객체 배열이면 통과
-        if (p.photos.length === 0 || typeof p.photos[0] === 'object') continue;
-        // string[] (dataURL) → ProjectPhoto[] 변환
-        const converted = (p.photos as string[]).map((url: string) => ({
-          cloudId: crypto.randomUUID(),
-          dataUrl: url,
-          storagePath: undefined,
-          contentType: extractDataUrlContentType(url) ?? 'image/jpeg',
-          createdAt: p.createdAt ?? now,
-          updatedAt: now,
-          isDeleted: false,
-          deletedAt: null,
-        }));
-        await tx.table('projects').put({ ...p, photos: converted });
+      // 마이그레이션 중 발생하는 put/update 가 dirty hook 을 발화시켜
+      // 첫 로드 직후 의도치 않은 자동 백업이 트리거되는 문제 방지.
+      pauseDirtyTracking();
+      try {
+        const projects = await tx.table('projects').toArray();
+        const now = Date.now();
+        for (const p of projects) {
+          if (!p || !Array.isArray(p.photos)) continue;
+          // 이미 객체 배열이면 통과
+          if (p.photos.length === 0 || typeof p.photos[0] === 'object') continue;
+          // string[] (dataURL) → ProjectPhoto[] 변환
+          const converted = (p.photos as string[]).map((url: string) => ({
+            cloudId: crypto.randomUUID(),
+            dataUrl: url,
+            storagePath: undefined,
+            contentType: extractDataUrlContentType(url) ?? 'image/jpeg',
+            createdAt: p.createdAt ?? now,
+            updatedAt: now,
+            isDeleted: false,
+            deletedAt: null,
+          }));
+          await tx.table('projects').put({ ...p, photos: converted });
+        }
+      } finally {
+        resumeDirtyTracking();
+        // 마이그레이션 직후의 잔존 dirty 상태 정리 (안전장치)
+        clearSyncDirty();
       }
     });
 
@@ -405,33 +414,46 @@ export async function importAll(data: any) {
 }
 
 export async function clearAll() {
-  await db.transaction(
-    'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
-    async () => {
-      await Promise.all([
-        db.projects.clear(),
-        db.patterns.clear(),
-        db.yarns.clear(),
-        db.needles.clear(),
-        db.notions.clear(),
-        db.projectYarns.clear(),
-        db.projectPatterns.clear(),
-        db.projectNeedles.clear(),
-        db.projectNotions.clear(),
-        db.rowCounters.clear(),
-        db.gaugePresets.clear(),
-        db.projectGauges.clear(),
-      ]);
-    }
-  );
+  // 전체 삭제는 'destructive' 흐름 — clear() 가 발화시키는 deleting hook 으로
+  // dirty 가 켜져 자동 백업이 실행되면 사용자가 의도하지 않은 클라우드 동작
+  // (재다운로드 또는 빈 데이터 덮어쓰기) 이 일어날 수 있다. dirty tracking 을
+  // 일시 정지하고 트랜잭션 안에서 모든 테이블을 비운 뒤, 명시적으로 dirty 를
+  // 해제한다.
+  pauseDirtyTracking();
+  try {
+    await db.transaction(
+      'rw',
+      [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
+      async () => {
+        await Promise.all([
+          db.projects.clear(),
+          db.patterns.clear(),
+          db.yarns.clear(),
+          db.needles.clear(),
+          db.notions.clear(),
+          db.projectYarns.clear(),
+          db.projectPatterns.clear(),
+          db.projectNeedles.clear(),
+          db.projectNotions.clear(),
+          db.rowCounters.clear(),
+          db.gaugePresets.clear(),
+          db.projectGauges.clear(),
+        ]);
+      }
+    );
+  } finally {
+    resumeDirtyTracking();
+    // pause 동안 들어온 dirty (없을 가능성 높지만 안전장치) 와, 직전 세션의
+    // 잔존 dirty 모두 명시적으로 해제 — 자동 백업 재실행 방지.
+    clearSyncDirty();
+  }
 }
 
 // ============================================================================
 // 사용자 변경 감지 — syncDirty 모듈에 hook 등록
 // ============================================================================
 
-import { attachDirtyHooks } from './syncDirty';
+import { attachDirtyHooks, pauseDirtyTracking, resumeDirtyTracking, clearSyncDirty } from './syncDirty';
 attachDirtyHooks(db);
 
 
