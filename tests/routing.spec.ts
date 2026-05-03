@@ -46,3 +46,12 @@ test.describe("주요 라우트 — heading 표시", () => {
     });
   }
 });
+
+
+test('/tools/ai-log → "AI 기록 입력" heading', async ({ page }) => {
+  await page.goto("/tools/ai-log");
+
+  await expect(page.getByRole("heading", { name: "AI 기록 입력" })).toBeVisible();
+  await expect(page.getByPlaceholder("오늘 봄이 조끼 등판 15단 떴고, 4.5mm 바늘 사용했어")).toBeVisible();
+  await expect(page.getByRole("button", { name: "AI로 분석" })).toBeVisible();
+});
