@@ -552,12 +552,27 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
       db.projectGauges.where("projectId").equals(projectId).toArray(),
     ]);
 
+    // 링크 테이블(yarn/pattern/needle/notion)은 종래대로 bulkDelete 후 재생성.
+    // 사용자 시점에서 직접적인 라이프사이클이 없고 프로젝트 단위로 갱신되므로
+    // 부활/유실 리스크가 적다.
     if (oldYarns.length) await db.projectYarns.bulkDelete(oldYarns.map(x => x.id!).filter(Boolean));
     if (oldPatterns.length) await db.projectPatterns.bulkDelete(oldPatterns.map(x => x.id!).filter(Boolean));
     if (oldNeedles.length) await db.projectNeedles.bulkDelete(oldNeedles.map(x => x.id!).filter(Boolean));
     if (oldNotions.length) await db.projectNotions.bulkDelete(oldNotions.map(x => x.id!).filter(Boolean));
-    if (oldRowCounters.length) await db.rowCounters.bulkDelete(oldRowCounters.map(x => x.id!).filter(Boolean));
-    if (oldGauges.length) await db.projectGauges.bulkDelete(oldGauges.map(x => x.id!).filter(Boolean));
+
+    // rowCounters / projectGauges 는 per-cloudId 병합.
+    //   - 사용자가 단수 카운터를 누르거나 게이지 메모를 수정하는 빈도가 매우 잦고,
+    //     소프트 삭제도 사용자 액션이라 fetch 시 부활하면 데이터 신뢰도가 흔들린다.
+    //   - 로컬 updatedAt > 원격 updatedAt 이면 로컬을 보존(skip),
+    //     아니면 update/add 로 원격 상태를 반영.
+    //   - 원격에 없고 로컬에만 존재하는 항목(cloudId 없거나 원격 누락)은 보존.
+    //     (clearAll/Trash purge 외에는 하드 삭제가 일어나지 않는 모델)
+    const oldRowCounterByCloudId = new Map(
+      oldRowCounters.filter(c => c.cloudId).map(c => [c.cloudId!, c]),
+    );
+    const oldGaugeByCloudId = new Map(
+      oldGauges.filter(g => g.cloudId).map(g => [g.cloudId!, g]),
+    );
 
     for (const link of remote.yarnLinks || []) {
       const yarn = await db.yarns.where("cloudId").equals(link.yarnCloudId).first();
@@ -624,21 +639,51 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
     }
 
     for (const counter of remote.rowCounters || []) {
-      await db.rowCounters.add({
+      const cloudId = counter.cloudId || crypto.randomUUID();
+      const existingLocal = counter.cloudId ? oldRowCounterByCloudId.get(counter.cloudId) : undefined;
+
+      // 로컬이 더 최신이면 보존 — 사용자가 막 누른 카운터/소프트 삭제 보호
+      if (
+        existingLocal &&
+        existingLocal.id != null &&
+        (existingLocal.updatedAt ?? 0) > (counter.updatedAt ?? 0)
+      ) {
+        continue;
+      }
+
+      const counterData = {
         projectId,
         name: counter.name,
         count: counter.count ?? 0,
         goal: counter.goal,
-        cloudId: counter.cloudId || crypto.randomUUID(),
+        cloudId,
         createdAt: counter.createdAt ?? Date.now(),
         updatedAt: counter.updatedAt ?? Date.now(),
         isDeleted: counter.isDeleted ?? false,
         deletedAt: counter.deletedAt ?? null,
-      } as any);
+      };
+
+      if (existingLocal && existingLocal.id != null) {
+        await db.rowCounters.update(existingLocal.id, counterData as any);
+      } else {
+        await db.rowCounters.add(counterData as any);
+      }
     }
 
     for (const gauge of remote.gauges || []) {
-      await db.projectGauges.add({
+      const cloudId = gauge.cloudId || crypto.randomUUID();
+      const existingLocal = gauge.cloudId ? oldGaugeByCloudId.get(gauge.cloudId) : undefined;
+
+      // 로컬이 더 최신이면 보존 — 메모/계산값 수정 또는 소프트 삭제 보호
+      if (
+        existingLocal &&
+        existingLocal.id != null &&
+        (existingLocal.updatedAt ?? 0) > (gauge.updatedAt ?? 0)
+      ) {
+        continue;
+      }
+
+      const gaugeData = {
         projectId,
         name: gauge.name,
         mode: gauge.mode,
@@ -652,12 +697,18 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
         resultStitches: gauge.resultStitches,
         resultRows: gauge.resultRows,
         memo: gauge.memo,
-        cloudId: gauge.cloudId || crypto.randomUUID(),
+        cloudId,
         createdAt: gauge.createdAt ?? Date.now(),
         updatedAt: gauge.updatedAt ?? Date.now(),
         isDeleted: gauge.isDeleted ?? false,
         deletedAt: gauge.deletedAt ?? null,
-      } as any);
+      };
+
+      if (existingLocal && existingLocal.id != null) {
+        await db.projectGauges.update(existingLocal.id, gaugeData as any);
+      } else {
+        await db.projectGauges.add(gaugeData as any);
+      }
     }
     },
   );
@@ -762,67 +813,4 @@ export async function executeProjectSync(userId: string, diff: ProjectSyncDiff):
           needsLocalUpdate = true;
         }
         if (needsLocalUpdate) {
-          await db.projects.update(localProjectId, fixUpdates);
-        }
-        const payload = await buildProjectSyncPayload(localProjectId, userId);
-        const docRef = doc(firestore, `users/${userId}/projects`, payload.cloudId);
-        const safePayload = sanitizeForFirestore(payload);
-        console.log(`[Project Sync Upload] ${payload.name}`);
-        console.log(`  - cloudId: ${payload.cloudId}`);
-        console.log(`  - updatedAt: ${payload.updatedAt}`);
-        console.log(`  - payload:`, payload);
-        batch.set(docRef, safePayload);
-        uploaded++;
-      } catch (e) {
-        console.error(`[Sync] Project 업로드 준비 실패: ${localProjectId}`, e);
-        failed++;
-      }
-    }
-    try {
-      await batch.commit();
-    } catch (batchError) {
-      console.error("[Sync] Firestore Batch Commit 실패 (Project):", batchError);
-      failed += uploaded;
-      uploaded = 0;
-    }
-    for (const remote of diff.toDownload) {
-      try {
-        await upsertProjectFromCloud(remote);
-        downloaded++;
-      } catch (e) {
-        console.error(`[Sync] Project 다운로드/저장 실패: ${remote.name} (${remote.cloudId})`, e);
-        failed++;
-      }
-    }
-    return { uploaded, downloaded, unchanged: diff.unchanged, failed };
-  } catch (error) {
-    console.error("Project Sync execution error:", error);
-    throw error;
-  }
-}
-
-export async function executeProjectFetch(diff: ProjectFetchDiff): Promise<FetchResult> {
-  let added = 0;
-  let updated = 0;
-  let failed = 0;
-
-  for (const remote of diff.toAdd) {
-    try {
-      await upsertProjectFromCloud(remote);
-      added++;
-    } catch (e) {
-      console.error(`[Fetch] Project 추가 실패: ${remote.name} (${remote.cloudId})`, e);
-      failed++;
-    }
-  }
-  for (const remote of diff.toUpdate) {
-    try {
-      await upsertProjectFromCloud(remote);
-      updated++;
-    } catch (e) {
-      console.error(`[Fetch] Project 덮어쓰기 실패: ${remote.name} (${remote.cloudId})`, e);
-      failed++;
-    }
-  }
-  return { added, updated, unchanged: diff.unchanged, failed };
-}
+          await 
