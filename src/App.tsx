@@ -23,6 +23,8 @@ import Trash from "./pages/Trash";
 import SettingsBackup from "./pages/SettingsBackup";
 import SettingsData from "./pages/SettingsData";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import About from "./pages/About";
 import GaugeCalculator from "./pages/GaugeCalculator";
 import NotFound from "./pages/NotFound.tsx";
 import Login from "./pages/Login";
@@ -64,6 +66,8 @@ const App = () => (
             <Route path="/settings/data" element={<SettingsData />} />
             <Route path="/settings/trash" element={<Trash />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/about" element={<About />} />
             <Route path="/tools/gauge" element={<GaugeCalculator />} />
           </Route>
           <Route path="*" element={<NotFound />} />

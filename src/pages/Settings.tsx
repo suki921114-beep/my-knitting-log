@@ -12,9 +12,8 @@ import {
   Database,
   Info,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
-
-const APP_VERSION = '0.1.0';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -127,8 +126,8 @@ export default function Settings() {
         />
       </Section>
 
-      {/* 4. 정보 */}
-      <Section title="정보">
+      {/* 4. 정책 및 정보 */}
+      <Section title="정책 및 정보">
         <MenuCard
           icon={ShieldCheck}
           tone="soft"
@@ -136,16 +135,20 @@ export default function Settings() {
           desc="데이터 저장 위치, 보관 기간, 탈퇴 요청"
           onClick={() => navigate('/privacy')}
         />
-        <div className="card-soft flex items-center gap-3 p-4 bg-card">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <Info className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-semibold text-foreground">앱 버전</div>
-            <div className="text-[11.5px] text-muted-foreground">나의 뜨개 프로젝트 기록</div>
-          </div>
-          <span className="text-[12px] font-semibold text-muted-foreground tabular-nums">v{APP_VERSION}</span>
-        </div>
+        <MenuCard
+          icon={FileText}
+          tone="muted"
+          title="이용약관"
+          desc="서비스 목적, 책임 한계, 변경 가능성"
+          onClick={() => navigate('/terms')}
+        />
+        <MenuCard
+          icon={Info}
+          tone="muted"
+          title="앱 정보"
+          desc="버전, 오픈소스 라이선스, 문의처"
+          onClick={() => navigate('/about')}
+        />
       </Section>
     </div>
   );

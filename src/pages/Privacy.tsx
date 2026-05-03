@@ -7,7 +7,11 @@ export default function Privacy() {
 
       <article className="card-soft space-y-5 p-5 text-[13px] leading-[1.65] text-foreground">
         <p className="text-muted-foreground">
-          마지막 업데이트: 2026-05-01
+          시행일: <strong className="text-foreground">TODO — 출시일 입력 필요</strong>
+        </p>
+        <p className="text-[12px] text-muted-foreground">
+          본 방침은 변호사 검토를 받은 문서가 아닙니다. 서비스 운영 중 변경될 수 있으며,
+          중요한 변경이 있을 때는 시행일과 함께 갱신됩니다.
         </p>
 
         <Section title="1. 서비스명">
@@ -20,7 +24,7 @@ export default function Privacy() {
             <li>Google 계정 식별자(UID), 이메일, 표시 이름, 프로필 사진 URL</li>
             <li>이용자가 직접 입력한 뜨개 기록 데이터: 실/도안/바늘/부자재/프로젝트/단수 카운터/게이지/메모 등</li>
             <li>이용자가 추가한 사진(현재는 이 기기 안에만 저장됩니다)</li>
-            <li>마지막 백업 시각, 자동 백업 모드 등 동작 상태</li>
+            <li>마지막 백업 시각, 자동 백업 모드, 휴지통 상태 등 동작 메타</li>
           </ul>
         </Section>
 
@@ -35,7 +39,7 @@ export default function Privacy() {
         <Section title="4. 저장 위치">
           <ul className="ml-4 list-disc space-y-1">
             <li>이 기기 (브라우저 IndexedDB) — 모든 입력 데이터의 1차 저장소</li>
-            <li>Google Cloud Firestore — 로그인한 이용자의 UID 경로 아래에 본인 데이터만 저장. 다른 이용자가 접근 불가하도록 보안 규칙으로 격리합니다.</li>
+            <li>Google Cloud Firestore — 로그인한 이용자의 UID 경로 아래에만 저장. 다른 이용자는 보안 규칙으로 접근 차단.</li>
             <li>사진은 현재 클라우드에 저장하지 않으며, 이 기기 안에만 보관됩니다.</li>
           </ul>
         </Section>
@@ -61,11 +65,11 @@ export default function Privacy() {
           </p>
         </Section>
 
-        <Section title="7. 이용자의 권리 (조회·삭제·탈퇴)">
+        <Section title="7. 이용자의 권리 (조회·수정·삭제·탈퇴)">
           <ul className="ml-4 list-disc space-y-1">
-            <li>설정 화면 → 데이터 관리에서 본인 데이터를 언제든 내보내기/가져오기 가능</li>
-            <li>설정 화면 → 휴지통에서 삭제된 항목 영구 삭제 가능</li>
-            <li>설정 화면 → 위험 영역의 '전체 삭제'로 이 기기의 모든 데이터를 한 번에 삭제 가능</li>
+            <li>설정 → 백업 및 동기화의 'JSON 파일로 내보내기' 로 본인 데이터 조회/이전 가능</li>
+            <li>설정 → 데이터 관리의 휴지통에서 삭제된 항목 영구 삭제 가능</li>
+            <li>설정 → 데이터 관리의 '전체 삭제' 로 이 기기의 모든 데이터를 한 번에 삭제 가능</li>
             <li>계정/클라우드 데이터 완전 삭제(탈퇴) 요청은 아래 9항의 문의 이메일로 보내주세요. 요청 확인 후 7일 안에 처리합니다.</li>
           </ul>
         </Section>
@@ -87,17 +91,17 @@ export default function Privacy() {
         <Section title="9. 문의처">
           <p>개인정보 관련 문의/탈퇴 요청은 아래 이메일로 보내주세요.</p>
           <p className="mt-1 font-semibold text-foreground">
-            ddoro86@gmail.com
+            TODO — 운영자 이메일 입력 필요
           </p>
           <p className="mt-1 text-[11.5px] text-muted-foreground">
-            ※ 운영용 별도 이메일이 준비되면 본 방침을 갱신합니다.
+            ※ 출시 시점에 실제 운영용 이메일로 갱신해야 합니다.
           </p>
         </Section>
 
         <Section title="10. 방침의 변경">
           <p>
-            법령 변경, 기능 추가(예: 프리미엄 사진 백업) 등이 있을 경우 본 방침을 갱신하고
-            상단의 '마지막 업데이트' 날짜를 최신으로 표시합니다.
+            법령 변경, 기능 추가(예: 프리미엄 사진 백업, 유료 기능 도입) 등이 있을 경우 본 방침을 갱신하고
+            상단의 '시행일' 을 최신으로 표시합니다.
           </p>
         </Section>
       </article>
