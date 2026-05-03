@@ -1,4 +1,6 @@
 import PageHeader from '@/components/PageHeader';
+import { LegalPlaceholder } from '@/components/LegalPlaceholder';
+import { OPERATOR_EMAIL, OPERATOR_NAME } from '@/lib/legalPlaceholders';
 
 const APP_VERSION = '0.1.0';
 
@@ -33,12 +35,16 @@ export default function About() {
 
         <section className="space-y-1.5">
           <h3 className="text-[13.5px] font-bold">개발 / 운영자</h3>
-          <p className="text-[12.5px] text-muted-foreground">TODO — 운영자 표시 필요</p>
+          <p className="text-[12.5px]">
+            <LegalPlaceholder value={OPERATOR_NAME} fallback="운영자 표시 미정" />
+          </p>
         </section>
 
         <section className="space-y-1.5">
           <h3 className="text-[13.5px] font-bold">문의</h3>
-          <p className="text-[12.5px] font-semibold">TODO — 운영자 이메일 입력 필요</p>
+          <p className="text-[12.5px]">
+            <LegalPlaceholder value={OPERATOR_EMAIL} fallback="운영자 이메일 미정" />
+          </p>
           <p className="text-[11.5px] text-muted-foreground">
             ※ 출시 시점에 실제 운영용 이메일로 갱신해야 합니다.
           </p>
@@ -70,14 +76,4 @@ export default function About() {
                 >
                   {lib.name}
                 </a>
-                <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
-                  {lib.license}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </article>
-    </div>
-  );
-}
+                <span c

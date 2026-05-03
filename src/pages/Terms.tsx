@@ -1,4 +1,6 @@
 import PageHeader from '@/components/PageHeader';
+import { LegalPlaceholder } from '@/components/LegalPlaceholder';
+import { EFFECTIVE_DATE, OPERATOR_EMAIL } from '@/lib/legalPlaceholders';
 
 export default function Terms() {
   return (
@@ -7,7 +9,7 @@ export default function Terms() {
 
       <article className="card-soft space-y-5 p-5 text-[13px] leading-[1.65] text-foreground">
         <p className="text-muted-foreground">
-          시행일: <strong className="text-foreground">TODO — 출시일 입력 필요</strong>
+          시행일: <LegalPlaceholder value={EFFECTIVE_DATE} fallback="출시일 미정" variant="inline" />
         </p>
         <p className="text-[12px] text-muted-foreground">
           본 약관은 변호사 검토를 받은 문서가 아닙니다. 서비스 운영 상황에 따라 변경될 수 있으며,
@@ -84,8 +86,8 @@ export default function Terms() {
 
         <Section title="8. 문의처">
           <p>약관 관련 문의는 아래 이메일로 보내주세요.</p>
-          <p className="mt-1 font-semibold text-foreground">
-            TODO — 운영자 이메일 입력 필요
+          <p className="mt-1">
+            <LegalPlaceholder value={OPERATOR_EMAIL} fallback="운영자 이메일 미정" />
           </p>
         </Section>
 
@@ -103,8 +105,4 @@ export default function Terms() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <h2 className="text-[14.5px] font-bold text-foreground">{title}</h2>
-      <div className="text-[12.5px] leading-relaxed text-foreground">{children}</div>
-    </section>
-  );
-}
+      <h2 className="te
