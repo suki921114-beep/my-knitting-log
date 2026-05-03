@@ -471,176 +471,197 @@ async function mergeRemotePhotos(
 }
 
 async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
-  const existing = await db.projects.where("cloudId").equals(remote.cloudId).first();
-  const baseProjectData = {
-    name: remote.name,
-    status: remote.status,
-    startDate: remote.startDate,
-    endDate: remote.endDate,
-    size: remote.size,
-    gauge: remote.gauge,
-    progressNote: remote.progressNote,
-    finishedNote: remote.finishedNote,
-    cloudId: remote.cloudId,
-    createdAt: remote.createdAt,
-    updatedAt: remote.updatedAt,
-    isDeleted: remote.isDeleted ?? false,
-    deletedAt: remote.deletedAt ?? null,
-  };
+  // 사진 다운로드는 IDB 외부 fetch 라 트랜잭션 도중 await 시 트랜잭션이 자동
+  // 종료됨. 현재 ENABLE_CLOUD_PHOTO_SYNC=false 라 mergeRemotePhotos 가 호출되지
+  // 않아 외부 await 가 없으므로 트랜잭션 안에서 안전. 향후 true 로 켜질 때는
+  // photos 처리만 트랜잭션 밖으로 빼야 한다 (TODO).
+  await db.transaction(
+    'rw',
+    [
+      db.projects,
+      db.projectYarns,
+      db.projectPatterns,
+      db.projectNeedles,
+      db.projectNotions,
+      db.rowCounters,
+      db.projectGauges,
+      db.yarns,
+      db.patterns,
+      db.needles,
+      db.notions,
+    ],
+    async () => {
+    const existing = await db.projects.where("cloudId").equals(remote.cloudId).first();
+    const baseProjectData = {
+      name: remote.name,
+      status: remote.status,
+      startDate: remote.startDate,
+      endDate: remote.endDate,
+      size: remote.size,
+      gauge: remote.gauge,
+      progressNote: remote.progressNote,
+      finishedNote: remote.finishedNote,
+      cloudId: remote.cloudId,
+      createdAt: remote.createdAt,
+      updatedAt: remote.updatedAt,
+      isDeleted: remote.isDeleted ?? false,
+      deletedAt: remote.deletedAt ?? null,
+    };
 
-  let projectId: number;
-  // 기존 로컬 사진 (dataUrl 캐시 보존용 — 이미 받은 사진 재다운로드 방지)
-  const existingPhotos: ProjectPhoto[] = (existing?.photos as any) || [];
-  const existingByCloudId = new Map<string, ProjectPhoto>(
-    existingPhotos.filter(p => p.cloudId).map(p => [p.cloudId, p]),
+    let projectId: number;
+    // 기존 로컬 사진 (dataUrl 캐시 보존용 — 이미 받은 사진 재다운로드 방지)
+    const existingPhotos: ProjectPhoto[] = (existing?.photos as any) || [];
+    const existingByCloudId = new Map<string, ProjectPhoto>(
+      existingPhotos.filter(p => p.cloudId).map(p => [p.cloudId, p]),
+    );
+
+    // remote.photos 메타 + 로컬 캐시 병합
+    // 플래그 false 면 remote.photos 무시하고 기존 로컬 photos 그대로 보존
+    // (가져오기 때문에 사진이 사라지는 일 방지)
+    const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
+      ? await mergeRemotePhotos(remote.photos || [], existingByCloudId)
+      : existingPhotos;
+
+    if (existing) {
+      await db.projects.update(existing.id!, {
+        ...baseProjectData,
+        id: existing.id,
+        photos: mergedPhotos,
+      } as any);
+      projectId = existing.id!;
+    } else {
+      projectId = await db.projects.add({
+        ...baseProjectData,
+        photos: mergedPhotos.length ? mergedPhotos : undefined,
+      } as any);
+    }
+
+    const [
+      oldYarns,
+      oldPatterns,
+      oldNeedles,
+      oldNotions,
+      oldRowCounters,
+      oldGauges,
+    ] = await Promise.all([
+      db.projectYarns.where("projectId").equals(projectId).toArray(),
+      db.projectPatterns.where("projectId").equals(projectId).toArray(),
+      db.projectNeedles.where("projectId").equals(projectId).toArray(),
+      db.projectNotions.where("projectId").equals(projectId).toArray(),
+      db.rowCounters.where("projectId").equals(projectId).toArray(),
+      db.projectGauges.where("projectId").equals(projectId).toArray(),
+    ]);
+
+    if (oldYarns.length) await db.projectYarns.bulkDelete(oldYarns.map(x => x.id!).filter(Boolean));
+    if (oldPatterns.length) await db.projectPatterns.bulkDelete(oldPatterns.map(x => x.id!).filter(Boolean));
+    if (oldNeedles.length) await db.projectNeedles.bulkDelete(oldNeedles.map(x => x.id!).filter(Boolean));
+    if (oldNotions.length) await db.projectNotions.bulkDelete(oldNotions.map(x => x.id!).filter(Boolean));
+    if (oldRowCounters.length) await db.rowCounters.bulkDelete(oldRowCounters.map(x => x.id!).filter(Boolean));
+    if (oldGauges.length) await db.projectGauges.bulkDelete(oldGauges.map(x => x.id!).filter(Boolean));
+
+    for (const link of remote.yarnLinks || []) {
+      const yarn = await db.yarns.where("cloudId").equals(link.yarnCloudId).first();
+      if (!yarn?.id) continue;
+      await db.projectYarns.add({
+        projectId,
+        yarnId: yarn.id,
+        usedGrams: link.usedGrams,
+        plannedGrams: link.plannedGrams,
+        colorNote: link.colorNote,
+        usageNote: link.usageNote,
+        cloudId: link.cloudId,
+        createdAt: link.createdAt,
+        updatedAt: link.updatedAt,
+        isDeleted: link.isDeleted ?? false,
+        deletedAt: link.deletedAt ?? null,
+      } as any);
+    }
+
+    for (const link of remote.patternLinks || []) {
+      const pattern = await db.patterns.where("cloudId").equals(link.patternCloudId).first();
+      if (!pattern?.id) continue;
+      await db.projectPatterns.add({
+        projectId,
+        patternId: pattern.id,
+        note: link.note,
+        cloudId: link.cloudId,
+        createdAt: link.createdAt,
+        updatedAt: link.updatedAt,
+        isDeleted: link.isDeleted ?? false,
+        deletedAt: link.deletedAt ?? null,
+      } as any);
+    }
+
+    for (const link of remote.needleLinks || []) {
+      const needle = await db.needles.where("cloudId").equals(link.needleCloudId).first();
+      if (!needle?.id) continue;
+      await db.projectNeedles.add({
+        projectId,
+        needleId: needle.id,
+        note: link.note,
+        cloudId: link.cloudId,
+        createdAt: link.createdAt,
+        updatedAt: link.updatedAt,
+        isDeleted: link.isDeleted ?? false,
+        deletedAt: link.deletedAt ?? null,
+      } as any);
+    }
+
+    for (const link of remote.notionLinks || []) {
+      const notion = await db.notions.where("cloudId").equals(link.notionCloudId).first();
+      if (!notion?.id) continue;
+      await db.projectNotions.add({
+        projectId,
+        notionId: notion.id,
+        quantity: link.quantity,
+        note: link.note,
+        cloudId: link.cloudId,
+        createdAt: link.createdAt,
+        updatedAt: link.updatedAt,
+        isDeleted: link.isDeleted ?? false,
+        deletedAt: link.deletedAt ?? null,
+      } as any);
+    }
+
+    for (const counter of remote.rowCounters || []) {
+      await db.rowCounters.add({
+        projectId,
+        name: counter.name,
+        count: counter.count ?? 0,
+        goal: counter.goal,
+        cloudId: counter.cloudId || crypto.randomUUID(),
+        createdAt: counter.createdAt ?? Date.now(),
+        updatedAt: counter.updatedAt ?? Date.now(),
+        isDeleted: counter.isDeleted ?? false,
+        deletedAt: counter.deletedAt ?? null,
+      } as any);
+    }
+
+    for (const gauge of remote.gauges || []) {
+      await db.projectGauges.add({
+        projectId,
+        name: gauge.name,
+        mode: gauge.mode,
+        patternStitches: gauge.patternStitches,
+        patternRows: gauge.patternRows,
+        myStitches: gauge.myStitches,
+        myRows: gauge.myRows,
+        targetCm: gauge.targetCm,
+        patternTargetStitches: gauge.patternTargetStitches,
+        patternTargetRows: gauge.patternTargetRows,
+        resultStitches: gauge.resultStitches,
+        resultRows: gauge.resultRows,
+        memo: gauge.memo,
+        cloudId: gauge.cloudId || crypto.randomUUID(),
+        createdAt: gauge.createdAt ?? Date.now(),
+        updatedAt: gauge.updatedAt ?? Date.now(),
+        isDeleted: gauge.isDeleted ?? false,
+        deletedAt: gauge.deletedAt ?? null,
+      } as any);
+    }
+    },
   );
-
-  // remote.photos 메타 + 로컬 캐시 병합
-  // 플래그 false 면 remote.photos 무시하고 기존 로컬 photos 그대로 보존
-  // (가져오기 때문에 사진이 사라지는 일 방지)
-  const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
-    ? await mergeRemotePhotos(remote.photos || [], existingByCloudId)
-    : existingPhotos;
-
-  if (existing) {
-    await db.projects.update(existing.id!, {
-      ...baseProjectData,
-      id: existing.id,
-      photos: mergedPhotos,
-    } as any);
-    projectId = existing.id!;
-  } else {
-    projectId = await db.projects.add({
-      ...baseProjectData,
-      photos: mergedPhotos.length ? mergedPhotos : undefined,
-    } as any);
-  }
-
-  const [
-    oldYarns,
-    oldPatterns,
-    oldNeedles,
-    oldNotions,
-    oldRowCounters,
-    oldGauges,
-  ] = await Promise.all([
-    db.projectYarns.where("projectId").equals(projectId).toArray(),
-    db.projectPatterns.where("projectId").equals(projectId).toArray(),
-    db.projectNeedles.where("projectId").equals(projectId).toArray(),
-    db.projectNotions.where("projectId").equals(projectId).toArray(),
-    db.rowCounters.where("projectId").equals(projectId).toArray(),
-    db.projectGauges.where("projectId").equals(projectId).toArray(),
-  ]);
-
-  if (oldYarns.length) await db.projectYarns.bulkDelete(oldYarns.map(x => x.id!).filter(Boolean));
-  if (oldPatterns.length) await db.projectPatterns.bulkDelete(oldPatterns.map(x => x.id!).filter(Boolean));
-  if (oldNeedles.length) await db.projectNeedles.bulkDelete(oldNeedles.map(x => x.id!).filter(Boolean));
-  if (oldNotions.length) await db.projectNotions.bulkDelete(oldNotions.map(x => x.id!).filter(Boolean));
-  if (oldRowCounters.length) await db.rowCounters.bulkDelete(oldRowCounters.map(x => x.id!).filter(Boolean));
-  if (oldGauges.length) await db.projectGauges.bulkDelete(oldGauges.map(x => x.id!).filter(Boolean));
-
-  for (const link of remote.yarnLinks || []) {
-    const yarn = await db.yarns.where("cloudId").equals(link.yarnCloudId).first();
-    if (!yarn?.id) continue;
-    await db.projectYarns.add({
-      projectId,
-      yarnId: yarn.id,
-      usedGrams: link.usedGrams,
-      plannedGrams: link.plannedGrams,
-      colorNote: link.colorNote,
-      usageNote: link.usageNote,
-      cloudId: link.cloudId,
-      createdAt: link.createdAt,
-      updatedAt: link.updatedAt,
-      isDeleted: link.isDeleted ?? false,
-      deletedAt: link.deletedAt ?? null,
-    } as any);
-  }
-
-  for (const link of remote.patternLinks || []) {
-    const pattern = await db.patterns.where("cloudId").equals(link.patternCloudId).first();
-    if (!pattern?.id) continue;
-    await db.projectPatterns.add({
-      projectId,
-      patternId: pattern.id,
-      note: link.note,
-      cloudId: link.cloudId,
-      createdAt: link.createdAt,
-      updatedAt: link.updatedAt,
-      isDeleted: link.isDeleted ?? false,
-      deletedAt: link.deletedAt ?? null,
-    } as any);
-  }
-
-  for (const link of remote.needleLinks || []) {
-    const needle = await db.needles.where("cloudId").equals(link.needleCloudId).first();
-    if (!needle?.id) continue;
-    await db.projectNeedles.add({
-      projectId,
-      needleId: needle.id,
-      note: link.note,
-      cloudId: link.cloudId,
-      createdAt: link.createdAt,
-      updatedAt: link.updatedAt,
-      isDeleted: link.isDeleted ?? false,
-      deletedAt: link.deletedAt ?? null,
-    } as any);
-  }
-
-  for (const link of remote.notionLinks || []) {
-    const notion = await db.notions.where("cloudId").equals(link.notionCloudId).first();
-    if (!notion?.id) continue;
-    await db.projectNotions.add({
-      projectId,
-      notionId: notion.id,
-      quantity: link.quantity,
-      note: link.note,
-      cloudId: link.cloudId,
-      createdAt: link.createdAt,
-      updatedAt: link.updatedAt,
-      isDeleted: link.isDeleted ?? false,
-      deletedAt: link.deletedAt ?? null,
-    } as any);
-  }
-
-  for (const counter of remote.rowCounters || []) {
-    await db.rowCounters.add({
-      projectId,
-      name: counter.name,
-      count: counter.count ?? 0,
-      goal: counter.goal,
-      cloudId: counter.cloudId || crypto.randomUUID(),
-      createdAt: counter.createdAt ?? Date.now(),
-      updatedAt: counter.updatedAt ?? Date.now(),
-      isDeleted: counter.isDeleted ?? false,
-      deletedAt: counter.deletedAt ?? null,
-    } as any);
-  }
-
-  for (const gauge of remote.gauges || []) {
-    await db.projectGauges.add({
-      projectId,
-      name: gauge.name,
-      mode: gauge.mode,
-      patternStitches: gauge.patternStitches,
-      patternRows: gauge.patternRows,
-      myStitches: gauge.myStitches,
-      myRows: gauge.myRows,
-      targetCm: gauge.targetCm,
-      patternTargetStitches: gauge.patternTargetStitches,
-      patternTargetRows: gauge.patternTargetRows,
-      resultStitches: gauge.resultStitches,
-      resultRows: gauge.resultRows,
-      memo: gauge.memo,
-      cloudId: gauge.cloudId || crypto.randomUUID(),
-      createdAt: gauge.createdAt ?? Date.now(),
-      updatedAt: gauge.updatedAt ?? Date.now(),
-      isDeleted: gauge.isDeleted ?? false,
-      deletedAt: gauge.deletedAt ?? null,
-    } as any);
-  }
 }
-
 export async function calculateProjectSyncDiff(userId: string): Promise<ProjectSyncDiff> {
   const diff: ProjectSyncDiff = { toUpload: [], toDownload: [], unchanged: 0 };
   const localProjects = await db.projects.toArray();
