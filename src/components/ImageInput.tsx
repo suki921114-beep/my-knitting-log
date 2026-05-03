@@ -1,7 +1,11 @@
 import { useRef } from 'react';
 import { ImagePlus, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { fileToCompressedDataUrl } from '@/lib/image';
+import { fileToCompressedDataUrl, estimateDataUrlBytes, formatBytes } from '@/lib/image';
+import { toast } from '@/components/ui/sonner';
+
+// 단일 이미지(라이브러리 대표 사진 등) 압축 후 허용 최대 바이트
+const SINGLE_HARD_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
 interface SingleProps {
   value?: string;
@@ -18,8 +22,30 @@ export function ImageInput({ value, onChange, label = '대표 이미지', aspect
     if (!file) return;
     setBusy(true);
     try {
-      const dataUrl = await fileToCompressedDataUrl(file, { maxDim: 1024, quality: 0.8 });
+      const dataUrl = await fileToCompressedDataUrl(file, {
+        maxDim: 1024,
+        quality: 0.8,
+        maxBytes: SINGLE_HARD_MAX_BYTES,
+      });
+      if (!dataUrl) {
+        toast.error('이미지를 읽지 못했어요', {
+          description: 'HEIC/HEIF 같은 일부 형식은 지원되지 않을 수 있어요.',
+        });
+        return;
+      }
+      const bytes = estimateDataUrlBytes(dataUrl);
+      if (bytes > SINGLE_HARD_MAX_BYTES) {
+        toast.warning('이미지가 너무 커요', {
+          description: `압축 후에도 ${formatBytes(bytes)} — 더 작은 사진을 선택해 주세요.`,
+        });
+        return;
+      }
       onChange(dataUrl);
+    } catch (e) {
+      console.error('[ImageInput] 압축 실패:', e);
+      toast.error('이미지 처리 실패', {
+        description: '다른 사진으로 다시 시도해 주세요.',
+      });
     } finally {
       setBusy(false);
     }
@@ -78,6 +104,9 @@ interface MultiProps {
   max?: number;
 }
 
+// 프로젝트 사진 한 장 압축 후 허용 최대 바이트
+const MULTI_HARD_MAX_BYTES = 1.5 * 1024 * 1024; // 1.5MB
+
 export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -89,10 +118,47 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
       const slots = Math.max(0, max - values.length);
       const list = Array.from(files).slice(0, slots);
       const out: string[] = [];
+      let skippedFormat = 0;
+      let skippedSize = 0;
       for (const f of list) {
-        out.push(await fileToCompressedDataUrl(f, { maxDim: 1280, quality: 0.82 }));
+        try {
+          const dataUrl = await fileToCompressedDataUrl(f, {
+            maxDim: 1280,
+            quality: 0.8,
+            maxBytes: MULTI_HARD_MAX_BYTES,
+          });
+          if (!dataUrl) {
+            skippedFormat++;
+            continue;
+          }
+          if (estimateDataUrlBytes(dataUrl) > MULTI_HARD_MAX_BYTES) {
+            skippedSize++;
+            continue;
+          }
+          out.push(dataUrl);
+        } catch (e) {
+          console.error('[MultiImageInput] 압축 실패:', f.name, e);
+          skippedFormat++;
+        }
       }
-      onChange([...values, ...out]);
+      if (out.length) {
+        onChange([...values, ...out]);
+      }
+      if (skippedFormat > 0) {
+        toast.error(`사진 ${skippedFormat}장을 읽지 못했어요`, {
+          description: 'HEIC/HEIF 같은 일부 형식은 지원되지 않을 수 있어요.',
+        });
+      }
+      if (skippedSize > 0) {
+        toast.warning(`사진 ${skippedSize}장이 너무 커요`, {
+          description: '압축 후에도 1.5MB 를 초과해 저장에서 제외했어요.',
+        });
+      }
+      if (files.length > slots) {
+        toast.message(`최대 ${max}장까지 저장할 수 있어요`, {
+          description: `${files.length - slots}장은 추가하지 못했어요.`,
+        });
+      }
     } finally {
       setBusy(false);
     }
