@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { db, clearAll } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2, ChevronRight, ShieldCheck } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 export default function SettingsData() {
   const navigate = useNavigate();
+  const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
+  const [clearing, setClearing] = useState(false);
 
   // 7개 entity 합산 카운트
   const trashCount = useLiveQuery(async () => {
@@ -33,11 +37,20 @@ export default function SettingsData() {
 
   const totalItems = totals.p + totals.y + totals.pat + totals.n + totals.no;
 
-  async function handleClear() {
-    if (!confirm('정말 모든 데이터를 삭제할까요?')) return;
-    if (!confirm('되돌릴 수 없습니다. 계속할까요?')) return;
-    await clearAll();
-    toast.success('전체 데이터가 삭제되었습니다');
+  async function runClear() {
+    setClearing(true);
+    try {
+      await clearAll();
+      toast.success('전체 데이터가 삭제되었습니다');
+    } catch (e) {
+      console.error('[SettingsData] 전체 삭제 실패:', e);
+      toast.error('전체 삭제 실패', {
+        description: '잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setClearing(false);
+      setClearStep(0);
+    }
   }
 
   return (
@@ -88,8 +101,9 @@ export default function SettingsData() {
       {/* 위험 영역 */}
       <Section title="위험 영역">
         <button
-          onClick={handleClear}
-          className="card-danger flex w-full items-center gap-3 p-4 text-left bg-card"
+          onClick={() => setClearStep(1)}
+          disabled={clearing}
+          className="card-danger flex w-full items-center gap-3 p-4 text-left bg-card disabled:opacity-50"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
             <Trash2 className="h-4 w-4" />
@@ -101,6 +115,36 @@ export default function SettingsData() {
           <ChevronRight className="h-4 w-4 text-destructive/50" />
         </button>
       </Section>
+
+      {/* 1단계: 전체 데이터 삭제 의사 확인 */}
+      <ConfirmDialog
+        open={clearStep === 1}
+        onOpenChange={(o) => !o && setClearStep(0)}
+        title="모든 데이터를 삭제할까요?"
+        description={
+          <span>
+            이 기기의 프로젝트 {totals.p}개, 실 {totals.y}개, 도안 {totals.pat}개, 바늘 {totals.n}개, 부자재 {totals.no}개와 휴지통 항목 {trashCount}개가 모두 사라집니다.
+            {' '}연결된 클라우드 백업은 영향을 받지 않아요.
+          </span>
+        }
+        confirmLabel="다음"
+        cancelLabel="취소"
+        destructive
+        onConfirm={() => setClearStep(2)}
+      />
+
+      {/* 2단계: 되돌릴 수 없음을 다시 한 번 환기 */}
+      <ConfirmDialog
+        open={clearStep === 2}
+        onOpenChange={(o) => !o && setClearStep(0)}
+        title="되돌릴 수 없어요. 계속할까요?"
+        description="삭제하면 휴지통에서도 복원할 수 없습니다. 클라우드 백업이 있다면 [가져오기] 로 다시 받아올 수 있어요."
+        confirmLabel="전체 삭제"
+        cancelLabel="취소"
+        destructive
+        busy={clearing}
+        onConfirm={runClear}
+      />
     </div>
   );
 }

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/components/ui/sonner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RotateCcw, Trash2, Inbox } from 'lucide-react';
 
 // ----------------------------------------------------------------------------
@@ -31,6 +33,14 @@ export default function Trash() {
     yarns.length + patterns.length + needles.length + notions.length +
     projects.length + rowCounters.length + projectGauges.length;
 
+  // AlertDialog 로 가로채기 위한 pending state — 누른 항목을 임시 보관
+  const [pendingPurge, setPendingPurge] = useState<{
+    table: TableName;
+    id: number;
+    label: string;
+  } | null>(null);
+  const [purging, setPurging] = useState(false);
+
   async function restore(table: TableName, id: number, label: string) {
     const t = Date.now();
     await (db as any)[table].update(id, {
@@ -41,12 +51,27 @@ export default function Trash() {
     toast.success(`${label}을(를) 복원했어요`);
   }
 
-  async function purge(table: TableName, id: number, label: string) {
-    if (!confirm(`"${label}"을(를) 영구 삭제할까요? 되돌릴 수 없어요.`)) return;
-    await (db as any)[table].delete(id);
-    toast.success('영구 삭제했어요', {
-      description: '이 기기에서 완전히 지웠습니다.',
-    });
+  function askPurge(table: TableName, id: number, label: string) {
+    setPendingPurge({ table, id, label });
+  }
+
+  async function runPurge() {
+    if (!pendingPurge) return;
+    setPurging(true);
+    try {
+      await (db as any)[pendingPurge.table].delete(pendingPurge.id);
+      toast.success('영구 삭제했어요', {
+        description: '이 기기에서 완전히 지웠습니다.',
+      });
+    } catch (e) {
+      console.error('[Trash] 영구 삭제 실패:', e);
+      toast.error('영구 삭제 실패', {
+        description: '잠시 후 다시 시도해 주세요.',
+      });
+    } finally {
+      setPurging(false);
+      setPendingPurge(null);
+    }
   }
 
   return (
@@ -69,7 +94,7 @@ export default function Trash() {
             getMeta={(y) => [y.brand, y.colorName].filter(Boolean).join(' · ')}
             tableName="yarns"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
           <Section
             title="도안"
@@ -78,7 +103,7 @@ export default function Trash() {
             getMeta={(p) => [p.designer, p.difficulty].filter(Boolean).join(' · ')}
             tableName="patterns"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
           <Section
             title="바늘"
@@ -87,7 +112,7 @@ export default function Trash() {
             getMeta={(n) => [n.brand, n.material].filter(Boolean).join(' · ')}
             tableName="needles"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
           <Section
             title="부자재"
@@ -96,7 +121,7 @@ export default function Trash() {
             getMeta={(n) => [n.kind, n.shop].filter(Boolean).join(' · ')}
             tableName="notions"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
           <Section
             title="프로젝트"
@@ -105,7 +130,7 @@ export default function Trash() {
             getMeta={(p) => p.status === 'in_progress' ? '진행중' : p.status === 'planned' ? '예정' : p.status === 'done' ? '완성' : '보류'}
             tableName="projects"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
           <Section
             title="단수 카운터"
@@ -118,7 +143,7 @@ export default function Trash() {
             }}
             tableName="rowCounters"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
           <Section
             title="게이지 계산"
@@ -134,7 +159,7 @@ export default function Trash() {
             }}
             tableName="projectGauges"
             onRestore={restore}
-            onPurge={purge}
+            onPurge={askPurge}
           />
         </>
       )}
@@ -143,6 +168,18 @@ export default function Trash() {
         ※ <strong>복원</strong>: 다음 자동 백업으로 다른 기기에도 다시 보입니다.<br />
         ※ <strong>영구 삭제</strong>: 이 기기에서 완전히 지웁니다. 클라우드의 삭제 기록은 그대로 남아 다른 기기에서도 부활하지 않아요.
       </p>
+
+      <ConfirmDialog
+        open={pendingPurge !== null}
+        onOpenChange={(o) => !o && setPendingPurge(null)}
+        title={pendingPurge ? `"${pendingPurge.label}" 을(를) 영구 삭제할까요?` : ''}
+        description="이 기기에서 즉시 사라지고 휴지통에서도 복원할 수 없어요. 클라우드 백업에는 삭제 기록만 남습니다."
+        confirmLabel="영구 삭제"
+        cancelLabel="취소"
+        destructive
+        busy={purging}
+        onConfirm={runPurge}
+      />
     </div>
   );
 }
@@ -162,7 +199,7 @@ function Section<T extends { id?: number; deletedAt?: number | null }>({
   getMeta: (it: T) => string;
   tableName: TableName;
   onRestore: (table: TableName, id: number, label: string) => Promise<void>;
-  onPurge: (table: TableName, id: number, label: string) => Promise<void>;
+  onPurge: (table: TableName, id: number, label: string) => void;
 }) {
   if (items.length === 0) return null;
   return (
