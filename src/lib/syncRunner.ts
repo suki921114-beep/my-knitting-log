@@ -49,39 +49,49 @@ export function setAutoSyncMode(mode: AutoSyncMode) {
 }
 
 /**
- * 현재 네트워크가 Wi-Fi(혹은 유선)에 가까운지 추정.
+ * 네트워크 종류 판정 결과.
+ *   - 'wifi'      : Wi-Fi/유선/Wimax 등 비셀룰러로 확인됨
+ *   - 'cellular'  : 셀룰러로 확인됨 (또는 saveData 켜짐)
+ *   - 'unknown'   : 브라우저가 정보 미제공 (Firefox/Safari 데스크톱, 일부 iOS 등)
  *
- * 브라우저별 Network Information API 차이를 흡수한다:
- * - Chromium 모바일: connection.type 노출 안 됨, effectiveType('4g'/'3g'/...)만 줌
- * - Chromium 데스크톱: connection.type 또는 effectiveType
- * - Firefox/Safari: navigator.connection 자체 없음
- *
- * 정확히 알 수 없을 때는 보수적으로 false (= 셀룰러로 간주). 그래야 'wifi only'
- * 모드가 데이터 환경에서 실수로 자동 동기화하지 않는다.
+ * 'unknown' 인 환경에서 'wifi' 모드를 쓰면 자동 백업이 한 번도 실행되지 않는다.
+ * UI 에서 이 상태를 사용자가 인지할 수 있게 노출해야 한다.
  */
-export function isOnWifi(): boolean {
-  if (typeof navigator === 'undefined') return false;
+export type NetworkKind = 'wifi' | 'cellular' | 'unknown';
+
+export function getNetworkKind(): NetworkKind {
+  if (typeof navigator === 'undefined') return 'unknown';
   const conn: any =
     (navigator as any).connection ||
     (navigator as any).mozConnection ||
     (navigator as any).webkitConnection;
 
-  // navigator.connection 자체가 없으면 — Firefox/Safari 등
-  // 이 경우 type 판정이 불가능하므로 사용자가 'always' 가 아니라면 자동 동기화 자제
-  if (!conn) return false;
+  if (!conn) return 'unknown';
 
-  // 데이터 절약 모드는 셀룰러로 간주
-  if (conn.saveData) return false;
+  // 데이터 절약 모드는 셀룰러처럼 취급
+  if (conn.saveData) return 'cellular';
 
-  // type 직접 노출되는 환경
   if (conn.type) {
-    return ['wifi', 'ethernet', 'wimax', 'unknown'].includes(conn.type);
+    if (['wifi', 'ethernet', 'wimax'].includes(conn.type)) return 'wifi';
+    if (['cellular'].includes(conn.type)) return 'cellular';
+    // 'none' / 'unknown' / 'bluetooth' / 'mixed' 등은 모름으로 처리
+    return 'unknown';
   }
 
-  // effectiveType 만 있으면 셀룰러일 가능성이 높으므로 보수적으로 false
-  if (conn.effectiveType) return false;
+  // effectiveType 만 있으면 type 정보 미제공 — 보수적으로 unknown
+  if (conn.effectiveType) return 'unknown';
 
-  return false;
+  return 'unknown';
+}
+
+/**
+ * 현재 네트워크가 Wi-Fi(혹은 유선)에 가까운지 추정.
+ *
+ * 'unknown' 일 때 false 를 반환하므로 'wifi only' 모드는 자동 백업을 건너뛴다.
+ * 이는 데이터 환경에서 실수로 셀룰러를 쓰는 것을 막기 위한 보수적 선택이다.
+ */
+export function isOnWifi(): boolean {
+  return getNetworkKind() === 'wifi';
 }
 
 export function shouldAutoSync(mode: AutoSyncMode): boolean {
@@ -228,14 +238,4 @@ export async function runFullFetch(userId: string): Promise<{ result: LastResult
 
   const result: LastResult = {
     mode: 'fetch',
-    at: new Date().toISOString(),
-    entries: [
-      { label: '실', stat: yarnResult },
-      { label: '도안', stat: patternResult },
-      { label: '바늘', stat: needleResult },
-      { label: '부자재', stat: notionResult },
-      { label: '프로젝트', stat: projectResult },
-    ],
-  };
-  return { result, failed };
-}
+    at: new D

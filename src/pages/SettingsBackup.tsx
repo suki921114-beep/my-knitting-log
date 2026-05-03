@@ -33,12 +33,14 @@ import {
   type EntitySyncStat,
   type EntityFetchStat,
   type LastResult,
+  type NetworkKind,
   getAutoSyncMode,
   setAutoSyncMode as persistAutoSyncMode,
   loadLastResult,
   saveLastResult,
   beginSyncRun,
   endSyncRun,
+  getNetworkKind,
 } from '@/lib/syncRunner';
 import {
   clearSyncDirty,
@@ -87,7 +89,16 @@ export default function SettingsBackup() {
     if (next === 'off') {
       toast.info('자동 백업을 껐어요. 필요할 때 [백업] 버튼으로 진행하세요.');
     } else if (next === 'wifi') {
-      toast.success('자동 백업: Wi-Fi 환경에서만 실행돼요.');
+      const kind = getNetworkKind();
+      if (kind === 'unknown') {
+        // 사용자가 인지할 수 있도록 경고: 이 브라우저에선 wifi 모드가 거의 작동 안 함
+        toast.warning('Wi-Fi 감지를 지원하지 않는 브라우저예요', {
+          description: "현재 환경에선 자동 백업이 거의 실행되지 않아요. '항상' 모드를 권장해요.",
+          duration: 8000,
+        });
+      } else {
+        toast.success('자동 백업: Wi-Fi 환경에서만 실행돼요.');
+      }
     } else {
       toast.success('자동 백업: Wi-Fi와 데이터 모두에서 실행돼요.');
     }
@@ -447,6 +458,12 @@ const AUTO_OPTIONS: { value: AutoSyncMode; label: string; desc: string; Icon: ty
   { value: 'always', label: '항상 자동 백업', desc: 'Wi-Fi와 모바일 데이터 모두에서 자동 실행', Icon: Globe },
 ];
 
+function networkKindLabel(kind: NetworkKind): { text: string; tone: 'green' | 'amber' | 'gray' } {
+  if (kind === 'wifi') return { text: 'Wi-Fi 또는 유선', tone: 'green' };
+  if (kind === 'cellular') return { text: '셀룰러/데이터 절약', tone: 'amber' };
+  return { text: '판별 불가', tone: 'gray' };
+}
+
 function AutoSyncSection({
   mode, onChange, dirty, lastAutoBackup,
 }: {
@@ -455,11 +472,50 @@ function AutoSyncSection({
   dirty: boolean;
   lastAutoBackup: string | null;
 }) {
+  // 네트워크 종류는 라우트 진입 + online/offline 이벤트마다 갱신
+  const [networkKind, setNetworkKind] = useState<NetworkKind>(() => getNetworkKind());
+  useEffect(() => {
+    const update = () => setNetworkKind(getNetworkKind());
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    const conn: any =
+      typeof navigator !== 'undefined'
+        ? (navigator as any).connection ||
+          (navigator as any).mozConnection ||
+          (navigator as any).webkitConnection
+        : null;
+    if (conn && typeof conn.addEventListener === 'function') {
+      conn.addEventListener('change', update);
+    }
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+      if (conn && typeof conn.removeEventListener === 'function') {
+        conn.removeEventListener('change', update);
+      }
+    };
+  }, []);
+
   const lastLabel = lastAutoBackup
     ? new Date(lastAutoBackup).toLocaleString('ko-KR', {
         month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit',
       })
     : '없음';
+
+  const netLabel = networkKindLabel(networkKind);
+  const netToneClass =
+    netLabel.tone === 'green'
+      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+      : netLabel.tone === 'amber'
+      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+      : 'bg-muted text-muted-foreground';
+  const netDotClass =
+    netLabel.tone === 'green' ? 'bg-green-500' : netLabel.tone === 'amber' ? 'bg-amber-500' : 'bg-muted-foreground';
+
+  // wifi 모드를 골랐는데 현재 환경이 wifi 가 아니거나 판별 불가면 즉시 안내 배너 노출
+  const wifiBlocked = mode === 'wifi' && networkKind !== 'wifi';
+
   return (
     <div className="card-soft overflow-hidden bg-card">
       <div className="p-4 border-b border-border/60">
@@ -467,7 +523,7 @@ function AutoSyncSection({
         <p className="mt-1 text-[11.5px] text-muted-foreground leading-relaxed">
           로컬 데이터가 변경되면 자동으로 클라우드에 백업합니다.
         </p>
-        <div className="mt-2.5 flex items-center gap-2 text-[11px] tabular-nums">
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] tabular-nums">
           <span
             className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-semibold ${
               dirty
@@ -478,12 +534,30 @@ function AutoSyncSection({
             <span className={`h-1.5 w-1.5 rounded-full ${dirty ? 'bg-amber-500' : 'bg-green-500'}`} />
             {dirty ? '백업 대기 중' : '최신'}
           </span>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-semibold ${netToneClass}`}
+            title="브라우저가 보고하는 현재 네트워크 종류"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${netDotClass}`} />
+            현재 {netLabel.text}
+          </span>
           <span className="text-muted-foreground">· 마지막 자동 백업 {lastLabel}</span>
         </div>
       </div>
+
+      {wifiBlocked && (
+        <div className="border-b border-amber-200/60 bg-amber-50 px-4 py-2.5 text-[11px] leading-relaxed text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          {networkKind === 'cellular'
+            ? '현재 셀룰러로 잡혀 자동 백업이 일시 중단돼요. Wi-Fi 에 접속하면 다시 실행됩니다.'
+            : "이 브라우저는 Wi-Fi 여부를 알려주지 않아 'Wi-Fi에서만' 모드에선 자동 백업이 건너뜁니다. 항상 자동 백업을 원하면 아래에서 '항상' 을 선택하세요."}
+        </div>
+      )}
+
       <div role="radiogroup" aria-label="자동 백업 모드" className="divide-y divide-border/60">
         {AUTO_OPTIONS.map((opt) => {
           const active = mode === opt.value;
+          const isWifiOption = opt.value === 'wifi';
+          const showWifiHint = isWifiOption && networkKind === 'unknown';
           return (
             <button
               key={opt.value}
@@ -503,109 +577,12 @@ function AutoSyncSection({
                 <opt.Icon className="h-4 w-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className={`text-[13px] font-semibold ${active ? 'text-primary' : 'text-foreground'}`}>
+                <div className={`flex items-center gap-1.5 text-[13px] font-semibold ${active ? 'text-primary' : 'text-foreground'}`}>
                   {opt.label}
+                  {showWifiHint && (
+                    <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      이 브라우저 미지원
+                    </span>
+                  )}
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{opt.desc}</div>
-              </div>
-              <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                  active ? 'border-primary bg-primary' : 'border-border'
-                }`}
-              >
-                {active && <span className="h-2 w-2 rounded-full bg-primary-foreground" />}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="px-4 py-3 bg-muted/20 border-t border-border/60">
-        <p className="text-[10.5px] text-muted-foreground leading-relaxed">
-          ※ 일부 브라우저는 Wi-Fi 여부를 정확히 확인하지 못해요. 그런 경우 'Wi-Fi에서만'은 안전을 위해 자동 백업을 건너뜁니다.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function LastResultCard({ result }: { result: LastResult }) {
-  const totalFailed = result.entries.reduce((acc, e) => acc + e.stat.failed, 0);
-  const at = new Date(result.at).toLocaleString('ko-KR', {
-    month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit',
-  });
-  const title = result.mode === 'sync' ? '마지막 백업 결과' : '마지막 가져오기 결과';
-
-  return (
-    <div className="card-soft p-4 bg-card animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[13.5px] font-bold text-foreground flex items-center gap-2">
-          {totalFailed > 0 ? (
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-          )}
-          {title}
-        </h3>
-        <span className="text-[10.5px] text-muted-foreground tabular-nums">{at}</span>
-      </div>
-      <div className="space-y-1.5 border-t border-border/60 pt-3">
-        {result.entries.map((entry) => (
-          <ResultRow key={entry.label} label={entry.label} stat={entry.stat} mode={result.mode} />
-        ))}
-      </div>
-      {totalFailed > 0 && (
-        <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
-          실패 {totalFailed}건 — 콘솔 로그에서 자세한 원인을 확인할 수 있어요.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ResultRow({
-  label, stat, mode,
-}: {
-  label: string; stat: EntitySyncStat | EntityFetchStat; mode: 'sync' | 'fetch';
-}) {
-  const items =
-    mode === 'sync'
-      ? [
-          { k: '↑', v: (stat as EntitySyncStat).uploaded, tone: 'primary' },
-          { k: '↓', v: (stat as EntitySyncStat).downloaded, tone: 'accent' },
-          { k: '·', v: stat.unchanged, tone: 'muted' },
-        ]
-      : [
-          { k: '+', v: (stat as EntityFetchStat).added, tone: 'primary' },
-          { k: '↻', v: (stat as EntityFetchStat).updated, tone: 'accent' },
-          { k: '·', v: stat.unchanged, tone: 'muted' },
-        ];
-  return (
-    <div className="flex items-center justify-between text-[12px]">
-      <span className="font-semibold text-foreground">{label}</span>
-      <div className="flex items-center gap-3 tabular-nums">
-        {items.map((item) => (
-          <span
-            key={item.k}
-            className={
-              item.tone === 'muted' ? 'text-muted-foreground'
-              : item.tone === 'accent' ? 'text-accent-foreground'
-              : 'text-primary'
-            }
-          >
-            <span className="opacity-60 mr-0.5">{item.k}</span>
-            {item.v}
-          </span>
-        ))}
-        {stat.failed > 0 && (
-          <span className="text-destructive">
-            <span className="opacity-60 mr-0.5">×</span>
-            {stat.failed}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// db 사용 — eslint 가 import 안 된 것으로 오인하지 않도록 사용처 확인용
-void db;
+                <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{opt
