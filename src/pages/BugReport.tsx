@@ -25,16 +25,27 @@ export default function BugReport() {
     setCopied(true);
   }
 
-  function handleClearLogs() {
-    clearErrorLogs();
-    setLogs([]);
-  }
+async function handleSendEmail() {
+  const text = JSON.stringify(report, null, 2);
 
+  await navigator.clipboard.writeText(text);
+
+  window.open(
+    "https://mail.google.com/mail/?view=cm&fs=1&to=suki921114@gmail.com&su=뜨개앱 버그 신고",
+    "_blank"
+  );
+
+  setCopied(true);
+}
+
+function handleClearLogs() {
+  clearErrorLogs();
+  setLogs([]);
+}
   return ( 
      <div className="space-y-5">
         <PageHeader title="버그 신고" back />
-
-            
+           
 
       <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
         앱에서 문제가 생긴 상황을 적어 주세요. 개인정보, 비밀번호, 민감한
@@ -68,6 +79,14 @@ export default function BugReport() {
           </pre>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={handleSendEmail}
+        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
+        >
+        신고 내용 이메일로 보내기
+        </button>
 
       <button
         type="button"

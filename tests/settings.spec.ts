@@ -63,3 +63,25 @@ test.describe("Settings — 정보 구조", () => {
     await expect(page.getByRole("button", { name: "로컬 AI 테스트" })).toBeVisible();
   });
 });
+
+test("/settings/bug-report 진입 시 버그 신고 화면이 보인다", async ({ page }) => {
+  await page.goto("/settings/bug-report");
+
+  await expect(page.getByRole("heading", { name: "버그 신고" })).toBeVisible();
+
+  await expect(
+    page.getByPlaceholder("어떤 화면에서 어떤 문제가 있었는지 적어 주세요.")
+  ).toBeVisible();
+
+  await expect(
+    page.getByRole("button", { name: "Gmail로 버그 신고 보내기" })
+  ).toBeVisible();
+
+  await expect(
+    page.getByRole("button", { name: "신고 내용 복사" })
+  ).toBeVisible();
+
+  await expect(
+    page.getByRole("button", { name: "에러 로그 비우기" })
+  ).toBeVisible();
+});
