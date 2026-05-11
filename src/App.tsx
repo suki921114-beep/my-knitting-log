@@ -1,3 +1,4 @@
+import BugReport from "./pages/BugReport";
 import AiLog from "./pages/AiLog";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -73,6 +74,8 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             <Route path="/about" element={<About />} />
             <Route path="/tools/gauge" element={<GaugeCalculator />} />
+            <Route path="/settings/bug-report" element={<BugReport />} />
+
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

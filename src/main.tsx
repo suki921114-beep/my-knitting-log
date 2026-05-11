@@ -1,6 +1,10 @@
+import { setupGlobalErrorLogging } from "@/lib/errorLog";
+
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+
+setupGlobalErrorLogging();
 
 createRoot(document.getElementById("root")!).render(<App />);
 

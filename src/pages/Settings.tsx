@@ -1,5 +1,4 @@
 import { askLocalAI } from "@/lib/ai/askLocalAI";
-
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +14,7 @@ import {
   Info,
   ShieldCheck,
   FileText,
+  Link,
 } from 'lucide-react';
 
 export default function Settings() {
@@ -38,20 +38,6 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <PageHeader title="설정" />
-// ##ai버튼 생성
-    <button
-      type="button"
-      onClick={async () => {
-        const result = await askLocalAI(
-          "오늘 봄이 조끼 등판 15단 떴고, 4.5mm 바늘 사용했어"
-        );
-        alert(JSON.stringify(result, null, 2));
-      }}
-      className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
-    >
-      로컬 AI 테스트
-    </button>
-
 
       {/* 1. 계정 */}
       <Section title="계정">
@@ -165,6 +151,27 @@ export default function Settings() {
           desc="버전, 오픈소스 라이선스, 문의처"
           onClick={() => navigate('/about')}
         />
+      </Section>
+
+      {/* 5. 버그 신고 링크  */}
+      <Section title="버그 신고">
+
+      <a
+        href="/settings/bug-report"
+        className="flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 shadow-sm transition hover:bg-muted/60"
+      >
+        <div>
+          <div className="text-[15px] font-extrabold text-foreground">
+            버그 신고
+          </div>
+          <div className="mt-1 text-[13px] text-muted-foreground">
+            문제 상황과 에러 로그 복사하기
+          </div>
+        </div>
+
+        <span className="text-2xl text-muted-foreground">›</span>
+      </a>
+
       </Section>
     </div>
   );
