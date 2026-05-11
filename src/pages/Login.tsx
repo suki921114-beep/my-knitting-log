@@ -10,7 +10,7 @@ export default function Login() {
   const { signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const inApp = detectInAppBrowser();
+
 
   // 로그인에 성공하면 설정(동기화 안내) 페이지로 이동시킵니다.
   useEffect(() => {
@@ -37,7 +37,20 @@ const isNativeApp = Capacitor.isNativePlatform();
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="로그인" back />
+      <div className="flex items-center gap-3 px-4 pt-2">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        aria-label="이전 화면으로 이동"
+        className="flex h-10 w-10 items-center justify-center rounded-full text-[32px] leading-none text-muted-foreground transition active:scale-95"
+      >
+        ‹
+      </button>
+
+      <h1 className="text-[22px] font-extrabold tracking-tight text-foreground">
+        로그인
+      </h1>
+    </div>
 
       {!isNativeApp && inApp.detected && (
         <div className="mx-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12.5px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
