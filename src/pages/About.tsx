@@ -30,13 +30,13 @@ export default function About() {
 
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">
           뜨개 프로젝트 / 실 / 도안 / 바늘 / 부자재 / 단수 카운터 / 게이지를 한 곳에서 기록하고,
-          로그인 시 여러 기기 간 클라우드와 양방향 동기화하는 개인용 기록 도구입니다.
+          로그인 시 여러 기기 간 클라우드와 양방향 동기화하는 뜨개 프로젝트와 재료, 진행 상황을 한 곳에서 기록하고 관리할 수 있는 앱입니다.
         </p>
 
         <section className="space-y-1.5">
           <h3 className="text-[13.5px] font-bold">개발 / 운영자</h3>
           <p className="text-[12.5px]">
-            <LegalPlaceholder value={OPERATOR_NAME} fallback="운영자 표시 미정" />
+            <LegalPlaceholder value={OPERATOR_NAME} fallback="문의 이메일은 정식 출시 시 공개될 예정입니다." />
           </p>
         </section>
 
@@ -50,15 +50,7 @@ export default function About() {
           </p>
         </section>
 
-        <section className="space-y-1.5">
-          <h3 className="text-[13.5px] font-bold">사업자 정보</h3>
-          <p className="text-[12.5px] text-muted-foreground">
-            본 서비스는 현재 유료 결제 / 전자상거래 기능이 없으므로 사업자등록번호 및
-            통신판매업 신고 정보를 별도로 표시하지 않습니다. 향후 유료 기능 도입 시
-            관련 정보를 추가하여 갱신합니다.
-          </p>
-        </section>
-
+      
         <section className="space-y-1.5">
           <h3 className="text-[13.5px] font-bold">오픈소스 라이선스</h3>
           <p className="text-[12px] text-muted-foreground">

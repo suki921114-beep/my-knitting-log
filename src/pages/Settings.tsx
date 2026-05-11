@@ -14,7 +14,7 @@ import {
   Info,
   ShieldCheck,
   FileText,
-  Link,
+  Bug,
 } from 'lucide-react';
 
 export default function Settings() {
@@ -153,26 +153,16 @@ export default function Settings() {
         />
       </Section>
 
-      {/* 5. 버그 신고 링크  */}
-      <Section title="버그 신고">
-
-      <a
-        href="/settings/bug-report"
-        className="flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 shadow-sm transition hover:bg-muted/60"
-      >
-        <div>
-          <div className="text-[15px] font-extrabold text-foreground">
-            버그 신고
-          </div>
-          <div className="mt-1 text-[13px] text-muted-foreground">
-            문제 상황과 에러 로그 복사하기
-          </div>
-        </div>
-
-        <span className="text-2xl text-muted-foreground">›</span>
-      </a>
-
-      </Section>
+      {/* 5. 버그 신고 */}
+    <Section title="버그 신고">
+      <MenuCard
+        icon={Bug}
+        tone="muted"
+        title="버그 신고"
+        desc="문제 상황과 에러 로그 복사하기"
+        onClick={() => navigate('/settings/bug-report')}
+      />
+    </Section>
     </div>
   );
 }

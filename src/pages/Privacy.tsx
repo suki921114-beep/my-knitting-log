@@ -12,7 +12,7 @@ export default function Privacy() {
           시행일: <LegalPlaceholder value={EFFECTIVE_DATE} fallback="출시일 미정" variant="inline" />
         </p>
         <p className="text-[12px] text-muted-foreground">
-          본 방침은 변호사 검토를 받은 문서가 아닙니다. 서비스 운영 중 변경될 수 있으며,
+          본 방침은 서비스 운영 상황에 따라 변경될 수 있으며, 중요한 변경 사항이 있을 경우 시행일과 함께 안내됩니다. 서비스 운영 중 변경될 수 있으며,
           중요한 변경이 있을 때는 시행일과 함께 갱신됩니다.
         </p>
 
@@ -21,7 +21,7 @@ export default function Privacy() {
         </Section>
 
         <Section title="2. 처리하는 개인정보 항목">
-          <p>본 서비스는 다음 정보를 처리합니다.</p>
+          <p>본 서비스는 서비스 제공을 위해 아래 정보를 저장하거나 처리할 수 있습니다.</p>
           <ul className="ml-4 mt-1 list-disc space-y-1">
             <li>Google 계정 식별자(UID), 이메일, 표시 이름, 프로필 사진 URL</li>
             <li>이용자가 직접 입력한 뜨개 기록 데이터: 실/도안/바늘/부자재/프로젝트/단수 카운터/게이지/메모 등</li>
@@ -40,8 +40,8 @@ export default function Privacy() {
 
         <Section title="4. 저장 위치">
           <ul className="ml-4 list-disc space-y-1">
-            <li>이 기기 (브라우저 IndexedDB) — 모든 입력 데이터의 1차 저장소</li>
-            <li>Google Cloud Firestore — 로그인한 이용자의 UID 경로 아래에만 저장. 다른 이용자는 보안 규칙으로 접근 차단.</li>
+            <li>이용자의 기기(브라우저 내부 저장소) — 모든 입력 데이터의 1차 저장소</li>
+            <li>Google Cloud Firestore — 로그인한 이용자의 UID 경로 아래에만 저장. 다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.</li>
             <li>사진은 현재 클라우드에 저장하지 않으며, 이 기기 안에만 보관됩니다.</li>
           </ul>
         </Section>
@@ -49,7 +49,7 @@ export default function Privacy() {
         <Section title="5. 사진 정책">
           <p>
             현재 무료 백업에는 사진이 포함되지 않으며, 사진은 이용자의 기기 안에만 저장됩니다.
-            여러 기기에서 동일한 사진을 보고 싶다면 향후 추가될 프리미엄 기능을 이용해야 합니다.
+            여러 기기에서 동일한 사진을 보고 싶다면 향후 제공될 수 있는 유료 기능을 이용해야 합니다.
           </p>
           <p className="mt-1 text-muted-foreground">
             ※ 프리미엄 사진 백업 기능이 도입되면 본 방침을 갱신하고 이용자에게 별도로 안내합니다.
