@@ -87,7 +87,7 @@ export default function Terms() {
         <Section title="8. 문의처">
           <p>약관 관련 문의는 아래 이메일로 보내주세요.</p>
           <p className="mt-1">
-            <LegalPlaceholder value={OPERATOR_EMAIL} fallback="운영자 이메일 미정" />
+            <LegalPlaceholder value={OPERATOR_EMAIL} fallback="문의 이메일은 정식 출시 시 공개될 예정입니다." />
           </p>
         </Section>
 

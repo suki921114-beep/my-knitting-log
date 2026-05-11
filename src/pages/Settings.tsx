@@ -36,7 +36,7 @@ export default function Settings() {
   }, []) ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-28">
       <PageHeader title="설정" />
 
       {/* 1. 계정 */}

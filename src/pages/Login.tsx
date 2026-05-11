@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogIn, Loader2, AlertTriangle } from "lucide-react";
@@ -20,20 +21,25 @@ export default function Login() {
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
+
     try {
       await signInWithGoogle();
       // 로그인이 완료되면 user 상태가 바뀌어 useEffect에 의해 자동으로 이동합니다.
     } catch (error) {
       alert("로그인에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
       setIsLoggingIn(false);
     }
   };
 
+const inApp = detectInAppBrowser();
+const isNativeApp = Capacitor.isNativePlatform();
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="로그인" showBack />
+      <PageHeader title="로그인" back />
 
-      {inApp.detected && (
+      {!isNativeApp && inApp.detected && (
         <div className="mx-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12.5px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

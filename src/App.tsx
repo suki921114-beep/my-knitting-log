@@ -1,6 +1,6 @@
 import BugReport from "./pages/BugReport";
 import AiLog from "./pages/AiLog";
-
+import ScrollToTop from "@/components/ScrollToTop";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -42,6 +42,7 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <BrowserRouter>
+        <ScrollToTop />
           <Routes>
             <Route path="/tools/ai-log" element={<AiLog />} />
             

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "270728801613",
+    "project_id": "my-knitting-log",
+    "storage_bucket": "my-knitting-log.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:270728801613:android:72847216b560884899db04",
+        "android_client_info": {
+          "package_name": "com.suki.knittinglog"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "270728801613-8b2o55p5cbfq504vh4uetsea2qvb99vl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.suki.knittinglog",
+            "certificate_hash": "7938dfca059bc0ac14d678869f3d425bb7dbe579"
+          }
+        },
+        {
+          "client_id": "270728801613-1puvgv2earajnk2fumbf87gu8kmnvnui.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAhKhtLo0PD4EwTULHs31xgURxoKlh31g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "270728801613-1puvgv2earajnk2fumbf87gu8kmnvnui.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

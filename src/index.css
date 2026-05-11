@@ -6,6 +6,9 @@
 
 @layer base {
   :root {
+    --app-safe-top: env(safe-area-inset-top, 0px);
+    --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+
     /* Soft Kitsch Atelier — milky ivory base, soft lilac primary, butter accent, plum charcoal text */
     --background: 40 40% 98%;            /* milky ivory */
     --foreground: 270 18% 22%;           /* plum charcoal */
@@ -61,6 +64,10 @@
     --sidebar-accent-foreground: 270 18% 28%;
     --sidebar-border: 270 18% 92%;
     --sidebar-ring: 268 40% 70%;
+  }
+
+  body {
+  padding-top: var(--app-safe-top);
   }
 
   .dark {

@@ -93,10 +93,10 @@ export default function Privacy() {
         <Section title="9. 문의처">
           <p>개인정보 관련 문의/탈퇴 요청은 아래 이메일로 보내주세요.</p>
           <p className="mt-1">
-            <LegalPlaceholder value={OPERATOR_EMAIL} fallback="운영자 이메일 미정" />
+            <LegalPlaceholder value={OPERATOR_EMAIL} fallback="문의 이메일은 정식 출시 시 공개될 예정입니다." />
           </p>
           <p className="mt-1 text-[11.5px] text-muted-foreground">
-            ※ 출시 시점에 실제 운영용 이메일로 갱신해야 합니다.
+          
           </p>
         </Section>
 
