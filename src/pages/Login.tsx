@@ -5,6 +5,7 @@ import { LogIn, Loader2, AlertTriangle } from "lucide-react";
 import { detectInAppBrowser } from "@/lib/inAppBrowser";
 import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "@/components/PageHeader";
+import { describeAuthError } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 
 export default function Login() {
@@ -27,7 +28,11 @@ export default function Login() {
       await signInWithGoogle();
       // 로그인이 완료되면 user 상태가 바뀌어 useEffect에 의해 자동으로 이동합니다.
     } catch (error) {
-      toast.error("로그인에 실패했습니다", { description: "잠시 후 다시 시도해 주세요." });
+      // 원인 코드를 함께 보여 준다 — 설정 → 버그 신고에도 같은 내용이 쌓인다
+      toast.error("로그인에 실패했습니다", {
+        description: describeAuthError(error),
+        duration: 12000,
+      });
     } finally {
       setIsLoggingIn(false);
     }
