@@ -1,6 +1,13 @@
 // 앱 버전 — About 화면과 버그 신고 양쪽에서 같은 값을 쓰도록 한 곳에 둔다.
-// 출시할 때 android/app/build.gradle 의 versionName 과 함께 올리세요.
-export const APP_VERSION = '0.1.0';
+//
+// ⚠️ android/app/build.gradle 의 versionName 과 항상 같아야 한다.
+//    버그 신고에 찍히는 버전과 스토어 버전이 어긋나면 어느 빌드에서 난
+//    오류인지 추적할 수 없다.
+//
+// 업데이트 절차:
+//   1) 이 값과 build.gradle 의 versionName 을 같이 올린다
+//   2) build.gradle 의 versionCode 를 +1 한다 (되돌릴 수 없음)
+export const APP_VERSION = '1.0.0';
 
 /** 버그 신고에 함께 보낼 환경 정보 */
 export function collectEnvInfo() {
