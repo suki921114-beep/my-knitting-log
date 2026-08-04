@@ -14,6 +14,7 @@ import {
   PauseCircle,
   Globe,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/sonner';
 import {
@@ -347,69 +348,19 @@ export default function SettingsBackup() {
     <div className="space-y-5">
       <PageHeader title="백업 및 동기화" back />
 
-      {/* 클라우드 백업 액션 카드 */}
-      {user ? (
-        <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
-          <div className="p-4">
-            <h3 className="text-[14px] font-bold text-foreground flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              클라우드 백업
-            </h3>
-            <p className="mt-1.5 text-[12px] text-muted-foreground leading-relaxed">
-              로그인한 계정으로 클라우드와 양방향 동기화합니다.
-            </p>
-            <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-              ※ 무료 백업에는 사진이 포함되지 않습니다. 사진 클라우드 백업은 추후 프리미엄 기능으로 제공될 예정입니다.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={handleFetch}
-                disabled={isFetching || isSyncing}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-[13px] font-semibold text-accent-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-accent/90 disabled:opacity-60"
-              >
-                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
-                가져오기
-              </button>
-              <button
-                onClick={handleSync}
-                disabled={isSyncing || isFetching}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-60"
-              >
-                {isSyncing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    진행 중...
-                  </>
-                ) : ('백업')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <p className="card-soft p-4 text-center text-[13px] text-muted-foreground">
-          클라우드 백업은 로그인 후 사용할 수 있어요.
-        </p>
-      )}
-
-      {/* 자동 백업 설정 */}
-      {user && <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} dirty={dirty} lastAutoBackup={lastAutoBackup} />}
-
-      {/* 마지막 결과 */}
-      {lastResult && <LastResultCard result={lastResult} />}
-
-      {/* 로컬 파일 백업 */}
-      <Section title="로컬 파일 백업">
+      {/* 1. 내 기기로 백업 — 사진까지 통째로 보관되는 유일한 방법이라 최우선 배치 */}
+      <Section title="내 기기로 백업" badge="권장">
         <button
           onClick={handleExport}
           disabled={busy}
-          className="card-soft flex w-full items-center gap-3 p-4 transition active:scale-[0.99] hover:shadow-soft disabled:opacity-60 bg-card"
+          className="card-soft flex w-full items-center gap-3 border-primary/20 bg-primary/5 p-4 transition active:scale-[0.99] hover:shadow-soft disabled:opacity-60"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-soft text-primary">
-            <Download className="h-4 w-4" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           </span>
           <div className="min-w-0 flex-1 text-left">
             <div className="text-[13.5px] font-semibold text-foreground">JSON 파일로 내보내기</div>
-            <div className="text-[11.5px] text-muted-foreground">기기에 백업 파일을 저장</div>
+            <div className="text-[11.5px] text-muted-foreground">사진까지 전부 담긴 백업 파일을 기기에 저장</div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -438,15 +389,121 @@ export default function SettingsBackup() {
             e.target.value = '';
           }}
         />
+        <p className="px-1 text-[10.5px] leading-relaxed text-muted-foreground">
+          기기를 바꾸거나 앱을 지우기 전에는 꼭 한 번 내보내 두세요. 사진을 포함해 모든 기록이 파일 하나에 담깁니다.
+        </p>
       </Section>
+
+      {/* 2. 클라우드 백업 액션 카드 */}
+      {user ? (
+        <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
+          <div className="p-4">
+            <h3 className="flex items-center gap-2 text-[14px] font-bold text-foreground">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              클라우드 백업
+              <PhotoWarningPopover />
+            </h3>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+              로그인한 계정으로 클라우드와 양방향 동기화합니다.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={handleFetch}
+                disabled={isFetching || isSyncing}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-[13px] font-semibold text-accent-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-accent/90 disabled:opacity-60"
+              >
+                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
+                가져오기
+              </button>
+              <button
+                onClick={handleSync}
+                disabled={isSyncing || isFetching}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-60"
+              >
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    진행 중...
+                  </>
+                ) : ('백업')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="card-soft p-4 text-center">
+          <p className="text-[13px] text-muted-foreground">클라우드 백업은 로그인 후 사용할 수 있어요.</p>
+          <div className="mt-2 flex justify-center">
+            <PhotoWarningPopover label="사진 백업 안내" />
+          </div>
+        </div>
+      )}
+
+      {/* 자동 백업 설정 */}
+      {user && <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} dirty={dirty} lastAutoBackup={lastAutoBackup} />}
+
+      {/* 마지막 결과 */}
+      {lastResult && <LastResultCard result={lastResult} />}
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * 클라우드 백업 옆의 ! 아이콘 — 눌러서 사진 미포함 경고를 띄운다.
+ * 모바일에서도 동작하도록 hover 툴팁이 아닌 popover(탭) 방식.
+ */
+function PhotoWarningPopover({ label }: { label?: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="사진 백업 안내"
+          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-700 transition hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300"
+        >
+          <AlertCircle className="h-3.5 w-3.5" />
+          {label && <span className="text-[11px] font-semibold">{label}</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 text-[12px] leading-relaxed">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1.5">
+            <p className="font-semibold text-foreground">무료 백업은 사진이 포함되지 않습니다</p>
+            <p className="text-muted-foreground">
+              클라우드에는 글자 기록만 올라가요. 프로젝트 사진, 실·도안·부자재 이미지는 이 기기에만
+              남아 있어 기기를 바꾸면 사라집니다.
+            </p>
+            <p className="text-muted-foreground">
+              사진까지 보관하려면 위의 <strong className="text-foreground">JSON 파일로 내보내기</strong>를
+              사용하세요. 사진 클라우드 백업은 추후 프리미엄 기능으로 제공될 예정입니다.
+            </p>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function Section({
+  title,
+  badge,
+  children,
+}: {
+  title: string;
+  badge?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="space-y-2">
-      <h2 className="section-title">{title}</h2>
+      <h2 className="section-title flex items-center gap-2">
+        {title}
+        {badge && (
+          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10.5px] font-bold text-primary">
+            {badge}
+          </span>
+        )}
+      </h2>
       <div className="space-y-2">{children}</div>
     </section>
   );
