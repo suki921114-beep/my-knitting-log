@@ -15,9 +15,9 @@
 
 const TODO_OPERATOR_EMAIL = 'knits2crochet@gmail.com';
 const TODO_OPERATOR_NAME  = '쿠쿠다스';
-// ⚠️ 출시 예정일이 확정되면 'YYYY-MM-DD' 형식으로 입력하세요. 스토어 공개일과
-//    맞추는 것이 정확합니다. 비어 있으면 정책/약관 페이지에 빨간 TODO 배지가 뜹니다.
-const TODO_EFFECTIVE_DATE = '';   // 예: '2026-09-01'
+// 정식 출시일 = 정책/약관 시행일. 그 이전은 테스트 기간.
+// 출시가 미뤄지면 이 값도 함께 옮겨야 합니다.
+const TODO_EFFECTIVE_DATE = '2026-09-01';
 
 export const OPERATOR_EMAIL: string | null = TODO_OPERATOR_EMAIL || null;
 export const OPERATOR_NAME:  string | null = TODO_OPERATOR_NAME  || null;
