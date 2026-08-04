@@ -1,4 +1,10 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { captureError } from '@/lib/errorLog';
+
+/** componentStack 첫 줄만 뽑아 어느 컴포넌트에서 터졌는지 표시 */
+function firstFrame(stack: string): string {
+  return stack.trim().split('\n')[0]?.trim() ?? '';
+}
 
 interface Props {
   children: ReactNode;
@@ -21,6 +27,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+    // 버그 신고 화면에서 볼 수 있도록 로컬 로그에 남긴다
+    captureError(error, `ErrorBoundary${info.componentStack ? ` @${firstFrame(info.componentStack)}` : ''}`);
   }
 
   render() {
@@ -52,6 +60,13 @@ export default class ErrorBoundary extends Component<Props, State> {
             홈으로
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => window.location.assign('/settings/bug-report')}
+          className="text-[12px] text-muted-foreground underline underline-offset-2"
+        >
+          이 오류 신고하기
+        </button>
       </div>
     );
   }

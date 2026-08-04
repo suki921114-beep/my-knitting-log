@@ -4,6 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, ProjectStatus, ProjectPhoto} from '@/lib/db';
 import { statusLabel } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/useConfirm';
+import { syncLinks } from '@/lib/linkSync';
 import PrivacyNote from '@/components/PrivacyNote';
 import YarnPicker, { YarnLink } from '@/components/YarnPicker';
 import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
@@ -47,6 +49,7 @@ export default function ProjectForm() {
   const { id } = useParams();
   const editing = !!id;
   const nav = useNavigate();
+  const { confirm, dialog } = useConfirm();
   const projectId = id ? Number(id) : undefined;
 
   const existing = useLiveQuery(() => (projectId ? db.projects.get(projectId) : undefined), [projectId]);
@@ -134,7 +137,7 @@ export default function ProjectForm() {
 
  async function save() {
   if (!name.trim()) {
-    alert('프로젝트명을 입력해 주세요.');
+    toast.error('프로젝트명을 입력해 주세요.');
     return;
   }
 
@@ -242,7 +245,13 @@ export default function ProjectForm() {
 
   async function remove() {
     if (!projectId) return;
-    if (!confirm('이 프로젝트를 삭제할까요? 연결된 실/도안/바늘/부자재, 단수 카운터, 게이지는 그대로 보존되어 되돌릴 수 있어요.')) return;
+    const ok = await confirm({
+      title: '이 프로젝트를 삭제할까요?',
+      description:
+        '연결된 실·도안·바늘·부자재, 단수 카운터, 게이지는 그대로 보존돼요. 휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = Date.now();
     // soft delete — 프로젝트 본문만 isDeleted 처리.
     // 연결관계(projectYarns/Patterns/Needles/Notions), rowCounters, projectGauges
@@ -273,6 +282,7 @@ export default function ProjectForm() {
   return (
     <div className="space-y-5">
       <PageHeader title={editing ? '프로젝트 수정' : '새 프로젝트'} back />
+      {dialog}
 
       <Field label="프로젝트명">
         <input className={inputCls} value={name} onChange={e => setName(e.target.value)} placeholder="예: 가을 카디건" />
@@ -361,48 +371,6 @@ export default function ProjectForm() {
       </div>
     </div>
   );
-}
-
-// Generic link table sync helper
-async function syncLinks<L extends { id?: number }, E extends { id?: number }>(
-  table: any,
-  existing: E[],
-  current: L[],
-  buildAdd: (l: L) => any,
-  buildUpdate: (l: L) => any,
-  t: number
-) {
-  const oldIds = existing.map(l => l.id!).filter(Boolean);
-  const keptIds = current.filter(l => l.id).map(l => l.id!);
-  const toDelete = oldIds.filter(i => !keptIds.includes(i));
-
-  if (toDelete.length) {
-    await table.bulkDelete(toDelete);
-  }
-
-  for (const l of current) {
-    if (l.id) {
-      const prev = existing.find(e => e.id === l.id) as any;
-
-      await table.update(l.id, {
-        ...buildUpdate(l),
-        cloudId: prev?.cloudId || crypto.randomUUID(),
-        createdAt: prev?.createdAt ?? t,
-        updatedAt: t,
-        isDeleted: prev?.isDeleted ?? false,
-        deletedAt: prev?.deletedAt ?? null,
-      });
-    } else {
-      await table.add({
-        ...buildAdd(l),
-        cloudId: crypto.randomUUID(),
-        createdAt: t,
-        updatedAt: t,
-        isDeleted: false,
-        deletedAt: null,
-      });
-    }
-  }
 }
 
 const inputCls = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';

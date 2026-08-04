@@ -1,6 +1,6 @@
-import { askLocalAI } from "@/lib/ai/askLocalAI";
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/useConfirm';
 import { useAuth } from '@/hooks/useAuth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -15,11 +15,13 @@ import {
   ShieldCheck,
   FileText,
   Bug,
+  UserX,
 } from 'lucide-react';
 
 export default function Settings() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { confirm, dialog } = useConfirm();
 
   // 휴지통 카운트 (데이터 관리 메뉴 옆 작은 배지)
   const trashCount = useLiveQuery(async () => {
@@ -38,6 +40,7 @@ export default function Settings() {
   return (
     <div className="space-y-6 pb-28">
       <PageHeader title="설정" />
+      {dialog}
 
       {/* 1. 계정 */}
       <Section title="계정">
@@ -63,9 +66,13 @@ export default function Settings() {
             </div>
             <button
               onClick={async () => {
-                if (confirm('로그아웃 하시겠습니까?')) {
-                  await logout();
-                }
+                const ok = await confirm({
+                  title: '로그아웃 할까요?',
+                  description: '이 기기의 기록은 그대로 남아요. 다시 로그인하면 클라우드 백업을 이어서 쓸 수 있어요.',
+                  confirmLabel: '로그아웃',
+                  destructive: false,
+                });
+                if (ok) await logout();
               }}
               className="flex w-full items-center gap-3 p-4 transition-colors active:bg-muted/50 hover:bg-muted/30"
             >
@@ -73,6 +80,19 @@ export default function Settings() {
                 <LogOut className="h-4 w-4" />
               </span>
               <div className="text-[13.5px] font-semibold text-foreground text-left flex-1">로그아웃</div>
+            </button>
+            <button
+              onClick={() => navigate('/settings/delete-account')}
+              className="flex w-full items-center gap-3 border-t border-border/60 p-4 transition-colors active:bg-destructive/10 hover:bg-destructive/5"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <UserX className="h-4 w-4" />
+              </span>
+              <div className="flex-1 text-left">
+                <div className="text-[13.5px] font-semibold text-destructive">계정 삭제 (탈퇴)</div>
+                <div className="text-[11px] text-destructive/70">계정과 클라우드 데이터를 영구 삭제</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-destructive/50" />
             </button>
           </div>
         ) : (

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/useConfirm';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -14,6 +15,7 @@ export default function NeedleForm() {
   const nid = id ? Number(id) : undefined;
   const editing = !!nid;
   const nav = useNavigate();
+  const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (nid ? db.needles.get(nid) : undefined), [nid]);
   const [f, setF] = useState({ type: '대바늘', sizeMm: '', brand: '', material: '', length: '', note: '' });
   const [hyd, setHyd] = useState(false);
@@ -54,7 +56,13 @@ export default function NeedleForm() {
     nav('/library/needles', { replace: true });
   }
   async function remove() {
-    if (!nid || !confirm('이 바늘을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    if (!nid) return;
+    const ok = await confirm({
+      title: '이 바늘을 삭제할까요?',
+      description: '프로젝트에 연결된 사용 기록은 그대로 남아요. 휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = Date.now();
     await db.needles.update(nid, {
       isDeleted: true,
@@ -83,6 +91,7 @@ export default function NeedleForm() {
   return (
     <div className="space-y-4">
       <PageHeader title={editing ? '바늘 수정' : '새 바늘'} back />
+      {dialog}
       <Field label="종류">
         <div className="flex flex-wrap gap-1.5">
           {TYPES.map(t => (

@@ -1,9 +1,9 @@
-import { askLocalAI } from "@/lib/ai/askLocalAI";
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
 import { coverPhotoUrl } from '@/lib/photo';
+import BackupReminder from '@/components/BackupReminder';
 import {
   Plus,
   Scroll,
@@ -72,6 +72,9 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
+      {/* 사진이 로컬에만 쌓였는데 오래 백업 안 했을 때만 노출 */}
+      <BackupReminder />
+
       {/* Hero — 시간대 인사 + 요약 */}
       <header className="space-y-1">
         <p className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-primary/70">
@@ -326,18 +329,3 @@ function Empty({
     </div>
   );
 }
-
-
-
-<button
-  onClick={async () => {
-    const result = await askLocalAI(
-      "오늘 봄이 조끼 등판 15단 떴고, 4.5mm 바늘 사용했어"
-    );
-
-    console.log(result);
-    alert(JSON.stringify(result, null, 2));
-  }}
->
-  로컬 AI 테스트
-</button>

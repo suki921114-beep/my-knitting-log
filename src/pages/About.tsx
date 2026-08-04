@@ -2,7 +2,7 @@ import PageHeader from '@/components/PageHeader';
 import { LegalPlaceholder } from '@/components/LegalPlaceholder';
 import { OPERATOR_EMAIL, OPERATOR_NAME } from '@/lib/legalPlaceholders';
 
-const APP_VERSION = '0.1.0';
+import { APP_VERSION } from '@/lib/appVersion';
 
 const OSS_LIBS = [
   { name: 'React', license: 'MIT', url: 'https://react.dev' },

@@ -1,113 +1,197 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { clearErrorLogs, getErrorLogs } from "@/lib/errorLog";
-import PageHeader from "@/components/PageHeader";
+import { useState } from 'react';
+import { clearErrorLogs, getErrorLogs } from '@/lib/errorLog';
+import { collectEnvInfo, APP_VERSION } from '@/lib/appVersion';
+import { OPERATOR_EMAIL } from '@/lib/legalPlaceholders';
+import PageHeader from '@/components/PageHeader';
+import { toast } from '@/components/ui/sonner';
+import { useConfirm } from '@/hooks/useConfirm';
+import { Copy, Mail, Trash2, Bug } from 'lucide-react';
+
+/** mailto 는 길면 잘리거나 열리지 않는 클라이언트가 있어 본문을 줄인다 */
+const MAILTO_BODY_LIMIT = 1500;
 
 export default function BugReport() {
-  const navigate = useNavigate();
-  const [description, setDescription] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [description, setDescription] = useState('');
   const [logs, setLogs] = useState(() => getErrorLogs());
+  const [copied, setCopied] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
-  const report = {
-    description,
-    pageUrl: window.location.href,
-    userAgent: navigator.userAgent,
-    createdAt: new Date().toISOString(),
-    errorLogs: logs,
-  };
+  const env = collectEnvInfo();
 
-  async function handleCopy() {
-    setCopied(false);
-
-    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-
-    setCopied(true);
+  function reportText() {
+    return JSON.stringify(
+      { description: description.trim(), ...env, errorLogs: logs },
+      null,
+      2,
+    );
   }
 
-async function handleSendEmail() {
-  const text = JSON.stringify(report, null, 2);
+  /**
+   * navigator.clipboard 는 비보안 컨텍스트나 일부 WebView 에서 없거나 실패한다.
+   * 실패하면 textarea + execCommand 로 폴백한다.
+   */
+  async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // 폴백으로 진행
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 
-  await navigator.clipboard.writeText(text);
+  async function handleCopy() {
+    const ok = await copyToClipboard(reportText());
+    setCopied(ok);
+    if (ok) {
+      toast.success('신고 내용을 복사했어요');
+    } else {
+      toast.error('복사하지 못했어요', {
+        description: '아래 로그를 길게 눌러 직접 복사해 주세요.',
+      });
+    }
+  }
 
-  window.open(
-    "https://mail.google.com/mail/?view=cm&fs=1&to=suki921114@gmail.com&su=뜨개앱 버그 신고",
-    "_blank"
-  );
+  async function handleSendEmail() {
+    if (!OPERATOR_EMAIL) {
+      toast.error('문의 이메일이 아직 설정되지 않았어요');
+      return;
+    }
+    // 전문은 클립보드에, 메일 본문에는 요약만 — 너무 길면 메일 앱이 안 열린다
+    const copiedOk = await copyToClipboard(reportText());
 
-  setCopied(true);
-}
+    const summary = [
+      description.trim() || '(증상을 적어 주세요)',
+      '',
+      '--- 환경 정보 ---',
+      `버전: v${env.appVersion}`,
+      `페이지: ${env.pageUrl}`,
+      `기기: ${env.userAgent}`,
+      `에러 로그: ${logs.length}개`,
+      '',
+      copiedOk ? '※ 로그 전문이 클립보드에 복사되어 있어요. 여기에 붙여넣어 주세요.' : '',
+    ]
+      .join('\n')
+      .slice(0, MAILTO_BODY_LIMIT);
 
-function handleClearLogs() {
-  clearErrorLogs();
-  setLogs([]);
-}
-  return ( 
-     <div className="space-y-5">
-        <PageHeader title="버그 신고" back />
-           
+    const url =
+      `mailto:${OPERATOR_EMAIL}` +
+      `?subject=${encodeURIComponent(`[뜨개앱 v${APP_VERSION}] 버그 신고`)}` +
+      `&body=${encodeURIComponent(summary)}`;
 
-      <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-        앱에서 문제가 생긴 상황을 적어 주세요. 개인정보, 비밀번호, 민감한
-        내용은 적지 마세요.
+    // 메일 앱이 없으면 아무 일도 일어나지 않으므로 안내를 함께 띄운다
+    window.location.href = url;
+    toast.message('메일 앱을 열고 있어요', {
+      description: copiedOk
+        ? '열리지 않으면 복사된 내용을 메일로 보내주세요.'
+        : `열리지 않으면 ${OPERATOR_EMAIL} 로 보내주세요.`,
+      duration: 8000,
+    });
+  }
+
+  async function handleClearLogs() {
+    const ok = await confirm({
+      title: '에러 로그를 비울까요?',
+      description: '기록된 오류 내용이 사라져요. 신고를 먼저 보낸 뒤 비우는 걸 권해요.',
+      confirmLabel: '비우기',
+    });
+    if (!ok) return;
+    clearErrorLogs();
+    setLogs([]);
+    toast.success('에러 로그를 비웠어요');
+  }
+
+  return (
+    <div className="space-y-5 pb-28">
+      <PageHeader title="버그 신고" back />
+      {dialog}
+
+      <div className="card-soft flex items-start gap-3 p-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+          <Bug className="h-4 w-4" />
+        </span>
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
+          어떤 화면에서 무엇을 눌렀을 때 문제가 생겼는지 적어 주시면 원인을 찾는 데 큰 도움이 됩니다.
+          개인정보나 비밀번호는 적지 마세요.
+        </p>
       </div>
 
       <textarea
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="어떤 화면에서 어떤 문제가 있었는지 적어 주세요."
-        className="min-h-40 w-full rounded-xl border bg-background p-4 text-sm"
+        onChange={e => setDescription(e.target.value)}
+        placeholder="예: 프로젝트에서 '새 도안 추가'를 눌렀더니 화면이 하얗게 변했어요."
+        className="min-h-36 w-full rounded-xl border bg-background p-4 text-sm outline-none focus:border-primary"
       />
 
-      <div className="space-y-2 rounded-xl border bg-card p-4 text-sm">
-        <div className="font-bold">기본 정보</div>
-        <div>현재 페이지: {window.location.href}</div>
-        <div className="break-all">브라우저: {navigator.userAgent}</div>
-        <div>최근 에러 로그: {logs.length}개</div>
+      <div className="card-soft space-y-1 p-4 text-[12px]">
+        <div className="mb-1 text-[13px] font-bold text-foreground">함께 보내지는 정보</div>
+        <div className="text-muted-foreground">
+          버전 <span className="tabular-nums text-foreground">v{env.appVersion}</span>
+        </div>
+        <div className="break-all text-muted-foreground">페이지 {env.pageUrl}</div>
+        <div className="break-all text-muted-foreground">기기 {env.userAgent}</div>
+        <div className="text-muted-foreground">
+          최근 에러 로그 <span className="tabular-nums text-foreground">{logs.length}개</span>
+        </div>
       </div>
 
-      <div className="space-y-2 rounded-xl border bg-card p-4">
-        <div className="font-bold">최근 에러 로그</div>
-
-        {logs.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            저장된 에러 로그가 없습니다.
-          </div>
-        ) : (
-          <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs">
+      {logs.length > 0 && (
+        <details className="card-soft p-4">
+          <summary className="cursor-pointer text-[13px] font-bold text-foreground">
+            최근 에러 로그 보기
+          </summary>
+          <pre className="mt-2 max-h-64 select-text overflow-auto rounded-lg bg-muted p-3 text-[11px]">
             {JSON.stringify(logs, null, 2)}
           </pre>
-        )}
+        </details>
+      )}
+
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={handleSendEmail}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+        >
+          <Mail className="h-4 w-4" />
+          메일로 신고 보내기
+        </button>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex w-full items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary"
+        >
+          <Copy className="h-4 w-4" />
+          신고 내용 복사
+        </button>
+        <button
+          type="button"
+          onClick={handleClearLogs}
+          className="flex w-full items-center justify-center gap-2 rounded-full border px-4 py-3 text-sm text-muted-foreground"
+        >
+          <Trash2 className="h-4 w-4" />
+          에러 로그 비우기
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={handleSendEmail}
-        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
-        >
-        신고 내용 이메일로 보내기
-        </button>
-
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground"
-      >
-        신고 내용 복사
-      </button>
-
-      <button
-        type="button"
-        onClick={handleClearLogs}
-        className="w-full rounded-xl border px-4 py-3 text-sm"
-      >
-        에러 로그 비우기
-      </button>
-
       {copied && (
-        <div className="rounded-xl border bg-card p-4 text-sm">
+        <p className="text-center text-[12px] text-muted-foreground">
           신고 내용이 클립보드에 복사되었습니다.
-        </div>
+        </p>
       )}
     </div>
   );

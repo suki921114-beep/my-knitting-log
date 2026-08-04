@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, ProjectGauge, RowCounter, GaugeMode } from '@/lib/db';
 import { Plus, Trash2, ChevronDown, Save, Target } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface Props { projectId: number }
 
@@ -106,6 +107,8 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
     ? (pRowsN > 0 && mRowsN > 0 && ptRowsN > 0 ? Math.round(ptRowsN * (mRowsN / pRowsN)) : 0)
     : (mRowsN > 0 && tCmN > 0 ? Math.round((tCmN / 10) * mRowsN) : 0);
 
+  const { confirm, dialog } = useConfirm();
+
   async function save() {
     await db.projectGauges.update(gauge.id!, {
       name: name.trim() || gauge.name,
@@ -125,7 +128,12 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
   }
 
   async function remove() {
-    if (!confirm(`"${gauge.name}" 계산을 삭제할까요?`)) return;
+    const ok = await confirm({
+      title: `"${gauge.name}" 계산을 삭제할까요?`,
+      description: '휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = now();
     // soft delete — DB 에는 보존, isDeleted 만 켠다.
     await db.projectGauges.update(gauge.id!, {
@@ -157,6 +165,7 @@ function GaugeItem({ gauge, projectId, open, onToggle }: { gauge: ProjectGauge; 
 
   return (
     <div className="card-soft overflow-hidden">
+      {dialog}
       <button
         type="button"
         onClick={onToggle}

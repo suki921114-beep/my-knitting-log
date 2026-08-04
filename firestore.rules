@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// ----------------------------------------------------------------------------
+// 내 뜨개 기록 — Firestore 보안 규칙
+// ----------------------------------------------------------------------------
+// 원칙: 로그인한 본인의 users/{uid} 하위만 읽고 쓸 수 있다.
+//       그 외 모든 경로는 기본 거부.
+//
+// 실제 사용 중인 경로 (src/lib/sync/*.ts 기준):
+//   users/{uid}/yarns/{cloudId}
+//   users/{uid}/patterns/{cloudId}
+//   users/{uid}/needles/{cloudId}
+//   users/{uid}/notions/{cloudId}
+//   users/{uid}/projects/{cloudId}
+//
+// 적용 방법은 docs/firestore-rules.md 참고.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 본인 여부 확인
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // 사용자 문서 및 그 하위 전체 (yarns / patterns / needles / notions / projects …)
+    // {document=**} 로 하위 컬렉션이 늘어나도 자동 커버된다.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /{document=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // 위에서 명시적으로 허용하지 않은 모든 경로는 거부.
+    // (테스트 모드의 `allow read, write: if true` 가 남아 있지 않도록
+    //  이 규칙 세트를 통째로 덮어쓰는 것이 중요하다.)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

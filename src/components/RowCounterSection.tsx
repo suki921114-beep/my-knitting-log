@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, RowCounter } from '@/lib/db';
 import { Plus, Minus, MoreHorizontal, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { useConfirm } from '@/hooks/useConfirm';
 
 function vibrate(ms = 10) {
   try { (navigator as any).vibrate?.(ms); } catch {}
@@ -67,6 +68,8 @@ function CounterCard({ counter }: { counter: RowCounter }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
+  const { confirm, dialog } = useConfirm();
+
   async function update(patch: Partial<RowCounter>) {
     await db.rowCounters.update(counter.id!, { ...patch, updatedAt: now() });
   }
@@ -75,7 +78,12 @@ function CounterCard({ counter }: { counter: RowCounter }) {
   async function reset() { setMenuOpen(false); await update({ count: 0 }); }
   async function remove() {
     setMenuOpen(false);
-    if (!confirm(`"${counter.name}" 카운터를 삭제할까요?`)) return;
+    const ok = await confirm({
+      title: `"${counter.name}" 카운터를 삭제할까요?`,
+      description: '휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = now();
     // soft delete — DB 에는 보존, isDeleted 만 켠다.
     await db.rowCounters.update(counter.id!, {
@@ -117,6 +125,7 @@ function CounterCard({ counter }: { counter: RowCounter }) {
 
   return (
     <div className="card-soft relative flex flex-col p-3">
+      {dialog}
       {/* Header: name + menu */}
       <div className="mb-1.5 flex items-start justify-between gap-1">
         {editing ? (

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/useConfirm';
 import { ImageInput } from '@/components/ImageInput';
 import { toast } from '@/components/ui/sonner';
 import { Save, Trash2 } from 'lucide-react';
@@ -12,6 +13,7 @@ export default function YarnForm() {
   const yid = id ? Number(id) : undefined;
   const editing = !!yid;
   const nav = useNavigate();
+  const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (yid ? db.yarns.get(yid) : undefined), [yid]);
 
   const [f, setF] = useState({
@@ -43,7 +45,10 @@ export default function YarnForm() {
   }, [editing, existing, nav]);
 
   async function save() {
-    if (!f.name.trim()) return alert('실 이름을 입력해 주세요.');
+    if (!f.name.trim()) {
+      toast.error('실 이름을 입력해 주세요.');
+      return;
+    }
     const t = now();
     
     // 공통 업데이트 필드
@@ -72,7 +77,12 @@ export default function YarnForm() {
 
   async function remove() {
     if (!yid) return;
-    if (!confirm('이 실을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    const ok = await confirm({
+      title: '이 실을 삭제할까요?',
+      description: '프로젝트에 연결된 사용 기록은 그대로 남아요. 휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = Date.now();
     // soft delete — 실제 row 는 보존하고 isDeleted 만 켠다.
     // 프로젝트의 연결관계(projectYarns)는 다음 단계에서 cascade 처리 예정이라 지금은 그대로 둔다.
@@ -104,6 +114,7 @@ export default function YarnForm() {
   return (
     <div className="space-y-4">
       <PageHeader title={editing ? '실 수정' : '새 실'} back />
+      {dialog}
       <Field label="대표 이미지">
         <ImageInput value={photo} onChange={setPhoto} aspect="square" />
       </Field>

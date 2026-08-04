@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/useConfirm';
 import PrivacyNote from '@/components/PrivacyNote';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
@@ -14,6 +15,7 @@ export default function PatternForm() {
   const pid = id ? Number(id) : undefined;
   const editing = !!pid;
   const nav = useNavigate();
+  const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (pid ? db.patterns.get(pid) : undefined), [pid]);
 
   const [f, setF] = useState({ name: '', designer: '', source: '', link: '', difficulty: '', sizeInfo: '', note: '' });
@@ -38,7 +40,10 @@ export default function PatternForm() {
   }, [editing, existing, nav]);
 
   async function save() {
-    if (!f.name.trim()) return alert('도안명을 입력해 주세요.');
+    if (!f.name.trim()) {
+      toast.error('도안명을 입력해 주세요.');
+      return;
+    }
     const t = now();
     
     // 공통 업데이트 필드
@@ -63,7 +68,12 @@ export default function PatternForm() {
   }
   async function remove() {
     if (!pid) return;
-    if (!confirm('이 도안을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    const ok = await confirm({
+      title: '이 도안을 삭제할까요?',
+      description: '프로젝트에 연결된 사용 기록은 그대로 남아요. 휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = Date.now();
     await db.patterns.update(pid, {
       isDeleted: true,
@@ -92,6 +102,7 @@ export default function PatternForm() {
   return (
     <div className="space-y-4">
       <PageHeader title={editing ? '도안 수정' : '새 도안'} back />
+      {dialog}
       <Field label="대표 이미지">
         <ImageInput value={image} onChange={setImage} aspect="video" />
       </Field>

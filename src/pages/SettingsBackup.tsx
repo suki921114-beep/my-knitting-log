@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
+import { useConfirm } from '@/hooks/useConfirm';
 import { toast } from '@/components/ui/sonner';
 import {
   calculateYarnSyncDiff, executeYarnSync,
@@ -64,6 +65,7 @@ export default function SettingsBackup() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
+  const { confirm, dialog } = useConfirm();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
@@ -132,16 +134,21 @@ export default function SettingsBackup() {
 
       toast.dismiss(tid);
 
-      const confirmMsg =
-        '클라우드에서 가져오기:\n\n' +
-        `[실] 추가 ${yarnDiff.toAdd.length} / 업데이트 ${yarnDiff.toUpdate.length} / 변경없음 ${yarnDiff.unchanged}\n` +
-        `[도안] 추가 ${patternDiff.toAdd.length} / 업데이트 ${patternDiff.toUpdate.length} / 변경없음 ${patternDiff.unchanged}\n` +
-        `[바늘] 추가 ${needleDiff.toAdd.length} / 업데이트 ${needleDiff.toUpdate.length} / 변경없음 ${needleDiff.unchanged}\n` +
-        `[부자재] 추가 ${notionDiff.toAdd.length} / 업데이트 ${notionDiff.toUpdate.length} / 변경없음 ${notionDiff.unchanged}\n` +
-        `[프로젝트] 추가 ${projectDiff.toAdd.length} / 업데이트 ${projectDiff.toUpdate.length} / 변경없음 ${projectDiff.unchanged}\n\n` +
-        '이 기기로 데이터를 가져오시겠습니까?';
+      const rows: DiffRow[] = [
+        { label: '실', a: yarnDiff.toAdd.length, b: yarnDiff.toUpdate.length, same: yarnDiff.unchanged },
+        { label: '도안', a: patternDiff.toAdd.length, b: patternDiff.toUpdate.length, same: patternDiff.unchanged },
+        { label: '바늘', a: needleDiff.toAdd.length, b: needleDiff.toUpdate.length, same: needleDiff.unchanged },
+        { label: '부자재', a: notionDiff.toAdd.length, b: notionDiff.toUpdate.length, same: notionDiff.unchanged },
+        { label: '프로젝트', a: projectDiff.toAdd.length, b: projectDiff.toUpdate.length, same: projectDiff.unchanged },
+      ];
 
-      if (!confirm(confirmMsg)) {
+      const ok = await confirm({
+        title: '이 기기로 데이터를 가져올까요?',
+        description: <DiffTable rows={rows} aLabel="추가" bLabel="업데이트" />,
+        confirmLabel: '가져오기',
+        destructive: false,
+      });
+      if (!ok) {
         setIsFetching(false);
         return;
       }
@@ -232,16 +239,21 @@ export default function SettingsBackup() {
 
       toast.dismiss(tid);
 
-      const confirmMsg =
-        '백업 대상 확인 (로컬 ↔ 클라우드):\n\n' +
-        `[실] 업로드 ${yarnDiff.toUpload.length} / 다운로드 ${yarnDiff.toDownload.length} / 변경없음 ${yarnDiff.unchanged}\n` +
-        `[도안] 업로드 ${patternDiff.toUpload.length} / 다운로드 ${patternDiff.toDownload.length} / 변경없음 ${patternDiff.unchanged}\n` +
-        `[바늘] 업로드 ${needleDiff.toUpload.length} / 다운로드 ${needleDiff.toDownload.length} / 변경없음 ${needleDiff.unchanged}\n` +
-        `[부자재] 업로드 ${notionDiff.toUpload.length} / 다운로드 ${notionDiff.toDownload.length} / 변경없음 ${notionDiff.unchanged}\n` +
-        `[프로젝트] 업로드 ${projectDiff.toUpload.length} / 다운로드 ${projectDiff.toDownload.length} / 변경없음 ${projectDiff.unchanged}\n\n` +
-        '지금 백업을 진행하시겠습니까?';
+      const rows: DiffRow[] = [
+        { label: '실', a: yarnDiff.toUpload.length, b: yarnDiff.toDownload.length, same: yarnDiff.unchanged },
+        { label: '도안', a: patternDiff.toUpload.length, b: patternDiff.toDownload.length, same: patternDiff.unchanged },
+        { label: '바늘', a: needleDiff.toUpload.length, b: needleDiff.toDownload.length, same: needleDiff.unchanged },
+        { label: '부자재', a: notionDiff.toUpload.length, b: notionDiff.toDownload.length, same: notionDiff.unchanged },
+        { label: '프로젝트', a: projectDiff.toUpload.length, b: projectDiff.toDownload.length, same: projectDiff.unchanged },
+      ];
 
-      if (!confirm(confirmMsg)) {
+      const ok = await confirm({
+        title: '지금 백업할까요?',
+        description: <DiffTable rows={rows} aLabel="업로드" bLabel="다운로드" />,
+        confirmLabel: '백업',
+        destructive: false,
+      });
+      if (!ok) {
         setIsSyncing(false);
         return;
       }
@@ -334,7 +346,13 @@ export default function SettingsBackup() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      if (!confirm('가져온 데이터를 현재 데이터에 병합할까요?')) return;
+      const ok = await confirm({
+        title: '백업 파일을 불러올까요?',
+        description: '파일의 내용이 현재 데이터에 병합됩니다. 같은 항목은 덮어쓰이고, 없는 항목은 추가돼요.',
+        confirmLabel: '가져오기',
+        destructive: false,
+      });
+      if (!ok) return;
       await importAll(data);
       toast.success('백업 파일을 가져왔습니다');
     } catch (e: any) {
@@ -347,6 +365,7 @@ export default function SettingsBackup() {
   return (
     <div className="space-y-5">
       <PageHeader title="백업 및 동기화" back />
+      {dialog}
 
       {/* 1. 내 기기로 백업 — 사진까지 통째로 보관되는 유일한 방법이라 최우선 배치 */}
       <Section title="내 기기로 백업" badge="권장">
@@ -748,3 +767,36 @@ function ResultRow({
 
 // db 사용 — eslint 가 import 안 된 것으로 오인하지 않도록 사용처 확인용
 void db;
+
+// 동기화 확인 다이얼로그에서 항목별 수치를 보여 주는 표
+interface DiffRow {
+  label: string;
+  a: number;
+  b: number;
+  same: number;
+}
+
+function DiffTable({ rows, aLabel, bLabel }: { rows: DiffRow[]; aLabel: string; bLabel: string }) {
+  return (
+    <div className="mt-1 space-y-1.5">
+      <div className="flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span>항목</span>
+        <span className="flex gap-3 tabular-nums">
+          <span className="w-12 text-right">{aLabel}</span>
+          <span className="w-12 text-right">{bLabel}</span>
+          <span className="w-12 text-right">변경없음</span>
+        </span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center justify-between text-[12px]">
+          <span className="font-medium text-foreground">{r.label}</span>
+          <span className="flex gap-3 tabular-nums">
+            <span className={`w-12 text-right ${r.a > 0 ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>{r.a}</span>
+            <span className={`w-12 text-right ${r.b > 0 ? 'font-semibold text-accent-foreground' : 'text-muted-foreground'}`}>{r.b}</span>
+            <span className="w-12 text-right text-muted-foreground">{r.same}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}

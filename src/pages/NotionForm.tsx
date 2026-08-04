@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/useConfirm';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
@@ -13,6 +14,7 @@ export default function NotionForm() {
   const nid = id ? Number(id) : undefined;
   const editing = !!nid;
   const nav = useNavigate();
+  const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (nid ? db.notions.get(nid) : undefined), [nid]);
   const [f, setF] = useState({ name: '', kind: '', quantity: 0, shop: '', note: '' });
   const [photo, setPhoto] = useState<string | undefined>(undefined);
@@ -33,7 +35,10 @@ export default function NotionForm() {
   }, [editing, existing, nav]);
 
   async function save() {
-    if (!f.name.trim()) return alert('품목명을 입력해 주세요.');
+    if (!f.name.trim()) {
+      toast.error('품목명을 입력해 주세요.');
+      return;
+    }
     const t = now();
     
     // 공통 업데이트 필드
@@ -57,7 +62,13 @@ export default function NotionForm() {
     nav('/library/notions', { replace: true });
   }
   async function remove() {
-    if (!nid || !confirm('이 부자재를 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
+    if (!nid) return;
+    const ok = await confirm({
+      title: '이 부자재를 삭제할까요?',
+      description: '프로젝트에 연결된 사용 기록은 그대로 남아요. 휴지통에서 되돌릴 수 있어요.',
+      confirmLabel: '삭제',
+    });
+    if (!ok) return;
     const t = Date.now();
     await db.notions.update(nid, {
       isDeleted: true,
@@ -86,6 +97,7 @@ export default function NotionForm() {
   return (
     <div className="space-y-4">
       <PageHeader title={editing ? '부자재 수정' : '새 부자재'} back />
+      {dialog}
       <Field label="대표 이미지">
         <ImageInput value={photo} onChange={setPhoto} aspect="square" />
       </Field>

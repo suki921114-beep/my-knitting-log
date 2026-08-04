@@ -5,6 +5,7 @@ import { LogIn, Loader2, AlertTriangle } from "lucide-react";
 import { detectInAppBrowser } from "@/lib/inAppBrowser";
 import { useAuth } from "@/hooks/useAuth";
 import PageHeader from "@/components/PageHeader";
+import { toast } from "@/components/ui/sonner";
 
 export default function Login() {
   const { signInWithGoogle, user } = useAuth();
@@ -26,7 +27,7 @@ export default function Login() {
       await signInWithGoogle();
       // 로그인이 완료되면 user 상태가 바뀌어 useEffect에 의해 자동으로 이동합니다.
     } catch (error) {
-      alert("로그인에 실패했습니다. 다시 시도해 주세요.");
+      toast.error("로그인에 실패했습니다", { description: "잠시 후 다시 시도해 주세요." });
     } finally {
       setIsLoggingIn(false);
     }

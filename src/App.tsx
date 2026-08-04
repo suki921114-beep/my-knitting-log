@@ -1,6 +1,9 @@
+import { lazy, Suspense } from "react";
 import BugReport from "./pages/BugReport";
-import AiLog from "./pages/AiLog";
 import ScrollToTop from "@/components/ScrollToTop";
+
+// 개발용 화면 — 별도 청크로 분리되어 프로덕션에서는 로드되지 않는다.
+const AiLog = lazy(() => import("./pages/AiLog"));
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -26,6 +29,7 @@ import Settings from "./pages/Settings";
 import Trash from "./pages/Trash";
 import SettingsBackup from "./pages/SettingsBackup";
 import SettingsData from "./pages/SettingsData";
+import SettingsDeleteAccount from "./pages/SettingsDeleteAccount";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import About from "./pages/About";
@@ -46,8 +50,19 @@ const App = () => (
         <ScrollToTop />
         <ErrorBoundary>
           <Routes>
-            <Route path="/tools/ai-log" element={<AiLog />} />
-            
+            {/* 개발용 AI 입력 실험 화면 — 로컬 Ollama 서버가 필요하므로
+                프로덕션 빌드에서는 라우트를 등록하지 않는다 (URL 직접 접근 차단). */}
+            {import.meta.env.DEV && (
+              <Route
+                path="/tools/ai-log"
+                element={
+                  <Suspense fallback={<p className="p-8 text-center text-sm">불러오는 중…</p>}>
+                    <AiLog />
+                  </Suspense>
+                }
+              />
+            )}
+
             <Route path="/login" element={<Login />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
@@ -73,6 +88,7 @@ const App = () => (
             <Route path="/settings/backup" element={<SettingsBackup />} />
             <Route path="/settings/data" element={<SettingsData />} />
             <Route path="/settings/trash" element={<Trash />} />
+            <Route path="/settings/delete-account" element={<SettingsDeleteAccount />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/about" element={<About />} />

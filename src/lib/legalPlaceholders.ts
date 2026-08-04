@@ -13,9 +13,11 @@
 // HAS_TODO 가 true 일 때는 각 페이지에 빨간 'TODO' 배지가 떠 사용자에게도
 // 공사중임을 명시한다 (출시 직후 모르고 노출되는 사고 방지).
 
-const TODO_OPERATOR_EMAIL = '';   // 예: 'support@example.com'
-const TODO_OPERATOR_NAME  = '';   // 예: 'OOO 개인 개발자'
-const TODO_EFFECTIVE_DATE = '';   // 예: '2026-06-01'
+const TODO_OPERATOR_EMAIL = 'knits2crochet@gmail.com';
+const TODO_OPERATOR_NAME  = '쿠쿠다스';
+// ⚠️ 출시 예정일이 확정되면 'YYYY-MM-DD' 형식으로 입력하세요. 스토어 공개일과
+//    맞추는 것이 정확합니다. 비어 있으면 정책/약관 페이지에 빨간 TODO 배지가 뜹니다.
+const TODO_EFFECTIVE_DATE = '';   // 예: '2026-09-01'
 
 export const OPERATOR_EMAIL: string | null = TODO_OPERATOR_EMAIL || null;
 export const OPERATOR_NAME:  string | null = TODO_OPERATOR_NAME  || null;

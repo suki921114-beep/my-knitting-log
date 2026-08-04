@@ -33,6 +33,42 @@ export function trashDaysLeft(deletedAt?: number | null, nowMs: number = Date.no
   return Math.max(0, Math.ceil((expires - nowMs) / (24 * 60 * 60 * 1000)));
 }
 
+export interface TrashRowLike {
+  id?: number;
+  isDeleted?: boolean;
+  deletedAt?: number | null;
+}
+
+export interface PurgeSelection {
+  /** 보관 기간이 지나 영구 삭제할 id */
+  expiredIds: number[];
+  /** deletedAt 이 없어 지금 시각으로 채워 넣어야 할 id (레거시 보정) */
+  missingTimestampIds: number[];
+}
+
+/**
+ * 어떤 휴지통 항목을 지울지 고른다. 부수효과 없음 — 테스트 대상.
+ * @param cutoff 이 시각 이하로 삭제된 항목이 만료 대상
+ */
+export function selectExpiredTrash(rows: TrashRowLike[], cutoff: number): PurgeSelection {
+  const expiredIds: number[] = [];
+  const missingTimestampIds: number[] = [];
+
+  for (const r of rows) {
+    if (r.id == null) continue;
+    // isDeleted 가 아닌 행이 섞여 들어와도 절대 지우지 않는다 (안전장치)
+    if (r.isDeleted !== true) continue;
+
+    if (typeof r.deletedAt !== 'number' || Number.isNaN(r.deletedAt)) {
+      missingTimestampIds.push(r.id);
+    } else if (r.deletedAt <= cutoff) {
+      expiredIds.push(r.id);
+    }
+  }
+
+  return { expiredIds, missingTimestampIds };
+}
+
 /**
  * 보관 기간이 지난 휴지통 항목을 영구 삭제한다.
  * deletedAt 이 없는 레거시 항목은 지금 시각으로 채워 넣어 보관 기간을 새로 시작한다.
@@ -48,20 +84,10 @@ export async function purgeExpiredTrash(nowMs: number = Date.now()): Promise<num
 
     try {
       const rows: any[] = await table.filter((r: any) => r.isDeleted === true).toArray();
-      const expiredIds: number[] = [];
-      const missingTimestamp: number[] = [];
-
-      for (const r of rows) {
-        if (r.id == null) continue;
-        if (typeof r.deletedAt !== 'number' || Number.isNaN(r.deletedAt)) {
-          missingTimestamp.push(r.id);
-        } else if (r.deletedAt <= cutoff) {
-          expiredIds.push(r.id);
-        }
-      }
+      const { expiredIds, missingTimestampIds } = selectExpiredTrash(rows, cutoff);
 
       // 레거시 보정 — 삭제 시각이 없으면 지금부터 카운트
-      for (const id of missingTimestamp) {
+      for (const id of missingTimestampIds) {
         await table.update(id, { deletedAt: nowMs });
       }
 

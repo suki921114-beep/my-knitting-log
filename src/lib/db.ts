@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { ensureSyncMeta, planImport } from './importMerge';
 
 export type ProjectStatus = 'planned' | 'in_progress' | 'done' | 'on_hold';
 
@@ -385,36 +386,31 @@ export async function exportAll() {
   return data;
 }
 
+const IMPORT_TABLES = [
+  'projects', 'patterns', 'yarns', 'needles', 'notions',
+  'projectYarns', 'projectPatterns', 'projectNeedles', 'projectNotions',
+  'rowCounters', 'gaugePresets', 'projectGauges',
+] as const;
+
 export async function importAll(data: any) {
   await db.transaction(
     'rw',
     [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
     async () => {
-      // 만약 낡은 버전의 백업을 불러올 경우 cloudId가 없을 수 있으므로 import시 부여
-      const ensureMeta = (items: any[] | undefined) => {
-        if (!items) return [];
-        return items.map(item => ({
-          ...item,
-          cloudId: item.cloudId || crypto.randomUUID(),
-          isDeleted: item.isDeleted || false,
-          deletedAt: item.deletedAt || null,
-          createdAt: item.createdAt || Date.now(),
-          updatedAt: item.updatedAt || Date.now(),
-        }));
-      };
+      for (const name of IMPORT_TABLES) {
+        const incoming = data?.[name];
+        if (!incoming || !Array.isArray(incoming) || incoming.length === 0) continue;
 
-      if (data.projects) await db.projects.bulkPut(ensureMeta(data.projects));
-      if (data.patterns) await db.patterns.bulkPut(ensureMeta(data.patterns));
-      if (data.yarns) await db.yarns.bulkPut(ensureMeta(data.yarns));
-      if (data.needles) await db.needles.bulkPut(ensureMeta(data.needles));
-      if (data.notions) await db.notions.bulkPut(ensureMeta(data.notions));
-      if (data.projectYarns) await db.projectYarns.bulkPut(ensureMeta(data.projectYarns));
-      if (data.projectPatterns) await db.projectPatterns.bulkPut(ensureMeta(data.projectPatterns));
-      if (data.projectNeedles) await db.projectNeedles.bulkPut(ensureMeta(data.projectNeedles));
-      if (data.projectNotions) await db.projectNotions.bulkPut(ensureMeta(data.projectNotions));
-      if (data.rowCounters) await db.rowCounters.bulkPut(ensureMeta(data.rowCounters));
-      if (data.gaugePresets) await db.gaugePresets.bulkPut(ensureMeta(data.gaugePresets));
-      if (data.projectGauges) await db.projectGauges.bulkPut(ensureMeta(data.projectGauges));
+        const table = (db as any)[name];
+        // 낡은 백업(cloudId 없음)은 여기서 메타를 채운다
+        const prepared = ensureSyncMeta(incoming);
+        // 동일성 판단은 cloudId 로 — 백업 파일의 id 로 로컬 레코드를 덮어쓰지 않는다
+        const existing = await table.toArray();
+        const { toUpdate, toAdd } = planImport(prepared, existing);
+
+        if (toUpdate.length) await table.bulkPut(toUpdate);
+        if (toAdd.length) await table.bulkAdd(toAdd);
+      }
     }
   );
 }
