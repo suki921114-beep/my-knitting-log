@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
 import { Plus, Search, Image as ImageIcon } from 'lucide-react';
+import { EmptyState } from '@/components/Mascot';
 
 export default function Patterns() {
   const items = useLiveQuery(() => db.patterns.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
@@ -28,7 +29,9 @@ export default function Patterns() {
         <ViewToggle value={view} onChange={setView} />
       </div>
       {filtered.length === 0 ? (
-        <p className="card-soft p-8 text-center text-sm text-muted-foreground">아직 등록된 도안이 없어요</p>
+        <div className="card-soft">
+          <EmptyState title="아직 등록된 도안이 없어요" sub="사둔 도안을 모아 두면 프로젝트에 바로 연결할 수 있어요." mood="sleepy" />
+        </div>
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {filtered.map(p => (

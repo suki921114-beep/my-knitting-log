@@ -12,6 +12,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "./components/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
+import Diary from "./pages/Diary";
+import LogForm from "./pages/LogForm";
 import Projects from "./pages/Projects";
 import ProjectForm from "./pages/ProjectForm";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -66,6 +68,9 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
+            <Route path="/diary" element={<Diary />} />
+            <Route path="/diary/new" element={<LogForm />} />
+            <Route path="/diary/:id/edit" element={<LogForm />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/projects/new" element={<ProjectForm />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />

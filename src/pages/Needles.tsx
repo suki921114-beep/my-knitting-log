@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { Plus, Search, Ruler } from 'lucide-react';
+import { EmptyState } from '@/components/Mascot';
 
 export default function Needles() {
   const items = useLiveQuery(() => db.needles.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
@@ -22,7 +23,9 @@ export default function Needles() {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="검색" className="input-pill" />
       </div>
       {filtered.length === 0 ? (
-        <p className="card-soft p-8 text-center text-sm text-muted-foreground">아직 등록된 바늘이 없어요</p>
+        <div className="card-soft">
+          <EmptyState title="아직 등록된 바늘이 없어요" sub="가진 바늘을 적어 두면 같은 호수를 또 사는 일이 줄어요." mood="sleepy" />
+        </div>
       ) : (
         <ul className="space-y-2">
           {filtered.map(n => (

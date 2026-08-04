@@ -5,7 +5,8 @@ import { purgeExpiredTrash, trashDaysLeft, TRASH_RETENTION_DAYS } from '@/lib/au
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/components/ui/sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { RotateCcw, Trash2, Inbox } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
+import { EmptyState } from '@/components/Mascot';
 
 // ----------------------------------------------------------------------------
 // 휴지통 — soft delete 된 모든 entity 를 한 곳에서 보고 복원/영구삭제
@@ -15,7 +16,7 @@ import { RotateCcw, Trash2, Inbox } from 'lucide-react';
 //          그대로 남아 다른 기기 가져오기 시 부활 방지. 클라우드 문서까지 삭제
 //          하려면 별도 단계 필요 (다음 작업).
 
-type TableName = 'yarns' | 'patterns' | 'needles' | 'notions' | 'projects' | 'rowCounters' | 'projectGauges';
+type TableName = 'yarns' | 'patterns' | 'needles' | 'notions' | 'projects' | 'rowCounters' | 'projectGauges' | 'logs';
 
 export default function Trash() {
   // 휴지통을 열 때마다 보관 기간이 지난 항목을 먼저 정리한다
@@ -30,6 +31,7 @@ export default function Trash() {
   const projects = useLiveQuery(() => db.projects.filter(p => p.isDeleted === true).toArray(), []) || [];
   const rowCounters = useLiveQuery(() => db.rowCounters.filter(c => c.isDeleted === true).toArray(), []) || [];
   const projectGauges = useLiveQuery(() => db.projectGauges.filter(g => g.isDeleted === true).toArray(), []) || [];
+  const logs = useLiveQuery(() => db.logs.filter(l => l.isDeleted === true).toArray(), []) || [];
 
   // sub-entity 의 소속 프로젝트 표시용 (삭제된 프로젝트 포함 전체)
   const allProjects = useLiveQuery(() => db.projects.toArray(), []) || [];
@@ -37,7 +39,7 @@ export default function Trash() {
 
   const total =
     yarns.length + patterns.length + needles.length + notions.length +
-    projects.length + rowCounters.length + projectGauges.length;
+    projects.length + rowCounters.length + projectGauges.length + logs.length;
 
   // AlertDialog 로 가로채기 위한 pending state — 누른 항목을 임시 보관
   const [pendingPurge, setPendingPurge] = useState<{
@@ -92,11 +94,8 @@ export default function Trash() {
       )}
 
       {total === 0 ? (
-        <div className="card-soft flex flex-col items-center gap-3 p-10 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-            <Inbox className="h-6 w-6" />
-          </span>
-          <p className="text-[13px] text-muted-foreground">휴지통이 비어있어요</p>
+        <div className="card-soft">
+          <EmptyState title="휴지통이 비어있어요" sub="지운 항목은 7일 동안 여기 머물러요." mood="happy" />
         </div>
       ) : (
         <>
@@ -155,6 +154,18 @@ export default function Trash() {
               return `${projectName} · ${c.count}단`;
             }}
             tableName="rowCounters"
+            onRestore={restore}
+            onPurge={askPurge}
+          />
+          <Section
+            title="뜨개 기록"
+            items={logs}
+            getName={(l) => (l.text.length > 24 ? l.text.slice(0, 24) + '…' : l.text) || '기록'}
+            getMeta={(l) => {
+              const p = l.projectId ? projectMap.get(l.projectId) : undefined;
+              return [l.date, p?.name].filter(Boolean).join(' · ');
+            }}
+            tableName="logs"
             onRestore={restore}
             onPurge={askPurge}
           />

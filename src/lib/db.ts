@@ -152,6 +152,30 @@ export interface ProjectNotion extends SyncMetadata {
   updatedAt: number;
 }
 
+/**
+ * 뜨개 기록 한 편 — 다이어리의 최소 단위.
+ *
+ * 다이어리와 프로젝트 메모를 따로 두지 않는다. 기록은 하나이고 보는 입구만 둘이다.
+ *   - 프로젝트 상세: 그 프로젝트에 연결된 기록만
+ *   - 다이어리: 모든 기록을 날짜순으로
+ * projectId 가 없으면 프로젝트와 무관한 일상 기록(실 구매, 손목 쉼 등).
+ */
+export interface KnitLog extends SyncMetadata {
+  id?: number;
+  /** 연결된 프로젝트. 없으면 자유 기록 */
+  projectId?: number;
+  /** 기록 날짜 'YYYY-MM-DD' — 작성 시각과 별개로 사용자가 고를 수 있다 */
+  date: string;
+  text: string;
+  /** 그날 뜬 단수 (선택) */
+  rows?: number;
+  /** 기분 이모지 (선택) */
+  mood?: string;
+  photos?: ProjectPhoto[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface RowCounter extends SyncMetadata {
   id?: number;
   projectId: number;
@@ -209,6 +233,7 @@ class KnitDB extends Dexie {
   rowCounters!: Table<RowCounter, number>;
   gaugePresets!: Table<GaugePreset, number>;
   projectGauges!: Table<ProjectGauge, number>;
+  logs!: Table<KnitLog, number>;
 
   constructor() {
     super('knit-db');
@@ -359,6 +384,50 @@ class KnitDB extends Dexie {
       }
     });
 
+    // v7: 뜨개 기록(logs) 테이블 추가.
+    // 기존 project.progressNote 는 한 칸짜리 필드라 덮어쓰면 이전 내용이 사라졌다.
+    // 남아 있는 메모를 첫 기록으로 옮겨 히스토리가 쌓이는 구조로 전환한다.
+    this.version(7).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+      logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
+    }).upgrade(async (tx) => {
+      pauseDirtyTracking();
+      try {
+        const projects = await tx.table('projects').toArray();
+        const logs = tx.table('logs');
+        for (const p of projects) {
+          const note = (p?.progressNote || '').trim();
+          if (!note) continue;
+          const t = p.updatedAt || p.createdAt || Date.now();
+          await logs.add({
+            projectId: p.id,
+            // 마지막 수정 시각을 기록 날짜로 삼는다
+            date: new Date(t).toISOString().slice(0, 10),
+            text: note,
+            createdAt: t,
+            updatedAt: t,
+            cloudId: crypto.randomUUID(),
+            isDeleted: false,
+            deletedAt: null,
+          });
+        }
+      } finally {
+        resumeDirtyTracking();
+        clearSyncDirty();
+      }
+    });
+
   }
 }
 
@@ -382,6 +451,7 @@ export async function exportAll() {
     rowCounters: await db.rowCounters.toArray(),
     gaugePresets: await db.gaugePresets.toArray(),
     projectGauges: await db.projectGauges.toArray(),
+    logs: await db.logs.toArray(),
   };
   return data;
 }
@@ -389,13 +459,13 @@ export async function exportAll() {
 const IMPORT_TABLES = [
   'projects', 'patterns', 'yarns', 'needles', 'notions',
   'projectYarns', 'projectPatterns', 'projectNeedles', 'projectNotions',
-  'rowCounters', 'gaugePresets', 'projectGauges',
+  'rowCounters', 'gaugePresets', 'projectGauges', 'logs',
 ] as const;
 
 export async function importAll(data: any) {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges, db.logs],
     async () => {
       for (const name of IMPORT_TABLES) {
         const incoming = data?.[name];
@@ -425,7 +495,7 @@ export async function clearAll() {
   try {
     await db.transaction(
       'rw',
-      [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges],
+      [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges, db.logs],
       async () => {
         await Promise.all([
           db.projects.clear(),
@@ -440,6 +510,7 @@ export async function clearAll() {
           db.rowCounters.clear(),
           db.gaugePresets.clear(),
           db.projectGauges.clear(),
+          db.logs.clear(),
         ]);
       }
     );

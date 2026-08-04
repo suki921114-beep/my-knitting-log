@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "270728801613-lhhaq77mif2l1icsgroh9osomaosfa00.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.suki.knittinglog",
+            "certificate_hash": "7a23e3cdffe0f9c448295345b83496822dd45d05"
+          }
+        },
+        {
           "client_id": "270728801613-1puvgv2earajnk2fumbf87gu8kmnvnui.apps.googleusercontent.com",
           "client_type": 3
         }

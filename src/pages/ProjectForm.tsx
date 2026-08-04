@@ -347,9 +347,6 @@ export default function ProjectForm() {
         </p>
       </Field>
 
-      <Field label="진행 메모">
-        <textarea className={`${inputCls} min-h-[88px] resize-y`} value={progressNote} onChange={e => setProgressNote(e.target.value)} placeholder="오늘은 소매까지 완성!" />
-      </Field>
 
       <Field label="완성 소감">
         <textarea className={`${inputCls} min-h-[64px] resize-y`} value={finishedNote} onChange={e => setFinishedNote(e.target.value)} placeholder="다 만들고 나면 적어보세요." />

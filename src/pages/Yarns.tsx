@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
 import { Plus, Search, ArrowUpDown, Image as ImageIcon } from 'lucide-react';
+import { EmptyState } from '@/components/Mascot';
 
 type Sort = 'updated' | 'low' | 'high';
 
@@ -63,7 +64,9 @@ export default function Yarns() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="card-soft p-8 text-center text-sm text-muted-foreground">아직 등록된 실이 없어요</p>
+        <div className="card-soft">
+          <EmptyState title="아직 등록된 실이 없어요" sub="가지고 있는 실을 등록해 두면 잔량이 자동으로 계산돼요." mood="sleepy" />
+        </div>
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {filtered.map(s => {

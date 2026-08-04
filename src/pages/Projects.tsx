@@ -5,6 +5,7 @@ import { db, ProjectStatus } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
 import { coverPhotoUrl } from '@/lib/photo';
 import PageHeader from '@/components/PageHeader';
+import { EmptyState } from '@/components/Mascot';
 import { Plus, Search, Image as ImageIcon } from 'lucide-react';
 
 const FILTERS: { v: 'all' | ProjectStatus; label: string }[] = [
@@ -79,11 +80,16 @@ export default function Projects() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card-soft mt-6 flex flex-col items-center gap-3 p-10 text-center">
-          <p className="text-[13px] text-muted-foreground">아직 프로젝트가 없어요</p>
-          <Link to="/projects/new" className="btn-primary btn-sm">
-            <Plus className="h-3.5 w-3.5" /> 첫 프로젝트
-          </Link>
+        <div className="card-soft mt-6">
+          <EmptyState
+            title="아직 프로젝트가 없어요"
+            sub="여러 개를 동시에 벌여두어도 괜찮아요. 그러라고 만든 앱이니까요."
+            action={
+              <Link to="/projects/new" className="btn-primary btn-sm">
+                <Plus className="h-3.5 w-3.5" /> 첫 프로젝트
+              </Link>
+            }
+          />
         </div>
       ) : (
         <ul className="space-y-2.5">
@@ -109,10 +115,6 @@ export default function Projects() {
                     {/* 2줄: 보조 정보 */}
                     {meta && (
                       <div className="mt-1 truncate text-[11.5px] text-muted-foreground">{meta}</div>
-                    )}
-                    {/* 3줄: 메모 */}
-                    {p.progressNote && (
-                      <p className="mt-0.5 line-clamp-1 text-[12px] text-muted-foreground/85">{p.progressNote}</p>
                     )}
                   </div>
                 </Link>

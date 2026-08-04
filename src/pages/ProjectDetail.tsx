@@ -3,10 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
-import { Pencil, Image as ImageIcon } from 'lucide-react';
+import { Pencil, Image as ImageIcon, PenLine } from 'lucide-react';
 import { useState } from 'react';
 import RowCounterSection from '@/components/RowCounterSection';
 import ProjectGaugeSection from '@/components/ProjectGaugeSection';
+import LogCard from '@/components/LogCard';
+import { groupByDate, formatLogDate } from '@/lib/logs';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -17,6 +19,10 @@ export default function ProjectDetail() {
   const patternLinks = useLiveQuery(() => db.projectPatterns.where('projectId').equals(pid).toArray(), [pid]) || [];
   const needleLinks = useLiveQuery(() => db.projectNeedles.where('projectId').equals(pid).toArray(), [pid]) || [];
   const notionLinks = useLiveQuery(() => db.projectNotions.where('projectId').equals(pid).toArray(), [pid]) || [];
+  const logs = useLiveQuery(
+    () => db.logs.where('projectId').equals(pid).filter(l => !l.isDeleted).toArray(),
+    [pid],
+  ) || [];
 
   const yarns = useLiveQuery(() => db.yarns.toArray(), []) || [];
   const patterns = useLiveQuery(() => db.patterns.toArray(), []) || [];
@@ -255,13 +261,33 @@ export default function ProjectDetail() {
         </Section>
       )}
 
-      {project.progressNote && (
-        <Section title="진행 메모">
-          <div className="card-soft whitespace-pre-wrap rounded-r-2xl border-l-4 border-primary/40 bg-primary-soft/30 px-4 py-3.5 text-[13px] leading-relaxed text-ink">
-            {project.progressNote}
+      <Section title={`뜨개 기록${logs.length ? ` · ${logs.length}` : ''}`}>
+        <Link
+          to={`/diary/new?projectId=${pid}`}
+          className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 py-2.5 text-[12.5px] font-semibold text-primary"
+        >
+          <PenLine className="h-3.5 w-3.5" /> 오늘 기록 남기기
+        </Link>
+        {logs.length === 0 ? (
+          <p className="rounded-xl bg-secondary/50 px-3 py-3.5 text-center text-[11.5px] text-muted-foreground">
+            아직 이 프로젝트의 기록이 없어요. 한 줄이면 충분해요.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {groupByDate(logs).map(g => (
+              <div key={g.date} className="space-y-1.5">
+                <div className="flex items-baseline gap-2 px-0.5">
+                  <span className="text-[12px] font-bold text-foreground">{formatLogDate(g.date)}</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground">{g.date}</span>
+                </div>
+                {g.items.map(l => (
+                  <LogCard key={l.id} log={l} />
+                ))}
+              </div>
+            ))}
           </div>
-        </Section>
-      )}
+        )}
+      </Section>
       {project.finishedNote && (
         <Section title="완성 소감">
           <div className="card-soft whitespace-pre-wrap rounded-r-2xl border-l-4 border-accent/40 bg-accent-soft/30 px-4 py-3.5 text-[13px] leading-relaxed text-ink">

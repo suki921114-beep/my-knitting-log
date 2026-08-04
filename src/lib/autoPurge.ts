@@ -19,6 +19,7 @@ const TRASH_TABLES = [
   'projects',
   'rowCounters',
   'projectGauges',
+  'logs',
 ] as const;
 
 /** 자동 영구삭제 예정 시각 (deletedAt 이 없으면 null) */

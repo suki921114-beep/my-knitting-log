@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Home, Notebook, Package, Settings } from 'lucide-react';
+import { Home, BookHeart, Notebook, Package, Settings } from 'lucide-react';
 import { useAutoSync } from '@/hooks/useAutoSync';
 import OfflineBanner from '@/components/OfflineBanner';
 
 const tabs = [
   { to: '/', label: '홈', icon: Home, end: true },
+  { to: '/diary', label: '다이어리', icon: BookHeart },
   { to: '/projects', label: '프로젝트', icon: Notebook },
   { to: '/library', label: '라이브러리', icon: Package },
   { to: '/settings', label: '설정', icon: Settings },
@@ -22,7 +23,7 @@ export default function AppLayout() {
       </main>
       <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-card/90 backdrop-blur-xl">
         <div
-          className="mx-auto max-w-2xl grid grid-cols-4"
+          className="mx-auto max-w-2xl grid grid-cols-5"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {tabs.map(t => (

@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
 import { Plus, Search, Image as ImageIcon } from 'lucide-react';
+import { EmptyState } from '@/components/Mascot';
 
 export default function Notions() {
   const items = useLiveQuery(() => db.notions.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
@@ -28,7 +29,9 @@ export default function Notions() {
         <ViewToggle value={view} onChange={setView} />
       </div>
       {filtered.length === 0 ? (
-        <p className="card-soft p-8 text-center text-sm text-muted-foreground">아직 등록된 부자재가 없어요</p>
+        <div className="card-soft">
+          <EmptyState title="아직 등록된 부자재가 없어요" sub="단추, 마커, 지퍼처럼 자잘한 것들을 모아 둘 수 있어요." mood="sleepy" />
+        </div>
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {filtered.map(n => (

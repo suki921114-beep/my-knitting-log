@@ -1,19 +1,13 @@
-import { Link } from 'react-router-dom';
+import { useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
-import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
+import { db, now, Project, RowCounter } from '@/lib/db';
+import { useAllYarnStats } from '@/lib/yarnCalc';
 import { coverPhotoUrl } from '@/lib/photo';
+import { formatLogDate } from '@/lib/logs';
 import BackupReminder from '@/components/BackupReminder';
-import {
-  Plus,
-  Scroll,
-  ArrowRight,
-  Layers,
-  Sparkles,
-  Image as ImageIcon,
-  Calculator,
-  Notebook,
-} from 'lucide-react';
+import Mascot, { EmptyState } from '@/components/Mascot';
+import { Plus, Minus, PenLine, Image as ImageIcon, ArrowRight } from 'lucide-react';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -25,307 +19,273 @@ function getGreeting(): string {
   return '오늘도 수고했어요';
 }
 
+function vibrate(ms = 10) {
+  try { (navigator as any).vibrate?.(ms); } catch { /* noop */ }
+}
+
 export default function Home() {
   const inProgress = useLiveQuery(
-    () => db.projects.where('status').equals('in_progress').filter(p => !p.isDeleted).reverse().sortBy('updatedAt'),
-    []
+    () =>
+      db.projects
+        .where('status')
+        .equals('in_progress')
+        .filter(p => !p.isDeleted)
+        .reverse()
+        .sortBy('updatedAt'),
+    [],
   );
   const allProjects = useLiveQuery(() => db.projects.filter(p => !p.isDeleted).toArray(), []) || [];
-  const yarnStats = useAllYarnStats() || [];
-  const topRemaining = yarnStats
-    .filter(s => s.remaining > 0)
-    .sort((a, b) => b.remaining - a.remaining)
-    .slice(0, 4);
-
-  // 진행중 프로젝트별 카운터 — Home 카드에 작은 진행 표시
   const counters = useLiveQuery(() => db.rowCounters.filter(c => !c.isDeleted).toArray(), []) || [];
-  const counterByProject = new Map<number, { count: number; goal?: number }>();
-  for (const c of counters) {
-    const existing = counterByProject.get(c.projectId);
-    // 한 프로젝트에 카운터 여러 개면 가장 최근 업데이트된 것 우선
-    if (!existing || (c.updatedAt ?? 0) > 0) {
-      counterByProject.set(c.projectId, { count: c.count ?? 0, goal: c.goal });
-    }
-  }
+  const logs = useLiveQuery(() => db.logs.filter(l => !l.isDeleted).toArray(), []) || [];
+  const yarnStats = useAllYarnStats() || [];
 
+  /** 프로젝트별 대표 카운터 — 가장 최근에 만진 것 하나만 홈에 보여준다 */
+  const counterByProject = useMemo(() => {
+    const m = new Map<number, RowCounter>();
+    for (const c of counters) {
+      const prev = m.get(c.projectId);
+      if (!prev || (c.updatedAt ?? 0) > (prev.updatedAt ?? 0)) m.set(c.projectId, c);
+    }
+    return m;
+  }, [counters]);
+
+  const projects = inProgress || [];
   const stats = {
     planned: allProjects.filter(p => p.status === 'planned').length,
-    inProgress: allProjects.filter(p => p.status === 'in_progress').length,
     done: allProjects.filter(p => p.status === 'done').length,
-    onHold: allProjects.filter(p => p.status === 'on_hold').length,
   };
-
-  const totalYarnGrams = yarnStats.reduce((acc, s) => acc + s.remaining, 0);
-  const yarnCount = yarnStats.length;
-
-  // 부드러운 한 줄 요약
-  let summary: string;
-  if (stats.inProgress > 0) {
-    summary = `진행중 ${stats.inProgress}개${yarnCount > 0 ? ` · 실 ${yarnCount}타래` : ''}`;
-  } else if (stats.planned > 0) {
-    summary = `예정 ${stats.planned}개의 새 프로젝트가 기다리고 있어요`;
-  } else if (yarnCount > 0) {
-    summary = `등록된 실 ${yarnCount}타래 · 잔량 ${totalYarnGrams}g`;
-  } else {
-    summary = '첫 프로젝트나 실을 등록해 보세요';
-  }
+  const latestLog = useMemo(
+    () => [...logs].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt))[0],
+    [logs],
+  );
 
   return (
-    <div className="space-y-6">
-      {/* 사진이 로컬에만 쌓였는데 오래 백업 안 했을 때만 노출 */}
+    <div className="space-y-5">
       <BackupReminder />
 
-      {/* Hero — 시간대 인사 + 요약 */}
-      <header className="space-y-1">
+      <header>
         <p className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-primary/70">
           {getGreeting()}
         </p>
-        <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-foreground">
+        <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight tracking-tight text-foreground">
           내 작업실
         </h1>
-        <p className="text-[12.5px] text-muted-foreground">{summary}</p>
       </header>
 
-      {/* 프로젝트 상태 — 4 grid */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatLink to="/projects?status=planned" label="예정" value={stats.planned} tone="neutral" />
-        <StatLink to="/projects?status=in_progress" label="진행중" value={stats.inProgress} tone="primary" />
-        <StatLink to="/projects?status=done" label="완성" value={stats.done} tone="accent" />
-        <StatLink to="/projects?status=on_hold" label="보류" value={stats.onHold} tone="muted" />
-      </div>
-
-      {/* 빠른 추가 — 4열 통합 (게이지 계산기 포함) */}
-      <section>
-        <h2 className="section-title mb-2.5">바로 추가</h2>
-        <div className="grid grid-cols-4 gap-2">
-          <QuickCard to="/projects/new" icon={Plus} label="프로젝트" tone="primary" />
-          <QuickCard to="/library/yarns/new" icon={Layers} label="실" tone="accent" />
-          <QuickCard to="/library/patterns/new" icon={Scroll} label="도안" tone="neutral" />
-          <QuickCard to="/tools/gauge" icon={Calculator} label="게이지" tone="soft" />
+      {projects.length === 0 ? (
+        <div className="card-soft">
+          <EmptyState
+            title="아직 뜨고 있는 게 없네요"
+            sub="지금 손에 잡고 있는 걸 하나 등록해 두면, 여기서 바로 단수를 셀 수 있어요."
+            action={
+              <Link to="/projects/new" className="btn-primary btn-sm">
+                <Plus className="h-3.5 w-3.5" /> 첫 프로젝트 시작
+              </Link>
+            }
+          />
         </div>
-      </section>
+      ) : (
+        <ProjectCarousel projects={projects} counterByProject={counterByProject} />
+      )}
 
-      {/* 진행중 프로젝트 */}
-      <Section title="오늘의 뜨개" to="/projects" cta="전체">
-        {!inProgress?.length ? (
-          <Empty
-            icon={Notebook}
-            text="지금 뜨고 있는 게 있나요?"
-            sub="진행중 프로젝트를 등록하면 여기에 모입니다"
-          />
-        ) : (
-          <div className="space-y-2">
-            {inProgress.slice(0, 3).map(p => {
-              const cover = coverPhotoUrl(p.photos);
-              const counter = counterByProject.get(p.id!);
-              const pct = counter?.goal && counter.goal > 0
-                ? Math.min(100, Math.round((counter.count / counter.goal) * 100))
-                : null;
-              return (
-                <Link
-                  key={p.id}
-                  to={`/projects/${p.id}`}
-                  className="card-soft flex items-center gap-3 overflow-hidden p-2.5 transition active:scale-[0.99] hover:shadow-soft"
-                >
-                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
-                    {cover ? (
-                      <img src={cover} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[14px] font-semibold text-foreground">{p.name}</h3>
-                    {p.progressNote && (
-                      <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{p.progressNote}</p>
-                    )}
-                    {counter !== undefined && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <div className="text-[10.5px] text-muted-foreground tabular-nums">
-                          {counter.count}{counter.goal ? `/${counter.goal}` : ''}단
-                        </div>
-                        {pct !== null && (
-                          <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
-                            <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <span className={`chip ${statusColor(p.status)}`}>{statusLabel(p.status)}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </Section>
+      {/* 한 줄 요약 — 상태 카드 4개를 대체 */}
+      <p className="text-center text-[11.5px] text-muted-foreground">
+        {[
+          yarnStats.length > 0 && `실 ${yarnStats.length}타래`,
+          stats.done > 0 && `완성 ${stats.done}개`,
+          stats.planned > 0 && `예정 ${stats.planned}개`,
+        ]
+          .filter(Boolean)
+          .join(' · ') || '실이나 도안을 등록해 보세요'}
+      </p>
 
-      {/* 우선 사용할 실 */}
-      <Section title="우선 사용할 실" to="/library/yarns" cta="실 보기">
-        {!topRemaining.length ? (
-          <Empty
-            icon={Sparkles}
-            text="등록된 실이 없어요"
-            sub="첫 실을 등록하면 잔량 순으로 정리해 드려요"
-          />
-        ) : (
-          <div className="space-y-2">
-            {topRemaining.map(s => {
-              const pct = s.yarn.totalGrams > 0
-                ? Math.max(0, Math.min(100, (s.remaining / s.yarn.totalGrams) * 100))
-                : 0;
-              return (
-                <Link
-                  key={s.yarn.id}
-                  to={`/library/yarns/${s.yarn.id}`}
-                  className="card-soft flex items-center gap-3 p-2.5 transition active:scale-[0.99] hover:shadow-soft"
-                >
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
-                    {s.yarn.photoDataUrl ? (
-                      <img src={s.yarn.photoDataUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="img-placeholder"><ImageIcon className="h-4 w-4" /></div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13.5px] font-semibold text-foreground">{s.yarn.name}</div>
-                    {s.yarn.brand && <div className="truncate text-[11.5px] text-muted-foreground">{s.yarn.brand}</div>}
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
-                        <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="text-[10px] text-muted-foreground tabular-nums">{Math.round(pct)}%</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[14px] font-bold text-primary tabular-nums">
-                      {s.remaining}
-                      <span className="ml-0.5 text-[11px] font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </Section>
-    </div>
-  );
-}
-
-function StatLink({
-  to,
-  label,
-  value,
-  tone,
-}: {
-  to: string;
-  label: string;
-  value: number;
-  tone: 'primary' | 'accent' | 'neutral' | 'muted';
-}) {
-  const toneClass =
-    tone === 'primary'
-      ? 'bg-primary-soft text-primary border-primary/15'
-      : tone === 'accent'
-      ? 'bg-accent-soft text-accent-foreground border-accent/20'
-      : tone === 'muted'
-      ? 'bg-muted text-muted-foreground border-border/40'
-      : 'bg-secondary text-foreground border-border/30';
-  return (
-    <Link
-      to={to}
-      role="button"
-      className={`group relative block rounded-2xl border px-3.5 py-3 transition-all active:scale-[0.97] hover:shadow-soft ${toneClass}`}
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold opacity-80">{label}</span>
-        <ArrowRight className="h-3 w-3 opacity-30 transition-opacity group-hover:opacity-70" />
+      <div className="flex gap-2">
+        <Link
+          to="/projects/new"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary py-3 text-[13px] font-bold text-primary-foreground shadow-soft"
+        >
+          <Plus className="h-4 w-4" /> 새 프로젝트
+        </Link>
+        <Link
+          to="/library/yarns/new"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-secondary py-3 text-[13px] font-bold text-secondary-foreground"
+        >
+          실 추가
+        </Link>
       </div>
-      <div className="mt-1.5 text-[24px] font-extrabold leading-none tracking-tight tabular-nums">
-        {value}
-      </div>
-    </Link>
-  );
-}
 
-function QuickCard({
-  to,
-  icon: Icon,
-  label,
-  tone,
-}: {
-  to: string;
-  icon: any;
-  label: string;
-  tone: 'primary' | 'accent' | 'neutral' | 'soft';
-}) {
-  const iconClass =
-    tone === 'primary'
-      ? 'bg-primary text-primary-foreground'
-      : tone === 'accent'
-      ? 'bg-accent text-accent-foreground'
-      : tone === 'soft'
-      ? 'bg-primary-soft text-primary'
-      : 'bg-foreground text-background';
-  return (
-    <Link
-      to={to}
-      className="card-soft flex flex-col items-center justify-center gap-1.5 py-3.5 text-center transition active:scale-[0.97] hover:-translate-y-0.5"
-    >
-      <span className={`flex h-9 w-9 items-center justify-center rounded-full ${iconClass}`}>
-        <Icon className="h-4 w-4" strokeWidth={2.4} />
-      </span>
-      <span className="text-[11.5px] font-semibold text-foreground">{label}</span>
-    </Link>
-  );
-}
-
-function Section({
-  title,
-  to,
-  cta,
-  children,
-}: {
-  title: string;
-  to?: string;
-  cta?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <div className="mb-2.5 flex items-center justify-between px-1">
-        <h2 className="section-title">{title}</h2>
-        {to && (
+      {/* 최근 기록 한 편만 — 나머지는 다이어리에서 */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between px-0.5">
+          <h2 className="section-title">최근 기록</h2>
+          <Link to="/diary" className="flex items-center gap-0.5 text-[11.5px] text-muted-foreground">
+            다이어리 <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+        {latestLog ? (
+          <Link to={`/diary/${latestLog.id}/edit`} className="card-soft block p-3.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[10.5px] font-semibold text-primary">
+                {formatLogDate(latestLog.date)}
+              </span>
+              {latestLog.mood && <span className="text-[13px]">{latestLog.mood}</span>}
+            </div>
+            <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-ink">{latestLog.text}</p>
+          </Link>
+        ) : (
           <Link
-            to={to}
-            className="flex items-center gap-0.5 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:text-primary"
+            to="/diary/new"
+            className="flex items-center justify-center gap-1.5 rounded-2xl border border-dashed border-primary/40 bg-primary/5 py-3.5 text-[12.5px] font-semibold text-primary"
           >
-            {cta || '전체'} <ArrowRight className="h-3 w-3" />
+            <PenLine className="h-3.5 w-3.5" /> 오늘 뭘 떴는지 적어볼까요?
           </Link>
         )}
-      </div>
-      {children}
-    </section>
+      </section>
+    </div>
   );
 }
 
-function Empty({
-  icon: Icon,
-  text,
-  sub,
+/** 진행 중 프로젝트를 좌우로 넘겨 보는 히어로 캐러셀 (문어발) */
+function ProjectCarousel({
+  projects,
+  counterByProject,
 }: {
-  icon: any;
-  text: string;
-  sub?: string;
+  projects: Project[];
+  counterByProject: Map<number, RowCounter>;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [idx, setIdx] = useState(0);
+
+  function onScroll() {
+    const el = ref.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    if (i !== idx) setIdx(i);
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-secondary/50 px-4 py-8 text-center">
-      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-card text-muted-foreground">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="text-[13px] font-semibold text-foreground">{text}</p>
-      {sub && <p className="text-[11.5px] text-muted-foreground">{sub}</p>}
+    <div>
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {projects.map(p => (
+          <div key={p.id} className="w-full shrink-0 snap-center">
+            <HeroCard project={p} counter={counterByProject.get(p.id!)} />
+          </div>
+        ))}
+      </div>
+
+      {projects.length > 1 && (
+        <div className="mt-2.5 flex justify-center gap-1.5">
+          {projects.map((p, i) => (
+            <span
+              key={p.id}
+              className={`h-1.5 rounded-full transition-all ${
+                i === idx ? 'w-4 bg-primary' : 'w-1.5 bg-border'
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function HeroCard({ project, counter }: { project: Project; counter?: RowCounter }) {
+  const nav = useNavigate();
+  const cover = coverPhotoUrl(project.photos);
+  const pct =
+    counter?.goal && counter.goal > 0
+      ? Math.min(100, Math.round((counter.count / counter.goal) * 100))
+      : null;
+
+  async function bump(delta: number) {
+    if (!counter?.id) return;
+    const next = Math.max(0, (counter.count ?? 0) + delta);
+    if (next === counter.count) return;
+    vibrate(delta > 0 ? 10 : 8);
+    await db.rowCounters.update(counter.id, { count: next, updatedAt: now() });
+  }
+
+  return (
+    <article className="card-soft overflow-hidden">
+      <button
+        type="button"
+        onClick={() => nav(`/projects/${project.id}`)}
+        className="block w-full text-left"
+      >
+        <div className="flex h-[150px] w-full items-center justify-center bg-primary-soft/60">
+          {cover ? (
+            <img src={cover} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <Mascot size={68} className="text-primary/40" />
+          )}
+        </div>
+        <div className="px-4 pt-3.5">
+          <span className="chip bg-primary-soft text-primary">진행중</span>
+          <h2 className="mt-2 truncate text-[16px] font-extrabold leading-tight text-foreground">
+            {project.name}
+          </h2>
+        </div>
+      </button>
+
+      <div className="px-4 pb-4 pt-3">
+        {counter ? (
+          <>
+            {pct !== null && (
+              <div className="mb-2.5 h-[7px] overflow-hidden rounded-full bg-secondary">
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <span className="text-[21px] font-extrabold tabular-nums text-foreground">
+                  {counter.count}
+                </span>
+                <span className="ml-1 text-[11.5px] text-muted-foreground">
+                  {counter.goal ? `/ ${counter.goal}단` : '단'}
+                </span>
+                <div className="truncate text-[10.5px] text-muted-foreground">{counter.name}</div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => bump(-1)}
+                  aria-label="한 단 빼기"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground active:scale-95"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => bump(1)}
+                  aria-label="한 단 더하기"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-soft active:scale-95"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => nav(`/projects/${project.id}`)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 py-2.5 text-[12px] font-semibold text-primary"
+          >
+            <Plus className="h-3.5 w-3.5" /> 단수 카운터 만들기
+          </button>
+        )}
+
+        <Link
+          to={`/diary/new?projectId=${project.id}`}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary/70 py-2.5 text-[12px] font-semibold text-secondary-foreground"
+        >
+          <PenLine className="h-3.5 w-3.5" /> 오늘 기록 남기기
+        </Link>
+      </div>
+    </article>
   );
 }
