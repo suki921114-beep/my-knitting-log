@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { fileToCompressedDataUrl, estimateDataUrlBytes, formatBytes } from '@/lib/image';
 import { toast } from '@/components/ui/sonner';
 
-// 단일 이미지(라이브러리 대표 사진 등) 압축 후 허용 최대 바이트
+// 단일 이미지(라이브러리 대표 사진 등)
+// TARGET: 압축이 목표로 삼는 크기 / HARD_MAX: 이걸 넘으면 저장 거부
+const SINGLE_TARGET_BYTES = 500 * 1024; // 500KB
 const SINGLE_HARD_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
 interface SingleProps {
@@ -25,7 +27,7 @@ export function ImageInput({ value, onChange, label = '대표 이미지', aspect
       const dataUrl = await fileToCompressedDataUrl(file, {
         maxDim: 1024,
         quality: 0.8,
-        maxBytes: SINGLE_HARD_MAX_BYTES,
+        maxBytes: SINGLE_TARGET_BYTES,
       });
       if (!dataUrl) {
         toast.error('이미지를 읽지 못했어요', {
@@ -104,7 +106,8 @@ interface MultiProps {
   max?: number;
 }
 
-// 프로젝트 사진 한 장 압축 후 허용 최대 바이트
+// 프로젝트 사진 한 장
+const MULTI_TARGET_BYTES = 400 * 1024; // 400KB
 const MULTI_HARD_MAX_BYTES = 1.5 * 1024 * 1024; // 1.5MB
 
 export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
@@ -125,7 +128,7 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
           const dataUrl = await fileToCompressedDataUrl(f, {
             maxDim: 1280,
             quality: 0.8,
-            maxBytes: MULTI_HARD_MAX_BYTES,
+            maxBytes: MULTI_TARGET_BYTES,
           });
           if (!dataUrl) {
             skippedFormat++;

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, ProjectStatus } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
+import { coverPhotoUrl } from '@/lib/photo';
 import PageHeader from '@/components/PageHeader';
 import { Plus, Search, Image as ImageIcon } from 'lucide-react';
 
@@ -87,7 +88,7 @@ export default function Projects() {
       ) : (
         <ul className="space-y-2.5">
           {filtered.map(p => {
-            const cover = p.photos?.[0];
+            const cover = coverPhotoUrl(p.photos);
             const meta = [p.size && `사이즈 ${p.size}`, p.gauge && `게이지 ${p.gauge}`].filter(Boolean).join(' · ');
             return (
               <li key={p.id}>

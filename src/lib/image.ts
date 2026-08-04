@@ -19,11 +19,11 @@
 export type CompressOptions = {
   /** 가로/세로 중 긴 쪽 픽셀 상한. 기본 1280. */
   maxDim?: number;
-  /** JPEG quality (0~1). 기본 0.8. */
+  /** 인코딩 quality (0~1). 기본 0.8. */
   quality?: number;
   /**
    * 결과 dataURL 의 최대 byte 크기. 초과 시 quality/maxDim 을 단계적으로
-   * 낮춰 재시도. 기본 1.5MB.
+   * 낮춰 재시도. 기본 800KB.
    */
   maxBytes?: number;
 };
@@ -31,8 +31,28 @@ export type CompressOptions = {
 const DEFAULTS: Required<Omit<CompressOptions, 'maxBytes'>> & { maxBytes: number } = {
   maxDim: 1280,
   quality: 0.8,
-  maxBytes: 1.5 * 1024 * 1024,
+  maxBytes: 800 * 1024,
 };
+
+/**
+ * WebP 인코딩 지원 여부 (1회 검사 후 캐시).
+ * WebP 는 같은 체감 화질에서 JPEG 대비 30~40% 작고 투명도도 보존한다.
+ * 안드로이드 WebView / 최신 브라우저 모두 지원하며, 미지원 환경에서는
+ * 기존처럼 JPEG(또는 PNG) 로 떨어진다.
+ */
+let webpSupport: boolean | null = null;
+export function supportsWebP(): boolean {
+  if (webpSupport !== null) return webpSupport;
+  try {
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = 1;
+    webpSupport = c.toDataURL('image/webp').startsWith('data:image/webp');
+  } catch {
+    webpSupport = false;
+  }
+  return webpSupport;
+}
 
 export async function fileToCompressedDataUrl(
   file: File,
@@ -40,6 +60,11 @@ export async function fileToCompressedDataUrl(
 ): Promise<string> {
   const { maxDim, quality, maxBytes } = { ...DEFAULTS, ...opts };
   const isPng = file.type === 'image/png';
+  // WebP 를 쓸 수 있으면 원본 형식과 무관하게 WebP 로 인코딩.
+  // 불가능하면 PNG 는 PNG 로(투명도 보존), 나머지는 JPEG 으로.
+  const mime: string = supportsWebP() ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
+  // PNG 만 quality 가 무시되는 무손실 경로 — 단계적 재압축이 무의미하다.
+  const lossless = mime === 'image/png';
 
   // 원본 dataUrl 은 fallback 용으로만 보관 (압축 경로 실패 시)
   let originalDataUrl: string | undefined;
@@ -60,13 +85,13 @@ export async function fileToCompressedDataUrl(
   }
 
   // 1차 시도
-  let result = drawAndEncode(bitmap, maxDim, quality, isPng);
+  let result = drawAndEncode(bitmap, maxDim, quality, mime);
   if (result === null) {
     return originalDataUrl;
   }
 
-  // PNG 는 quality 무시되므로 progressive 가 무의미 → 그대로 반환
-  if (isPng) {
+  // 무손실(PNG) 경로는 quality 가 무시되므로 progressive 가 무의미 → 그대로 반환
+  if (lossless) {
     closeBitmapIfNeeded(bitmap);
     return result;
   }
@@ -81,7 +106,7 @@ export async function fileToCompressedDataUrl(
   ];
   for (const step of steps) {
     if (result === null || estimateDataUrlBytes(result) <= maxBytes) break;
-    const next = drawAndEncode(bitmap, step.dim, step.q, false);
+    const next = drawAndEncode(bitmap, step.dim, step.q, mime);
     if (next === null) break;
     result = next;
   }
@@ -98,7 +123,7 @@ function drawAndEncode(
   source: ImageBitmap | HTMLImageElement,
   maxDim: number,
   quality: number,
-  isPng: boolean,
+  mime: string,
 ): string | null {
   try {
     const sw = (source as ImageBitmap).width || (source as HTMLImageElement).naturalWidth;
@@ -110,7 +135,13 @@ function drawAndEncode(
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(source as CanvasImageSource, 0, 0, width, height);
-    return canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', quality);
+    const out = canvas.toDataURL(mime, quality);
+    // 브라우저가 요청한 mime 을 지원하지 않으면 PNG 로 떨어진다 —
+    // 그 경우 JPEG 으로 한 번 더 시도해 용량 폭증을 막는다.
+    if (mime !== 'image/png' && !out.startsWith(`data:${mime}`)) {
+      return canvas.toDataURL('image/jpeg', quality);
+    }
+    return out;
   } catch {
     return null;
   }

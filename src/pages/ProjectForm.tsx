@@ -332,8 +332,8 @@ export default function ProjectForm() {
           onChange={(urls) => setPhotos(reconcilePhotos(photos, urls))}
         />
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          ※ 사진은 현재 이 기기에만 저장됩니다. 무료 백업에는 사진이 포함되지 않아요.
-          (사진 클라우드 백업은 추후 프리미엄 기능으로 제공 예정)
+          ※ 사진은 현재 이 기기에만 저장됩니다. 클라우드 백업에는 사진이 포함되지 않아요.
+          기기를 바꾸기 전에는 설정 → 백업에서 <strong>JSON 내보내기</strong>를 해두세요 — 여기엔 사진도 함께 저장됩니다.
         </p>
       </Field>
 

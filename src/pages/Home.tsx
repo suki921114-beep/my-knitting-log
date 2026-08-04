@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllYarnStats, statusLabel, statusColor } from '@/lib/yarnCalc';
+import { coverPhotoUrl } from '@/lib/photo';
 import {
   Plus,
   Scroll,
@@ -112,7 +113,7 @@ export default function Home() {
         ) : (
           <div className="space-y-2">
             {inProgress.slice(0, 3).map(p => {
-              const cover = (p.photos as any)?.[0]?.dataUrl;
+              const cover = coverPhotoUrl(p.photos);
               const counter = counterByProject.get(p.id!);
               const pct = counter?.goal && counter.goal > 0
                 ? Math.min(100, Math.round((counter.count / counter.goal) * 100))
