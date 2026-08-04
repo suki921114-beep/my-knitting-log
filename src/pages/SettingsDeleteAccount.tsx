@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { deleteAccount, reauthenticate, ReauthRequiredError } from '@/lib/deleteAccount';
-import { AlertTriangle, Loader2, UserX, Download } from 'lucide-react';
+import { AlertTriangle, Loader2, UserX, Download, CheckCircle2, ExternalLink } from 'lucide-react';
 import { OPERATOR_EMAIL } from '@/lib/legalPlaceholders';
 
 /**
@@ -21,6 +21,7 @@ export default function SettingsDeleteAccount() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
+  const [done, setDone] = useState(false);
 
   const CONFIRM_WORD = '삭제';
   const canProceed = !!user && typed.trim() === CONFIRM_WORD && !busy;
@@ -32,8 +33,7 @@ export default function SettingsDeleteAccount() {
         alsoClearLocal,
         onProgress: setProgress,
       });
-      toast.success('계정과 데이터를 삭제했어요');
-      nav('/', { replace: true });
+      setDone(true);
     } catch (e: any) {
       if (e instanceof ReauthRequiredError && !afterReauth) {
         // 보안상 최근 로그인을 요구하는 경우 — 한 번 더 인증받고 재시도
@@ -58,6 +58,51 @@ export default function SettingsDeleteAccount() {
       setBusy(false);
       setProgress('');
     }
+  }
+
+  // 삭제 완료 — 재로그인 시 동의 화면 없이 통과하는 이유를 함께 안내한다.
+  // (Firebase 계정 삭제와 Google 계정의 앱 사용 허가는 별개)
+  if (done) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="삭제 완료" />
+        <div className="card-soft space-y-3 p-6 text-center">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+            <CheckCircle2 className="h-6 w-6" />
+          </span>
+          <p className="text-[14px] font-semibold text-foreground">계정과 데이터를 삭제했어요</p>
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            그동안 이용해 주셔서 고맙습니다.
+          </p>
+        </div>
+
+        <div className="card-soft space-y-2 p-4">
+          <p className="text-[12.5px] font-semibold text-foreground">Google 계정 연결도 끊으시려면</p>
+          <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+            이 앱의 계정은 삭제됐지만, Google 계정에는 "이 앱에 로그인 허용" 기록이 남아 있어요.
+            그래서 다시 로그인하면 동의 화면 없이 <strong className="text-foreground">완전히 새로운 계정</strong>이
+            만들어집니다. 이 허가까지 없애려면 아래에서 직접 해제해 주세요.
+          </p>
+          <a
+            href="https://myaccount.google.com/permissions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[12px] text-primary underline underline-offset-2"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Google 계정 액세스 권한 관리
+          </a>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => nav('/', { replace: true })}
+          className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
+        >
+          홈으로
+        </button>
+      </div>
+    );
   }
 
   if (!user) {

@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   FileText,
   Bug,
-  UserX,
 } from 'lucide-react';
 
 export default function Settings() {
@@ -80,19 +79,6 @@ export default function Settings() {
                 <LogOut className="h-4 w-4" />
               </span>
               <div className="text-[13.5px] font-semibold text-foreground text-left flex-1">로그아웃</div>
-            </button>
-            <button
-              onClick={() => navigate('/settings/delete-account')}
-              className="flex w-full items-center gap-3 border-t border-border/60 p-4 transition-colors active:bg-destructive/10 hover:bg-destructive/5"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                <UserX className="h-4 w-4" />
-              </span>
-              <div className="flex-1 text-left">
-                <div className="text-[13.5px] font-semibold text-destructive">계정 삭제 (탈퇴)</div>
-                <div className="text-[11px] text-destructive/70">계정과 클라우드 데이터를 영구 삭제</div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-destructive/50" />
             </button>
           </div>
         ) : (
@@ -183,6 +169,19 @@ export default function Settings() {
         onClick={() => navigate('/settings/bug-report')}
       />
     </Section>
+
+      {/* 계정 삭제 — 파괴적 동작이라 눈에 띄지 않게 맨 아래 작은 링크로 둔다 */}
+      {user && (
+        <div className="pt-2 text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/settings/delete-account')}
+            className="text-[11.5px] text-muted-foreground/70 underline underline-offset-4 hover:text-muted-foreground"
+          >
+            계정 삭제
+          </button>
+        </div>
+      )}
     </div>
   );
 }
