@@ -33,6 +33,19 @@ service cloud.firestore {
       }
     }
 
+    // 버그 신고 — 로그인한 사용자가 '보내기' 를 눌렀을 때만 생성된다.
+    //   create: 본인 uid 로만, 최소한의 형식 검증
+    //   read/update/delete: 전부 금지 (다른 사람 신고를 볼 수 없다)
+    //   → 운영자는 Firebase 콘솔에서 확인한다
+    match /bugReports/{reportId} {
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.description is string
+                    && request.resource.data.description.size() > 0
+                    && request.resource.data.description.size() < 5000;
+      allow read, update, delete: if false;
+    }
+
     // 위에서 명시적으로 허용하지 않은 모든 경로는 거부.
     // (테스트 모드의 `allow read, write: if true` 가 남아 있지 않도록
     //  이 규칙 세트를 통째로 덮어쓰는 것이 중요하다.)

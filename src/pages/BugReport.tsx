@@ -5,7 +5,9 @@ import { OPERATOR_EMAIL } from '@/lib/legalPlaceholders';
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/components/ui/sonner';
 import { useConfirm } from '@/hooks/useConfirm';
-import { Copy, Mail, Trash2, Bug } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { submitBugReport } from '@/lib/bugReport';
+import { Copy, Mail, Trash2, Bug, Send, Loader2, CheckCircle2 } from 'lucide-react';
 
 /** mailto 는 길면 잘리거나 열리지 않는 클라이언트가 있어 본문을 줄인다 */
 const MAILTO_BODY_LIMIT = 1500;
@@ -15,6 +17,9 @@ export default function BugReport() {
   const [logs, setLogs] = useState(() => getErrorLogs());
   const [copied, setCopied] = useState(false);
   const { confirm, dialog } = useConfirm();
+  const { user } = useAuth();
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const env = collectEnvInfo();
 
@@ -64,6 +69,28 @@ export default function BugReport() {
       toast.error('복사하지 못했어요', {
         description: '아래 로그를 길게 눌러 직접 복사해 주세요.',
       });
+    }
+  }
+
+  /** 앱에서 바로 전송 — 로그인 사용자만 */
+  async function handleSubmit() {
+    if (sending) return;
+    setSending(true);
+    const res = await submitBugReport(description);
+    setSending(false);
+
+    if (res.ok) {
+      setSent(true);
+      setDescription('');
+      toast.success('신고를 보냈어요', { description: '확인하고 고치겠습니다. 고맙습니다!' });
+      return;
+    }
+    if (res.reason === 'empty') {
+      toast.error('어떤 문제가 있었는지 적어 주세요');
+    } else if (res.reason === 'offline') {
+      toast.error('오프라인 상태예요', { description: '인터넷 연결 후 다시 시도해 주세요.' });
+    } else {
+      toast.error('전송하지 못했어요', { description: '아래 메일 보내기를 이용해 주세요.' });
     }
   }
 
@@ -127,7 +154,7 @@ export default function BugReport() {
         </span>
         <p className="text-[12px] leading-relaxed text-muted-foreground">
           어떤 화면에서 무엇을 눌렀을 때 문제가 생겼는지 적어 주시면 원인을 찾는 데 큰 도움이 됩니다.
-          개인정보나 비밀번호는 적지 마세요.
+          보내기를 누르면 아래 정보가 함께 전송돼요. 개인정보나 비밀번호는 적지 마세요.
         </p>
       </div>
 
@@ -161,19 +188,46 @@ export default function BugReport() {
         </details>
       )}
 
+      {sent && (
+        <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 text-[12.5px] text-primary">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          신고가 접수되었어요. 확인하고 고치겠습니다.
+        </div>
+      )}
+
       <div className="space-y-2">
+        {user ? (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={sending || !description.trim()}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {sending ? '보내는 중…' : '신고 보내기'}
+          </button>
+        ) : (
+          <p className="rounded-xl bg-secondary/60 px-3.5 py-3 text-[11.5px] leading-relaxed text-muted-foreground">
+            로그인하면 앱에서 바로 신고를 보낼 수 있어요. 지금은 아래 메일 보내기를 이용해 주세요.
+          </p>
+        )}
+
         <button
           type="button"
           onClick={handleSendEmail}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+          className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold ${
+            user
+              ? 'border border-primary/40 bg-primary/5 text-primary'
+              : 'bg-primary text-primary-foreground'
+          }`}
         >
           <Mail className="h-4 w-4" />
-          메일로 신고 보내기
+          메일로 보내기
         </button>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex w-full items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary"
+          className="flex w-full items-center justify-center gap-2 rounded-full border px-4 py-3 text-sm text-muted-foreground"
         >
           <Copy className="h-4 w-4" />
           신고 내용 복사

@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# 안드로이드 서명 키 — 절대 커밋 금지.
+# 유출되면 남이 내 앱인 척 서명할 수 있고, 잃어버리면 앱을 영원히 업데이트할 수 없다.
+*.jks
+*.keystore
+keystore.properties
+android/key.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
