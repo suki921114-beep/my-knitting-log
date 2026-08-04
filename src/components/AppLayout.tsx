@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, BookHeart, Notebook, Package, Settings } from 'lucide-react';
 import { useAutoSync } from '@/hooks/useAutoSync';
+import { useAndroidBackButton } from '@/hooks/useAndroidBackButton';
 import OfflineBanner from '@/components/OfflineBanner';
 
 const tabs = [
@@ -14,6 +15,8 @@ const tabs = [
 export default function AppLayout() {
   // 로그인 + 모드/네트워크 조건 충족 시 앱 진입 직후 한 번 자동 백업
   useAutoSync();
+  // 안드로이드 하드웨어 뒤로가기 — 기본값은 앱 종료라 직접 처리한다
+  useAndroidBackButton();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
