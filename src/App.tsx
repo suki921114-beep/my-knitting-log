@@ -7,6 +7,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "./components/AppLayout";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import Projects from "./pages/Projects";
 import ProjectForm from "./pages/ProjectForm";
@@ -43,6 +44,7 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
         <ScrollToTop />
+        <ErrorBoundary>
           <Routes>
             <Route path="/tools/ai-log" element={<AiLog />} />
             
@@ -80,6 +82,7 @@ const App = () => (
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>

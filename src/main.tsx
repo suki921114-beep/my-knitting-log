@@ -1,10 +1,14 @@
 import { setupGlobalErrorLogging } from "@/lib/errorLog";
+import { startTrashAutoPurge } from "@/lib/autoPurge";
 
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
 setupGlobalErrorLogging();
+
+// 휴지통 자동 영구삭제 (삭제 후 7일 경과 항목)
+startTrashAutoPurge();
 
 createRoot(document.getElementById("root")!).render(<App />);
 

@@ -104,6 +104,13 @@ export default function ProjectForm() {
     }
   }, [editing, existing, hydrated]);
 
+  // 삭제된 프로젝트의 수정 화면으로 (뒤로가기 등으로) 진입하면 목록으로 되돌린다
+  useEffect(() => {
+    if (editing && existing?.isDeleted) {
+      nav('/projects', { replace: true });
+    }
+  }, [editing, existing, nav]);
+
   useEffect(() => {
     if (!editing || linksHydrated) return;
     if (!existingYarnLinks || !existingPatternLinks || !existingNeedleLinks || !existingNotionLinks) return;
@@ -230,7 +237,7 @@ export default function ProjectForm() {
     t
   );
 
-  nav(`/projects/${pid}`);
+  nav(`/projects/${pid}`, { replace: true });
 }
 
   async function remove() {
@@ -245,7 +252,7 @@ export default function ProjectForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/projects');
+    nav('/projects', { replace: true });
     toast.success('프로젝트를 삭제했어요', {
       duration: 8000,
       action: {
@@ -298,11 +305,11 @@ export default function ProjectForm() {
         <Field label="게이지"><input className={inputCls} value={gauge} onChange={e => setGauge(e.target.value)} placeholder="22코 28단/10cm" /></Field>
       </div>
 
-      <Field label="도안">
+      <Field label="도안" as="div">
         <EntityPicker kind="pattern" links={patternLinks} onChange={setPatternLinks} />
       </Field>
 
-      <Field label={status === 'planned' ? '사용할 실 (예상)' : '사용한 실'}>
+      <Field label={status === 'planned' ? '사용할 실 (예상)' : '사용한 실'} as="div">
         <YarnPicker
           links={yarnLinks}
           onChange={setYarnLinks}
@@ -311,15 +318,15 @@ export default function ProjectForm() {
         />
       </Field>
 
-      <Field label="바늘">
+      <Field label="바늘" as="div">
         <EntityPicker kind="needle" links={needleLinks} onChange={setNeedleLinks} />
       </Field>
 
-      <Field label="부자재">
+      <Field label="부자재" as="div">
         <EntityPicker kind="notion" links={notionLinks} onChange={setNotionLinks} />
       </Field>
 
-      <Field label="사진">
+      <Field label="사진" as="div">
         <MultiImageInput
           values={photoUrls}
           onChange={(urls) => setPhotos(reconcilePhotos(photos, urls))}
@@ -400,11 +407,25 @@ async function syncLinks<L extends { id?: number }, E extends { id?: number }>(
 
 const inputCls = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * as="div" 는 내부에 버튼/모달 등 인터랙티브 요소가 들어가는 경우에 사용한다.
+ * <label> 안에 버튼이 중첩되면 클릭이 라벨의 기본 동작으로 전파되어
+ * 엉뚱한 컨트롤이 눌리는 문제가 생긴다.
+ */
+function Field({
+  label,
+  children,
+  as = 'label',
+}: {
+  label: string;
+  children: React.ReactNode;
+  as?: 'label' | 'div';
+}) {
+  const Tag = as as any;
   return (
-    <label className="block">
+    <Tag className="block">
       <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
-    </label>
+    </Tag>
   );
 }

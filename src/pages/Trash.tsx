@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { purgeExpiredTrash, trashDaysLeft, TRASH_RETENTION_DAYS } from '@/lib/autoPurge';
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/components/ui/sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -17,6 +18,11 @@ import { RotateCcw, Trash2, Inbox } from 'lucide-react';
 type TableName = 'yarns' | 'patterns' | 'needles' | 'notions' | 'projects' | 'rowCounters' | 'projectGauges';
 
 export default function Trash() {
+  // 휴지통을 열 때마다 보관 기간이 지난 항목을 먼저 정리한다
+  useEffect(() => {
+    purgeExpiredTrash().catch(e => console.error('[Trash] 자동 영구삭제 실패:', e));
+  }, []);
+
   const yarns = useLiveQuery(() => db.yarns.filter(y => y.isDeleted === true).toArray(), []) || [];
   const patterns = useLiveQuery(() => db.patterns.filter(p => p.isDeleted === true).toArray(), []) || [];
   const needles = useLiveQuery(() => db.needles.filter(n => n.isDeleted === true).toArray(), []) || [];
@@ -77,6 +83,13 @@ export default function Trash() {
   return (
     <div className="space-y-5">
       <PageHeader title="휴지통" back subtitle={total > 0 ? `${total}개 항목` : '비어있음'} />
+
+      {total > 0 && (
+        <div className="rounded-xl border border-warm/40 bg-warm/10 px-3 py-2.5 text-[11.5px] leading-relaxed text-ink">
+          삭제 후 <strong>{TRASH_RETENTION_DAYS}일</strong>이 지나면 이 기기에서 자동으로 영구 삭제됩니다.
+          되살리려면 그 전에 복원해 주세요.
+        </div>
+      )}
 
       {total === 0 ? (
         <div className="card-soft flex flex-col items-center gap-3 p-10 text-center">
@@ -165,6 +178,7 @@ export default function Trash() {
       )}
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+        ※ <strong>자동 정리</strong>: 삭제 후 {TRASH_RETENTION_DAYS}일이 지난 항목은 이 기기에서 자동으로 영구 삭제됩니다.<br />
         ※ <strong>복원</strong>: 다음 자동 백업으로 다른 기기에도 다시 보입니다.<br />
         ※ <strong>영구 삭제</strong>: 이 기기에서 완전히 지웁니다. 클라우드의 삭제 기록은 그대로 남아 다른 기기에서도 부활하지 않아요.
       </p>
@@ -214,6 +228,7 @@ function Section<T extends { id?: number; deletedAt?: number | null }>({
                 month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit',
               })
             : '';
+          const left = trashDaysLeft(it.deletedAt);
           return (
             <li key={it.id} className="card-soft p-3">
               <div className="flex items-start justify-between gap-2">
@@ -221,6 +236,15 @@ function Section<T extends { id?: number; deletedAt?: number | null }>({
                   <div className="truncate text-[13.5px] font-semibold text-foreground">{name}</div>
                   {meta && <div className="truncate text-[11.5px] text-muted-foreground">{meta}</div>}
                   {at && <div className="mt-0.5 text-[10.5px] text-muted-foreground tabular-nums">삭제: {at}</div>}
+                  {left !== null && (
+                    <div
+                      className={`mt-0.5 text-[10.5px] tabular-nums ${
+                        left <= 1 ? 'font-semibold text-destructive' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {left === 0 ? '오늘 자동 영구삭제' : `${left}일 후 자동 영구삭제`}
+                    </div>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                   <button

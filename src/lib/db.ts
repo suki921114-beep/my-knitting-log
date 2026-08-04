@@ -71,8 +71,14 @@ export interface Yarn extends SyncMetadata {
   colorName?: string;
   colorCode?: string;
   shop?: string;
+  /** 구매 링크 (쇼핑몰 상품 페이지 등) */
+  link?: string;
   fiber?: string;
   weight?: string;
+  /** 권장 바늘 호수 (예: "4.0mm", "5호") */
+  needleSize?: string;
+  /** 권장 게이지 (예: "22코 30단 / 10cm") */
+  gauge?: string;
   totalGrams: number;
   note?: string;
   photoDataUrl?: string;

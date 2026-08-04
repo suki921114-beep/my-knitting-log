@@ -24,6 +24,13 @@ export default function NeedleForm() {
     }
   }, [editing, existing, hyd]);
 
+  // 삭제된 항목의 수정 화면으로 (뒤로가기 등으로) 진입하면 목록으로 되돌린다
+  useEffect(() => {
+    if (editing && existing?.isDeleted) {
+      nav('/library/needles', { replace: true });
+    }
+  }, [editing, existing, nav]);
+
   async function save() {
     const t = now();
     
@@ -44,7 +51,7 @@ export default function NeedleForm() {
         cloudId: crypto.randomUUID()
       });
     }
-    nav('/library/needles');
+    nav('/library/needles', { replace: true });
   }
   async function remove() {
     if (!nid || !confirm('이 바늘을 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
@@ -54,7 +61,7 @@ export default function NeedleForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/needles');
+    nav('/library/needles', { replace: true });
     toast.success('바늘을 삭제했어요', {
       duration: 8000,
       action: {

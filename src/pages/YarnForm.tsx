@@ -15,7 +15,8 @@ export default function YarnForm() {
   const existing = useLiveQuery(() => (yid ? db.yarns.get(yid) : undefined), [yid]);
 
   const [f, setF] = useState({
-    name: '', brand: '', colorName: '', colorCode: '', shop: '', fiber: '', weight: '', totalGrams: 0, note: '',
+    name: '', brand: '', colorName: '', colorCode: '', shop: '', link: '', fiber: '', weight: '',
+    needleSize: '', gauge: '', totalGrams: 0, note: '',
   });
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
@@ -24,13 +25,22 @@ export default function YarnForm() {
     if (editing && existing && !hyd) {
       setF({
         name: existing.name, brand: existing.brand || '', colorName: existing.colorName || '',
-        colorCode: existing.colorCode || '', shop: existing.shop || '', fiber: existing.fiber || '',
-        weight: existing.weight || '', totalGrams: existing.totalGrams, note: existing.note || '',
+        colorCode: existing.colorCode || '', shop: existing.shop || '', link: existing.link || '',
+        fiber: existing.fiber || '',
+        weight: existing.weight || '', needleSize: existing.needleSize || '', gauge: existing.gauge || '',
+        totalGrams: existing.totalGrams, note: existing.note || '',
       });
       setPhoto(existing.photoDataUrl);
       setHyd(true);
     }
   }, [editing, existing, hyd]);
+
+  // 삭제된 항목의 수정 화면으로 (뒤로가기 등으로) 진입하면 목록으로 되돌린다
+  useEffect(() => {
+    if (editing && existing?.isDeleted) {
+      nav('/library/yarns', { replace: true });
+    }
+  }, [editing, existing, nav]);
 
   async function save() {
     if (!f.name.trim()) return alert('실 이름을 입력해 주세요.');
@@ -48,7 +58,7 @@ export default function YarnForm() {
     if (editing && yid) {
       // 수정 시 기존 createdAt, cloudId는 그대로 유지됨 (update 동작)
       await db.yarns.update(yid, payload);
-      nav(`/library/yarns/${yid}`);
+      nav(`/library/yarns/${yid}`, { replace: true });
     } else {
       // 신규 생성 시 누락된 필수 필드 전부 주입
       const id = (await db.yarns.add({ 
@@ -56,7 +66,7 @@ export default function YarnForm() {
         createdAt: t,
         cloudId: crypto.randomUUID()
       })) as number;
-      nav(`/library/yarns/${id}`);
+      nav(`/library/yarns/${id}`, { replace: true });
     }
   }
 
@@ -71,7 +81,7 @@ export default function YarnForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/yarns');
+    nav('/library/yarns', { replace: true });
     toast.success('실을 삭제했어요', {
       duration: 8000,
       action: {
@@ -106,10 +116,33 @@ export default function YarnForm() {
         <Field label="컬러명"><input className={inp} value={f.colorName} onChange={u('colorName')} /></Field>
         <Field label="컬러번호"><input className={inp} value={f.colorCode} onChange={u('colorCode')} /></Field>
       </div>
+      <Field label="구매 링크">
+        <input
+          className={inp}
+          type="url"
+          inputMode="url"
+          value={f.link}
+          onChange={u('link')}
+          placeholder="https://…"
+        />
+      </Field>
+
       <div className="grid grid-cols-2 gap-3">
         <Field label="성분"><input className={inp} value={f.fiber} onChange={u('fiber')} placeholder="울 100%" /></Field>
         <Field label="굵기"><input className={inp} value={f.weight} onChange={u('weight')} placeholder="fingering" /></Field>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="권장 바늘 호수">
+          <input className={inp} value={f.needleSize} onChange={u('needleSize')} placeholder="4.0mm / 5호" />
+        </Field>
+        <Field label="권장 게이지">
+          <input className={inp} value={f.gauge} onChange={u('gauge')} placeholder="22코 30단 / 10cm" />
+        </Field>
+      </div>
+      <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        ※ 라벨(볼밴드)에 적힌 권장 바늘 호수와 게이지를 적어두면 나중에 도안 매칭이 쉬워요.
+      </p>
+
       <Field label="총 보유량 (g)">
         <input type="number" inputMode="decimal" className={inp} value={f.totalGrams} onChange={u('totalGrams')} />
       </Field>

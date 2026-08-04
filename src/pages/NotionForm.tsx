@@ -25,6 +25,13 @@ export default function NotionForm() {
     }
   }, [editing, existing, hyd]);
 
+  // 삭제된 항목의 수정 화면으로 (뒤로가기 등으로) 진입하면 목록으로 되돌린다
+  useEffect(() => {
+    if (editing && existing?.isDeleted) {
+      nav('/library/notions', { replace: true });
+    }
+  }, [editing, existing, nav]);
+
   async function save() {
     if (!f.name.trim()) return alert('품목명을 입력해 주세요.');
     const t = now();
@@ -47,7 +54,7 @@ export default function NotionForm() {
         cloudId: crypto.randomUUID()
       });
     }
-    nav('/library/notions');
+    nav('/library/notions', { replace: true });
   }
   async function remove() {
     if (!nid || !confirm('이 부자재를 삭제할까요? 프로젝트에 연결된 사용 기록은 그대로 남아요.')) return;
@@ -57,7 +64,7 @@ export default function NotionForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/notions');
+    nav('/library/notions', { replace: true });
     toast.success('부자재를 삭제했어요', {
       duration: 8000,
       action: {

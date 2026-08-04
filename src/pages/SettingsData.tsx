@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { purgeExpiredTrash, TRASH_RETENTION_DAYS } from '@/lib/autoPurge';
 import PageHeader from '@/components/PageHeader';
 import { db, clearAll } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -11,6 +12,11 @@ export default function SettingsData() {
   const navigate = useNavigate();
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
   const [clearing, setClearing] = useState(false);
+
+  // 데이터 관리 화면 진입 시 보관 기간이 지난 휴지통 항목을 정리
+  useEffect(() => {
+    purgeExpiredTrash().catch(e => console.error('[SettingsData] 자동 영구삭제 실패:', e));
+  }, []);
 
   // 7개 entity 합산 카운트
   const trashCount = useLiveQuery(async () => {
@@ -87,7 +93,9 @@ export default function SettingsData() {
           </span>
           <div className="min-w-0 flex-1 text-left">
             <div className="text-[13.5px] font-semibold text-foreground">삭제된 항목</div>
-            <div className="text-[11.5px] text-muted-foreground">복원하거나 영구 삭제할 수 있어요</div>
+            <div className="text-[11.5px] text-muted-foreground">
+              {TRASH_RETENTION_DAYS}일 뒤 자동 영구삭제 · 그 전에 복원할 수 있어요
+            </div>
           </div>
           {trashCount > 0 && (
             <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 tabular-nums">

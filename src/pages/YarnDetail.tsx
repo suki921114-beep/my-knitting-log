@@ -3,7 +3,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useYarnRemaining } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
-import { Pencil } from 'lucide-react';
+import { Pencil, ExternalLink } from 'lucide-react';
+
+/** 스킴이 없으면 https:// 를 붙여 준다 (예: "shop.com/x" → "https://shop.com/x") */
+function normalizeUrl(raw: string): string {
+  const s = raw.trim();
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+}
 
 export default function YarnDetail() {
   const { id } = useParams();
@@ -60,12 +66,39 @@ export default function YarnDetail() {
         </div>
       </div>
 
-      {(yarn.fiber || yarn.weight || yarn.shop) && (
-        <div className="card-soft p-4 text-sm">
+      {(yarn.fiber || yarn.weight || yarn.shop || yarn.link) && (
+        <div className="card-soft space-y-0.5 p-4 text-sm">
           {yarn.fiber && <div><span className="text-muted-foreground">성분 </span>{yarn.fiber}</div>}
           {yarn.weight && <div><span className="text-muted-foreground">굵기 </span>{yarn.weight}</div>}
           {yarn.shop && <div><span className="text-muted-foreground">구매처 </span>{yarn.shop}</div>}
+          {yarn.link && (
+            <a
+              href={normalizeUrl(yarn.link)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-flex max-w-full items-center gap-1 text-primary underline underline-offset-2"
+            >
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">구매 링크 열기</span>
+            </a>
+          )}
         </div>
+      )}
+
+      {(yarn.needleSize || yarn.gauge) && (
+        <section className="space-y-2">
+          <h2 className="section-title">권장 사양</h2>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="card-soft p-3.5">
+              <div className="text-[11px] font-medium text-muted-foreground">권장 바늘 호수</div>
+              <div className="mt-1 text-sm font-semibold text-ink">{yarn.needleSize || '—'}</div>
+            </div>
+            <div className="card-soft p-3.5">
+              <div className="text-[11px] font-medium text-muted-foreground">권장 게이지</div>
+              <div className="mt-1 text-sm font-semibold text-ink">{yarn.gauge || '—'}</div>
+            </div>
+          </div>
+        </section>
       )}
 
       <section className="space-y-2">

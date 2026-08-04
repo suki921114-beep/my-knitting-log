@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, Yarn } from '@/lib/db';
 import { Plus, X, Search, Check, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -77,7 +78,12 @@ export default function YarnPicker({ links, onChange, showPlanned, currentProjec
                   {y?.brand} {y?.colorName && `· ${y.colorName}`} {y?.colorCode && `(${y.colorCode})`}
                 </div>
               </div>
-              <button onClick={() => remove(i)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="rounded-full p-1 text-muted-foreground hover:bg-secondary"
+                aria-label="제거"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -173,6 +179,20 @@ function YarnPickerModal({
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
 
+  // ESC 닫기 + 배경 스크롤 잠금
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return yarns;
@@ -187,17 +207,22 @@ function YarnPickerModal({
     return yarns.filter(y => y.name.toLowerCase().includes(s) || (y.brand || '').toLowerCase().includes(s)).slice(0, 3);
   }, [q, yarns]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+  const body = (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-card p-4 sm:rounded-3xl"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-4 sm:rounded-3xl"
         onClick={e => e.stopPropagation()}
       >
         {!creating ? (
           <>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-serif text-lg font-semibold">실 선택</h3>
-              <button onClick={onClose} className="rounded-full p-1 text-muted-foreground"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground" aria-label="닫기"><X className="h-5 w-5" /></button>
             </div>
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -210,11 +235,18 @@ function YarnPickerModal({
               />
             </div>
             <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
-              {filtered.length === 0 && (
-                <p className="px-2 py-4 text-center text-sm text-muted-foreground">검색 결과가 없어요.</p>
+              {yarns.length === 0 ? (
+                <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                  아직 등록된 실이 없어요. 아래에서 바로 추가할 수 있어요.
+                </p>
+              ) : (
+                filtered.length === 0 && (
+                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">검색 결과가 없어요.</p>
+                )
               )}
               {filtered.map(y => (
                 <button
+                  type="button"
                   key={y.id}
                   onClick={() => onPick(y)}
                   className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-secondary"
@@ -230,6 +262,7 @@ function YarnPickerModal({
               ))}
             </div>
             <button
+              type="button"
               onClick={() => setCreating(true)}
               className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 py-2.5 text-sm font-medium text-primary"
             >
@@ -247,6 +280,8 @@ function YarnPickerModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(body, document.body) : body;
 }
 
 function QuickAddYarn({
@@ -264,32 +299,56 @@ function QuickAddYarn({
   const [brand, setBrand] = useState('');
   const [colorName, setColorName] = useState('');
   const [colorCode, setColorCode] = useState('');
+  const [link, setLink] = useState('');
+  const [needleSize, setNeedleSize] = useState('');
+  const [gauge, setGauge] = useState('');
   const [totalGrams, setTotalGrams] = useState<number | ''>('');
   const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canSave = name.trim().length > 0;
 
   async function save() {
-    if (!name.trim()) return;
-    const t = now();
-    const id = (await db.yarns.add({
-      name: name.trim(),
-      brand: brand || undefined,
-      colorName: colorName || undefined,
-      colorCode: colorCode || undefined,
-      totalGrams: Number(totalGrams) || 0,
-      note: note || undefined,
-      createdAt: t,
-      updatedAt: t,
-      cloudId: crypto.randomUUID(),
-    })) as number;
-    const y = await db.yarns.get(id);
-    if (y) onCreated(y);
+    if (saving) return;
+    if (!canSave) {
+      setError('실 이름을 입력해 주세요.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const t = now();
+      const id = (await db.yarns.add({
+        name: name.trim(),
+        brand: brand.trim() || undefined,
+        colorName: colorName.trim() || undefined,
+        colorCode: colorCode.trim() || undefined,
+        link: link.trim() || undefined,
+        needleSize: needleSize.trim() || undefined,
+        gauge: gauge.trim() || undefined,
+        totalGrams: Number(totalGrams) || 0,
+        note: note.trim() || undefined,
+        createdAt: t,
+        updatedAt: t,
+        cloudId: crypto.randomUUID(),
+        isDeleted: false,
+        deletedAt: null,
+      })) as number;
+      const y = await db.yarns.get(id);
+      if (y) onCreated(y);
+    } catch (e) {
+      console.error('[YarnPicker] 빠른 추가 실패', e);
+      setError('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      setSaving(false);
+    }
   }
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-serif text-lg font-semibold">새 실 추가</h3>
-        <button onClick={onCancel} className="rounded-full p-1 text-muted-foreground"><X className="h-5 w-5" /></button>
+        <button type="button" onClick={onCancel} className="rounded-full p-1 text-muted-foreground" aria-label="뒤로"><X className="h-5 w-5" /></button>
       </div>
 
       {similar.length > 0 && (
@@ -298,6 +357,7 @@ function QuickAddYarn({
           <div className="space-y-1">
             {similar.map(s => (
               <button
+                type="button"
                 key={s.id}
                 onClick={() => onCreated(s)}
                 className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-card"
@@ -311,11 +371,23 @@ function QuickAddYarn({
       )}
 
       <div className="space-y-2.5">
-        <input className={qaInput} value={name} onChange={e => setName(e.target.value)} placeholder="실 이름 *" />
+        <input autoFocus className={qaInput} value={name} onChange={e => setName(e.target.value)} placeholder="실 이름 *" />
         <input className={qaInput} value={brand} onChange={e => setBrand(e.target.value)} placeholder="브랜드" />
         <div className="grid grid-cols-2 gap-2">
           <input className={qaInput} value={colorName} onChange={e => setColorName(e.target.value)} placeholder="컬러명" />
           <input className={qaInput} value={colorCode} onChange={e => setColorCode(e.target.value)} placeholder="컬러번호" />
+        </div>
+        <input
+          className={qaInput}
+          type="url"
+          inputMode="url"
+          value={link}
+          onChange={e => setLink(e.target.value)}
+          placeholder="구매 링크 (https://…)"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input className={qaInput} value={needleSize} onChange={e => setNeedleSize(e.target.value)} placeholder="권장 바늘 (4.0mm)" />
+          <input className={qaInput} value={gauge} onChange={e => setGauge(e.target.value)} placeholder="권장 게이지" />
         </div>
         <input
           className={qaInput}
@@ -327,8 +399,16 @@ function QuickAddYarn({
         />
         <textarea className={`${qaInput} min-h-[60px]`} value={note} onChange={e => setNote(e.target.value)} placeholder="간단 메모 (선택)" />
       </div>
-      <button onClick={save} className="mt-3 w-full rounded-full bg-primary py-2.5 text-sm font-medium text-primary-foreground">
-        저장하고 프로젝트에 연결
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+      <button
+        type="button"
+        onClick={save}
+        disabled={!canSave || saving}
+        className="mt-3 w-full rounded-full bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+      >
+        {saving ? '저장 중…' : '저장하고 프로젝트에 연결'}
       </button>
     </div>
   );
