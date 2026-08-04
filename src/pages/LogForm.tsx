@@ -47,7 +47,11 @@ export default function LogForm() {
     [],
   ) || [];
 
-  const [date, setDate] = useState(todayStr());
+  // 달력에서 특정 날짜를 고르고 왔으면 그 날짜로 시작
+  const [date, setDate] = useState(() => {
+    const q = params.get('date');
+    return q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : todayStr();
+  });
   const [text, setText] = useState('');
   const [rows, setRows] = useState<string>('');
   const [mood, setMood] = useState<string | undefined>(undefined);
