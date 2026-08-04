@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">App name:나의 뜨개 프로젝트 기록App ID:com.suki.knittinglog</string>
-    <string name="title_activity_main">App name:나의 뜨개 프로젝트 기록App ID:com.suki.knittinglog</string>
+    <string name="app_name">뜨개일기</string>
+    <string name="title_activity_main">뜨개일기</string>
     <string name="package_name">com.suki.knittinglog</string>
     <string name="custom_url_scheme">com.suki.knittinglog</string>
 </resources>

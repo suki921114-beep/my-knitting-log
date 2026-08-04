@@ -91,7 +91,7 @@ export default function BugReport() {
 
     const url =
       `mailto:${OPERATOR_EMAIL}` +
-      `?subject=${encodeURIComponent(`[뜨개앱 v${APP_VERSION}] 버그 신고`)}` +
+      `?subject=${encodeURIComponent(`[뜨개일기 v${APP_VERSION}] 버그 신고`)}` +
       `&body=${encodeURIComponent(summary)}`;
 
     // 메일 앱이 없으면 아무 일도 일어나지 않으므로 안내를 함께 띄운다

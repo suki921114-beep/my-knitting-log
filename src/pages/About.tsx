@@ -24,13 +24,13 @@ export default function About() {
 
       <article className="card-soft space-y-4 p-5 text-[13px] leading-[1.65] text-foreground">
         <header>
-          <h2 className="text-[16px] font-bold">나의 뜨개 프로젝트 기록</h2>
+          <h2 className="text-[16px] font-bold">뜨개일기</h2>
           <p className="mt-1 text-[12px] text-muted-foreground tabular-nums">버전 v{APP_VERSION}</p>
         </header>
 
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-          뜨개 프로젝트 / 실 / 도안 / 바늘 / 부자재 / 단수 카운터 / 게이지를 한 곳에서 기록하고,
-          로그인 시 여러 기기 간 클라우드와 양방향 동기화하는 뜨개 프로젝트와 재료, 진행 상황을 한 곳에서 기록하고 관리할 수 있는 앱입니다.
+          프로젝트 · 실 · 도안 · 바늘 · 부자재 · 단수 카운터 · 게이지를 한 곳에 기록하는 뜨개 일기장입니다.
+          로그인하면 여러 기기 사이에서 기록을 동기화할 수 있어요.
         </p>
 
         <section className="space-y-1.5">

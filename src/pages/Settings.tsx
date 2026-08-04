@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
+import AppInfoDialog from '@/components/AppInfoDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -11,9 +12,6 @@ import {
   LogIn,
   CloudDownload,
   Database,
-  Info,
-  ShieldCheck,
-  FileText,
   Bug,
 } from 'lucide-react';
 
@@ -134,32 +132,7 @@ export default function Settings() {
         />
       </Section>
 
-      {/* 4. 정책 및 정보 */}
-      <Section title="정책 및 정보">
-        <MenuCard
-          icon={ShieldCheck}
-          tone="soft"
-          title="개인정보처리방침"
-          desc="데이터 저장 위치, 보관 기간, 탈퇴 요청"
-          onClick={() => navigate('/privacy')}
-        />
-        <MenuCard
-          icon={FileText}
-          tone="muted"
-          title="이용약관"
-          desc="서비스 목적, 책임 한계, 변경 가능성"
-          onClick={() => navigate('/terms')}
-        />
-        <MenuCard
-          icon={Info}
-          tone="muted"
-          title="앱 정보"
-          desc="버전, 오픈소스 라이선스, 문의처"
-          onClick={() => navigate('/about')}
-        />
-      </Section>
-
-      {/* 5. 버그 신고 */}
+      {/* 4. 버그 신고 */}
     <Section title="버그 신고">
       <MenuCard
         icon={Bug}
@@ -169,6 +142,11 @@ export default function Settings() {
         onClick={() => navigate('/settings/bug-report')}
       />
     </Section>
+
+      {/* 앱 정보 — 방침/약관/오픈소스는 여기 안에 묶어 둔다 */}
+      <div className="border-t border-border/60 pt-2">
+        <AppInfoDialog />
+      </div>
 
       {/* 계정 삭제 — 파괴적 동작이라 눈에 띄지 않게 맨 아래 작은 링크로 둔다 */}
       {user && (

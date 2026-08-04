@@ -17,7 +17,7 @@ export default function Privacy() {
         </p>
 
         <Section title="1. 서비스명">
-          <p>나의 뜨개 프로젝트 기록 (이하 '본 서비스')</p>
+          <p>뜨개일기 (이하 '본 서비스')</p>
         </Section>
 
         <Section title="2. 처리하는 개인정보 항목">
