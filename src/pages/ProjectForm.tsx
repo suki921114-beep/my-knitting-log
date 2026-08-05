@@ -385,7 +385,8 @@ function Field({
 }) {
   const Tag = as as any;
   return (
-    <Tag className="block">
+    // min-w-0 — 두 칸짜리 격자 안에서 날짜칸이 내용만큼 벌어져 옆 칸을 밀어내는 것을 막는다
+    <Tag className="block min-w-0">
       <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </Tag>
