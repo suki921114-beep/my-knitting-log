@@ -29,11 +29,14 @@ const AuthContext = createContext<AuthContextType>({
 /** 로그인 오류에서 사람이 읽을 수 있는 원인을 뽑아낸다 */
 export function describeAuthError(error: unknown): string {
   const e = error as { code?: string | number; message?: string; errorMessage?: string } | null;
-  const code = e?.code ?? (e as any)?.errorCode;
   const msg = e?.message ?? e?.errorMessage ?? String(error);
 
+  // 안드로이드 GoogleSignIn 은 code 필드 없이 "10:" 처럼 상태 코드만 던질 때가 있다.
+  // 그러면 원인 안내를 못 붙이므로 메시지 앞머리에서도 코드를 뽑아 본다.
+  const code = e?.code ?? (e as any)?.errorCode ?? msg.match(/^\s*(\d{1,5})\s*:/)?.[1];
+
   const hints: Record<string, string> = {
-    "10": "DEVELOPER_ERROR — 이 앱 서명의 SHA-1 이 Firebase 에 등록되어 있지 않거나 google-services.json 이 오래되었습니다.",
+    "10": "DEVELOPER_ERROR — 지금 실행 중인 앱 서명의 SHA-1 이 Firebase 에 등록되어 있지 않거나, google-services.json 이 등록 이후에 다시 받아지지 않았습니다. Play 로 설치한 앱은 '업로드 키'가 아니라 Play 앱 서명 키의 SHA-1 을 등록해야 합니다.",
     "12500": "Play 서비스 설정 오류 — SHA-1 또는 OAuth 클라이언트 설정을 확인하세요.",
     "12501": "사용자가 로그인을 취소했습니다.",
     "7": "네트워크 오류입니다.",
