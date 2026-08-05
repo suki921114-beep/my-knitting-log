@@ -17,6 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
 import { useConfirm } from '@/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { toast } from '@/components/ui/sonner';
 import {
   calculateYarnSyncDiff, executeYarnSync,
@@ -45,6 +46,7 @@ import {
   beginSyncRun,
   endSyncRun,
   getNetworkKind,
+  runFullRestore,
 } from '@/lib/syncRunner';
 import { readUsage, takeSkippedPhotos } from '@/lib/cloudUsage';
 import {
@@ -85,6 +87,8 @@ export default function SettingsBackup() {
   const [dirty, setDirty] = useState(false);
   const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
   const [usage, setUsage] = useState<StorageUsage>(EMPTY_USAGE);
+  const [restoreStep, setRestoreStep] = useState<0 | 1 | 2>(0);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     setLastResult(loadLastResult());
@@ -241,6 +245,39 @@ export default function SettingsBackup() {
       toast.error('가져오기 중 오류가 발생했습니다', { id: tid, description: '잠시 후 다시 시도해주세요.' });
     } finally {
       setIsFetching(false);
+      endSyncRun();
+      void refreshUsage();
+    }
+  };
+
+  /**
+   * 클라우드 상태로 되돌리기.
+   * 일반 [가져오기] 는 이 기기에서 방금 바꾼 것을 보호하지만, 되돌리기는
+   * 그 보호를 건너뛰고 클라우드 내용으로 덮어쓴다.
+   */
+  const handleRestore = async () => {
+    if (!user) return;
+    if (!beginSyncRun()) {
+      toast.info('다른 동기화가 진행 중이에요. 끝난 뒤 다시 눌러주세요.');
+      return;
+    }
+    setRestoring(true);
+    const tid = 'restore-progress';
+    try {
+      toast.loading('클라우드 상태로 되돌리는 중…', { id: tid });
+      const { result, failed } = await runFullRestore(user.uid);
+      persistResult(result);
+      if (failed > 0) {
+        toast.warning(`되돌리기 완료 · 실패 ${failed}건`, { id: tid, description: '아래 결과 카드를 확인하세요.' });
+      } else {
+        toast.success('클라우드 상태로 되돌렸어요', { id: tid });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('되돌리기 중 오류가 발생했습니다', { id: tid, description: '잠시 후 다시 시도해주세요.' });
+    } finally {
+      setRestoring(false);
+      setRestoreStep(0);
       endSyncRun();
       void refreshUsage();
     }
@@ -484,6 +521,18 @@ export default function SettingsBackup() {
                 ) : ('백업')}
               </button>
             </div>
+
+            {/*
+              가져오기는 '최신 것이 이긴다' 병합이라, 이 기기에서 방금 지우거나
+              바꾼 것은 그대로 남는다. 실수로 지웠을 때를 위한 탈출구를 따로 둔다.
+            */}
+            <button
+              onClick={() => setRestoreStep(1)}
+              disabled={isSyncing || isFetching || restoring}
+              className="mt-3 w-full text-center text-[11.5px] text-muted-foreground underline underline-offset-4 disabled:opacity-50"
+            >
+              {restoring ? '되돌리는 중…' : '클라우드 상태로 되돌리기'}
+            </button>
           </div>
         </div>
       ) : (
@@ -497,6 +546,38 @@ export default function SettingsBackup() {
 
       {/* 자동 백업 설정 */}
       {user && <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} dirty={dirty} lastAutoBackup={lastAutoBackup} />}
+
+      {/* 되돌리기 1단계 */}
+      <ConfirmDialog
+        open={restoreStep === 1}
+        onOpenChange={(o) => !o && setRestoreStep(0)}
+        title="클라우드 상태로 되돌릴까요?"
+        description={
+          <span>
+            마지막으로 백업한 시점의 내용으로 이 기기를 되돌립니다.
+            {' '}백업 이후 이 기기에서 지우거나 고친 내용은 <strong>사라집니다.</strong>
+            {' '}클라우드에 없는 기록(백업한 적 없는 것)은 그대로 남아요.
+          </span>
+        }
+        confirmLabel="다음"
+        cancelLabel="취소"
+        destructive
+        closeOnConfirm={false}
+        onConfirm={() => setRestoreStep(2)}
+      />
+
+      {/* 되돌리기 2단계 */}
+      <ConfirmDialog
+        open={restoreStep === 2}
+        onOpenChange={(o) => !o && setRestoreStep(0)}
+        title="되돌릴 수 없어요. 계속할까요?"
+        description="지금 이 기기의 내용이 클라우드 백업으로 덮어써집니다."
+        confirmLabel="되돌리기"
+        cancelLabel="취소"
+        destructive
+        busy={restoring}
+        onConfirm={handleRestore}
+      />
 
       {/* 마지막 결과 */}
       {lastResult && <LastResultCard result={lastResult} />}

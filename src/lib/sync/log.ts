@@ -154,7 +154,11 @@ export async function executeLogSync(userId: string, diff: LogSyncDiff): Promise
 // 가져오기 (클라우드 → 이 기기)
 // ----------------------------------------------------------------------------
 
-export async function calculateLogFetchDiff(userId: string): Promise<LogFetchDiff> {
+/**
+ * @param force true 면 updatedAt 비교를 건너뛰고 클라우드 내용으로 덮어쓴다.
+ *              '클라우드 상태로 되돌리기' 전용 — 일반 가져오기는 false.
+ */
+export async function calculateLogFetchDiff(userId: string, force = false): Promise<LogFetchDiff> {
   const diff: LogFetchDiff = { toAdd: [], toUpdate: [], unchanged: 0 };
 
   const localLogs = await db.logs.toArray();
@@ -164,7 +168,7 @@ export async function calculateLogFetchDiff(userId: string): Promise<LogFetchDif
     const local = localMap.get(remote.cloudId);
     if (!local) {
       diff.toAdd.push(remote);
-    } else if ((remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
+    } else if (force || (remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
       diff.toUpdate.push(remote);
     } else {
       diff.unchanged++;

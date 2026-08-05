@@ -50,7 +50,11 @@ export async function calculateNotionSyncDiff(userId: string): Promise<SyncDiff<
   return diff;
 }
 
-export async function calculateNotionFetchDiff(userId: string): Promise<FetchDiff<Notion>> {
+/**
+ * @param force true 면 updatedAt 비교를 건너뛰고 클라우드 내용으로 덮어쓴다.
+ *              '클라우드 상태로 되돌리기' 전용 — 일반 가져오기는 false.
+ */
+export async function calculateNotionFetchDiff(userId: string, force = false): Promise<FetchDiff<Notion>> {
   const diff: FetchDiff<Notion> = { toAdd: [], toUpdate: [], unchanged: 0 };
 
   const localNotions = await db.notions.toArray();
@@ -67,7 +71,7 @@ export async function calculateNotionFetchDiff(userId: string): Promise<FetchDif
 
     if (!local) {
       diff.toAdd.push(remote);
-    } else if ((remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
+    } else if (force || (remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
       diff.toUpdate.push(remote);
     } else {
       diff.unchanged++;

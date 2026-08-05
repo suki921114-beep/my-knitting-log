@@ -44,7 +44,11 @@ export async function calculateNeedleSyncDiff(userId: string): Promise<SyncDiff<
   return diff;
 }
 
-export async function calculateNeedleFetchDiff(userId: string): Promise<FetchDiff<Needle>> {
+/**
+ * @param force true 면 updatedAt 비교를 건너뛰고 클라우드 내용으로 덮어쓴다.
+ *              '클라우드 상태로 되돌리기' 전용 — 일반 가져오기는 false.
+ */
+export async function calculateNeedleFetchDiff(userId: string, force = false): Promise<FetchDiff<Needle>> {
   const diff: FetchDiff<Needle> = { toAdd: [], toUpdate: [], unchanged: 0 };
 
   const localNeedles = await db.needles.toArray();
@@ -60,12 +64,11 @@ export async function calculateNeedleFetchDiff(userId: string): Promise<FetchDif
     const local = localMap.get(remote.cloudId);
     if (!local) {
       diff.toAdd.push(remote);
+    } else if (force || (remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
+      diff.toUpdate.push(remote);
     } else {
-      if (remote.updatedAt > local.updatedAt) {
-        diff.toUpdate.push(remote);
-      } else if (remote.updatedAt === local.updatedAt) {
-        diff.unchanged++;
-      }
+      // 로컬이 더 최신이면 그대로 둔다 (방금 쓴 기록이 옛 값으로 덮이지 않도록)
+      diff.unchanged++;
     }
   }
 

@@ -223,6 +223,54 @@ export async function runFullSync(userId: string): Promise<{ result: LastResult;
   return { result, failed };
 }
 
+/**
+ * 클라우드 상태로 되돌리기.
+ *
+ * 일반 가져오기는 "최신 것이 이긴다" 병합이라, 이 기기에서 방금 지우거나 바꾼 것은
+ * 그대로 남는다(여러 기기를 오갈 때는 그게 맞다). 되돌리기는 그 보호를 일부러
+ * 건너뛰고 클라우드 내용으로 덮어쓴다 — 실수로 지웠을 때 쓰는 기능.
+ *
+ * 클라우드에 아예 없는 기록(백업한 적 없는 것)은 지우지 않고 그대로 둔다.
+ */
+export async function runFullRestore(userId: string): Promise<{ result: LastResult; failed: number }> {
+  const yarnDiff = await calculateYarnFetchDiff(userId, true);
+  const patternDiff = await calculatePatternFetchDiff(userId, true);
+  const needleDiff = await calculateNeedleFetchDiff(userId, true);
+  const notionDiff = await calculateNotionFetchDiff(userId, true);
+  const projectDiff = await calculateProjectFetchDiff(userId, true);
+
+  const yarnResult = await executeYarnFetch(yarnDiff);
+  const patternResult = await executePatternFetch(patternDiff);
+  const needleResult = await executeNeedleFetch(needleDiff);
+  const notionResult = await executeNotionFetch(notionDiff);
+  const projectResult = await executeProjectFetch(projectDiff, true);
+  // 프로젝트를 먼저 되돌려야 일기가 올바른 프로젝트에 붙는다
+  const logDiff = await calculateLogFetchDiff(userId, true);
+  const logResult = await executeLogFetch(logDiff);
+
+  const failed =
+    yarnResult.failed +
+    patternResult.failed +
+    needleResult.failed +
+    notionResult.failed +
+    projectResult.failed +
+    logResult.failed;
+
+  const result: LastResult = {
+    mode: 'fetch',
+    at: new Date().toISOString(),
+    entries: [
+      { label: '실', stat: yarnResult },
+      { label: '도안', stat: patternResult },
+      { label: '바늘', stat: needleResult },
+      { label: '부자재', stat: notionResult },
+      { label: '프로젝트', stat: projectResult },
+      { label: '일기', stat: logResult },
+    ],
+  };
+  return { result, failed };
+}
+
 export async function runFullFetch(userId: string): Promise<{ result: LastResult; failed: number }> {
   const yarnDiff = await calculateYarnFetchDiff(userId);
   const patternDiff = await calculatePatternFetchDiff(userId);

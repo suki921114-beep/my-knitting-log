@@ -524,7 +524,7 @@ async function mergeRemotePhotos(
   return merged;
 }
 
-async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
+async function upsertProjectFromCloud(remote: ProjectSyncPayload, force = false) {
   // ⚠️ 사진 다운로드는 IndexedDB 가 아닌 네트워크 fetch 다.
   //    Dexie 트랜잭션 안에서 IDB 가 아닌 Promise 를 await 하면 트랜잭션이
   //    그 자리에서 자동 커밋되어, 뒤이은 쓰기가 전부 실패한다.
@@ -700,7 +700,9 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
       const existingLocal = counter.cloudId ? oldRowCounterByCloudId.get(counter.cloudId) : undefined;
 
       // 로컬이 더 최신이면 보존 — 사용자가 막 누른 카운터/소프트 삭제 보호
+      // (되돌리기(force)는 이 보호를 일부러 건너뛴다)
       if (
+        !force &&
         existingLocal &&
         existingLocal.id != null &&
         (existingLocal.updatedAt ?? 0) > (counter.updatedAt ?? 0)
@@ -732,7 +734,9 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
       const existingLocal = gauge.cloudId ? oldGaugeByCloudId.get(gauge.cloudId) : undefined;
 
       // 로컬이 더 최신이면 보존 — 메모/계산값 수정 또는 소프트 삭제 보호
+      // (되돌리기(force)는 이 보호를 일부러 건너뛴다)
       if (
+        !force &&
         existingLocal &&
         existingLocal.id != null &&
         (existingLocal.updatedAt ?? 0) > (gauge.updatedAt ?? 0)
@@ -808,7 +812,11 @@ export async function calculateProjectSyncDiff(userId: string): Promise<ProjectS
   return diff;
 }
 
-export async function calculateProjectFetchDiff(userId: string): Promise<ProjectFetchDiff> {
+/**
+ * @param force true 면 updatedAt 비교를 건너뛰고 클라우드 내용으로 덮어쓴다.
+ *              '클라우드 상태로 되돌리기' 전용 — 일반 가져오기는 false.
+ */
+export async function calculateProjectFetchDiff(userId: string, force = false): Promise<ProjectFetchDiff> {
   const diff: ProjectFetchDiff = { toAdd: [], toUpdate: [], unchanged: 0 };
   const localProjects = await db.projects.toArray();
   const localMap = new Map(localProjects.filter(p => p.cloudId).map(p => [p.cloudId!, p]));
@@ -823,7 +831,7 @@ export async function calculateProjectFetchDiff(userId: string): Promise<Project
       diff.toAdd.push(remote);
     } else {
       const localSyncUpdatedAt = await getProjectLocalSyncUpdatedAt(local.id!, local.updatedAt ?? 0);
-      if ((remote.updatedAt ?? 0) > localSyncUpdatedAt) {
+      if (force || (remote.updatedAt ?? 0) > localSyncUpdatedAt) {
         diff.toUpdate.push(remote);
       } else {
         diff.unchanged++;
@@ -919,14 +927,15 @@ export async function executeProjectSync(userId: string, diff: ProjectSyncDiff):
   }
 }
 
-export async function executeProjectFetch(diff: ProjectFetchDiff): Promise<FetchResult> {
+/** @param force true 면 로컬이 더 최신이어도 클라우드 값으로 덮어쓴다 */
+export async function executeProjectFetch(diff: ProjectFetchDiff, force = false): Promise<FetchResult> {
   let added = 0;
   let updated = 0;
   let failed = 0;
 
   for (const remote of diff.toAdd) {
     try {
-      await upsertProjectFromCloud(remote);
+      await upsertProjectFromCloud(remote, force);
       added++;
     } catch (e) {
       console.error(`[Fetch] Project 추가 실패: ${remote.name} (${remote.cloudId})`, e);
@@ -935,7 +944,7 @@ export async function executeProjectFetch(diff: ProjectFetchDiff): Promise<Fetch
   }
   for (const remote of diff.toUpdate) {
     try {
-      await upsertProjectFromCloud(remote);
+      await upsertProjectFromCloud(remote, force);
       updated++;
     } catch (e) {
       console.error(`[Fetch] Project 덮어쓰기 실패: ${remote.name} (${remote.cloudId})`, e);

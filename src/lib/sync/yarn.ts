@@ -9,8 +9,8 @@ import { db } from '@/lib/db';
 import type { Yarn } from '@/lib/db';
 import { sanitizeForFirestore, type FetchDiff, type SyncDiff } from './common';
 
-export async function calculateYarnSyncDiff(userId: string): Promise<SyncDiff> {
-  const diff: SyncDiff = { toUpload: [], toDownload: [], unchanged: 0 };
+export async function calculateYarnSyncDiff(userId: string): Promise<SyncDiff<Yarn>> {
+  const diff: SyncDiff<Yarn> = { toUpload: [], toDownload: [], unchanged: 0 };
 
   // 1. 로컬 데이터 가져오기
   const localYarns = await db.yarns.toArray();
@@ -50,8 +50,12 @@ export async function calculateYarnSyncDiff(userId: string): Promise<SyncDiff> {
   return diff;
 }
 
-export async function calculateYarnFetchDiff(userId: string): Promise<FetchDiff> {
-  const diff: FetchDiff = { toAdd: [], toUpdate: [], unchanged: 0 };
+/**
+ * @param force true 면 updatedAt 비교를 건너뛰고 클라우드 내용으로 덮어쓴다.
+ *              '클라우드 상태로 되돌리기' 전용 — 일반 가져오기는 false.
+ */
+export async function calculateYarnFetchDiff(userId: string, force = false): Promise<FetchDiff<Yarn>> {
+  const diff: FetchDiff<Yarn> = { toAdd: [], toUpdate: [], unchanged: 0 };
 
   const localYarns = await db.yarns.toArray();
   const localMap = new Map(localYarns.map(y => [y.cloudId!, y]));
@@ -67,21 +71,18 @@ export async function calculateYarnFetchDiff(userId: string): Promise<FetchDiff>
     if (!local) {
       // 로컬에 없으면 새로 추가
       diff.toAdd.push(remote);
+    } else if (force || (remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
+      diff.toUpdate.push(remote);
     } else {
-      // 로컬에 있으면 updatedAt 비교
-      if (remote.updatedAt > local.updatedAt) {
-        diff.toUpdate.push(remote);
-      } else if (remote.updatedAt === local.updatedAt) {
-        diff.unchanged++;
-      }
-      // 로컬이 더 최신인 경우 무시 (업데이트 안함)
+      // 로컬이 더 최신이면 그대로 둔다 (방금 쓴 기록이 옛 값으로 덮이지 않도록)
+      diff.unchanged++;
     }
   }
 
   return diff;
 }
 
-export async function executeYarnSync(userId: string, diff: SyncDiff) {
+export async function executeYarnSync(userId: string, diff: SyncDiff<Yarn>) {
   let uploaded = 0;
   let downloaded = 0;
   let failed = 0;
@@ -173,7 +174,7 @@ export async function executeYarnSync(userId: string, diff: SyncDiff) {
   }
 }
 
-export async function executeYarnFetch(diff: FetchDiff) {
+export async function executeYarnFetch(diff: FetchDiff<Yarn>) {
   let added = 0;
   let updated = 0;
   let failed = 0;
