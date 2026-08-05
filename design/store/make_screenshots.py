@@ -52,8 +52,8 @@ SHOTS = {
         "",
     ),
     "02-01-project": (
-        "", "실·도안·바늘까지", "프로젝트 한 곳에",
-        "무엇으로 떴는지 나중에도 알 수 있어요",
+        "", "문어발 모여라!", "프로젝트 관리",
+        "어떤 실로 떴는지 나중에도 알 수 있어요",
     ),
     "02-02-counter-gauge": (
         "", "내 게이지에 맞게", "코수를 다시 계산",
@@ -104,6 +104,13 @@ DECOR_MOOD = {"03-diary"}
 #   출력 이름: ([가운데, 왼쪽, 오른쪽] 원본 이름, 배지, 윗줄, 아랫줄, 보조)
 #   맨 앞 화면이 가운데에 온다.
 FANS = {
+    "project-fan": (
+        ["02-counter", "02-02-counter-gauge"],
+        "",
+        "내가 어디까지 떴더라?",
+        "단수도 게이지도 걱정 NO!",
+        "프로젝트 안에서 세고, 내 게이지로 다시 계산해요",
+    ),
     "library-fan": (
         ["04-02.library-pattern", "04-03.library-nedlee", "04-04-library-notion"],
         "",
@@ -415,15 +422,20 @@ def build_fan(stems: list[str], badge: str, line1: str, line2: str, sub: str, ou
         print(f"  건너뜀 — 원본을 찾지 못했습니다: {stems}")
         return
 
-    card_w = 470
+    card_w = 560 if len(shots) == 2 else 470
     max_h = H - y - 40
 
     # 중심 x 를 기준으로 놓는다. 회전하면 이미지가 커지는데, 왼쪽 좌표로 놓으면
     # 그만큼 오른쪽이 화면 밖으로 밀려 잘린다.
     #   (중심 x, 기울기, 세로 밀기)  — 가장자리는 뒤로, 가운데는 앞으로
-    #   (중심 x, 기울기, 세로 밀기)  — 뒤에 깔리는 둘을 먼저, 가운데를 마지막에
-    places = [(272, -5, 64), (808, 5, 64), (540, 0, 0)]
-    order = [1, 2, 0] if len(shots) >= 3 else list(range(len(shots)))
+    #   (중심 x, 기울기, 세로 밀기)  — 뒤에 깔리는 것부터, 앞에 올 것을 마지막에
+    if len(shots) == 2:
+        # 두 장이면 나란히 조금만 겹친다. 첫 번째가 앞.
+        places = [(700, 5, 56), (400, -3, 0)]
+        order = [1, 0]
+    else:
+        places = [(272, -5, 64), (808, 5, 64), (540, 0, 0)]
+        order = [1, 2, 0] if len(shots) >= 3 else list(range(len(shots)))
 
     # 먼저 크기를 정해 블록 높이를 구하고, 남는 공간에 가운데 맞춤으로 놓는다
     sample = Image.open(shots[0])
