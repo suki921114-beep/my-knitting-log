@@ -12,6 +12,7 @@ import { uploadPhotoDataUrl, downloadPhotoAsDataUrl } from './photoStorage';
 import { ENABLE_CLOUD_PHOTO_SYNC } from '@/lib/featureFlags';
 import { readUsage, writeUsage, reportSkippedPhoto } from '@/lib/cloudUsage';
 import { canUpload, dataUrlBytes, EMPTY_USAGE } from '@/lib/quota';
+import { captureError } from '@/lib/errorLog';
 import {
   sanitizeForFirestore,
   type FetchResult,
@@ -475,16 +476,33 @@ async function getProjectLocalSyncUpdatedAt(projectId: number, fallback = 0) {
 async function mergeRemotePhotos(
   remotePhotos: ProjectSyncPayload['photos'],
   existingByCloudId: Map<string, ProjectPhoto>,
+  projectName = '',
 ): Promise<ProjectPhoto[]> {
   const merged: ProjectPhoto[] = [];
+  // 어디서 끊기는지 알기 위한 집계 — 설정 → 버그 신고에서 확인할 수 있다
+  let cachedCount = 0;
+  let downloaded = 0;
+  let failed = 0;
+  let noPath = 0;
+
   for (const remotePh of remotePhotos) {
     const cached = existingByCloudId.get(remotePh.cloudId);
     let dataUrl = cached?.dataUrl;
+    if (dataUrl) cachedCount++;
+
+    if (!dataUrl && !remotePh.storagePath) noPath++;
+
     if (!dataUrl && remotePh.storagePath) {
       try {
         dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath);
+        downloaded++;
       } catch (e) {
+        failed++;
         console.error('[Project Fetch] 사진 다운로드 실패:', remotePh.storagePath, e);
+        captureError(
+          `사진 다운로드 실패 | ${remotePh.storagePath} | ${String((e as { code?: string })?.code ?? '')} ${String((e as Error)?.message ?? e)}`,
+          'projectFetch/photo',
+        );
       }
     }
     merged.push({
@@ -498,6 +516,11 @@ async function mergeRemotePhotos(
       deletedAt: remotePh.deletedAt ?? null,
     });
   }
+
+  captureError(
+    `사진 병합 | ${projectName} | 원격 ${remotePhotos.length}장 · 캐시 ${cachedCount} · 받음 ${downloaded} · 실패 ${failed} · 경로없음 ${noPath}`,
+    'projectFetch/photoSummary',
+  );
   return merged;
 }
 
@@ -516,7 +539,7 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
   // 플래그가 꺼져 있으면 원격 photos 를 무시하고 로컬 사진을 그대로 보존한다
   // (가져오기 때문에 사진이 사라지는 일 방지)
   const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
-    ? await mergeRemotePhotos(remote.photos || [], photoCache)
+    ? await mergeRemotePhotos(remote.photos || [], photoCache, remote.name)
     : preexistingPhotos;
 
   await db.transaction(
@@ -804,6 +827,16 @@ export async function calculateProjectFetchDiff(userId: string): Promise<Project
         diff.toUpdate.push(remote);
       } else {
         diff.unchanged++;
+        // '변경 없음' 으로 걸러졌는데 원격에 사진이 있다면, 사진이 영영 안 넘어온다.
+        // 사진 시각이 프로젝트 updatedAt 에 반영됐는지 확인하기 위해 남긴다.
+        const remotePhotoCount = (remote.photos || []).length;
+        const localPhotoCount = ((local.photos as any) || []).length;
+        if (remotePhotoCount > localPhotoCount) {
+          captureError(
+            `사진이 있는데 건너뜀 | ${remote.name} | 원격사진 ${remotePhotoCount} vs 로컬 ${localPhotoCount} | 원격 ${remote.updatedAt} <= 로컬 ${localSyncUpdatedAt}`,
+            'projectFetch/skipped',
+          );
+        }
       }
     }
   }
