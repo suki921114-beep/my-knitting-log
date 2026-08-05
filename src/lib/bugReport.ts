@@ -10,21 +10,9 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, firestore } from '@/lib/firebase';
 import { getErrorLogs } from '@/lib/errorLog';
 import { collectEnvInfo } from '@/lib/appVersion';
-import { OPERATOR_EMAIL } from '@/lib/legalPlaceholders';
 
-// ----------------------------------------------------------------------------
-// 메일 알림
-// ----------------------------------------------------------------------------
-// Firebase 확장 'Trigger Email from Firestore' 는 지정한 컬렉션에 문서가 생기면
-// 그 문서의 to / message 필드를 읽어 메일을 보낸다.
-// 그래서 신고 문서에 두 필드를 함께 넣어 두면 별도 서버 코드 없이 알림이 온다.
-//
-// ⚠️ 받는 주소는 클라이언트가 정하는 값이라, 보안 규칙에서 운영자 주소로 고정한다.
-//    (firestore.rules 의 bugReports 참고) 그렇지 않으면 아무에게나 메일을
-//    보내는 발송기로 쓰일 수 있다.
-
-/** 메일 본문에 넣을 최대 길이 — 문서 크기(1MB) 여유 확보 */
-const MAX_MAIL_BODY = 4000;
+// 메일 알림은 서버(functions/index.js)가 이 문서를 보고 보낸다.
+// 받는 주소를 클라이언트가 정하지 않으므로 스팸 발송기로 악용될 여지가 없다.
 
 /** 신고에 함께 보낼 에러 로그 최대 개수 — 문서 크기 제한(1MB) 여유 확보 */
 const MAX_LOGS = 20;
@@ -70,34 +58,10 @@ export async function submitBugReport(
       stack: l.stack ? l.stack.slice(0, MAX_STACK) : null,
     }));
 
-  const mailBody = [
-    `[${FEEDBACK_KIND_LABEL[kind]}]`,
-    '',
-    text,
-    '',
-    '--- 환경 ---',
-    `버전: v${env.appVersion}`,
-    `보낸 사람: ${user.email ?? user.uid}`,
-    `화면: ${env.pageUrl}`,
-    `기기: ${env.userAgent}`,
-    `해상도: ${env.screen}`,
-    '',
-    `--- 오류 기록 ${errorLogs.length}개 ---`,
-    ...errorLogs.map(l => `${l.createdAt} [${l.context ?? '-'}] ${l.message}`),
-  ]
-    .join('\n')
-    .slice(0, MAX_MAIL_BODY);
-
   try {
     await addDoc(collection(firestore, 'bugReports'), {
       description: text,
       kind,
-      // Trigger Email 확장이 읽는 필드 — 이 두 개가 있어야 메일이 나간다
-      to: OPERATOR_EMAIL ? [OPERATOR_EMAIL] : [],
-      message: {
-        subject: `[뜨개일기 v${env.appVersion}] ${FEEDBACK_KIND_LABEL[kind]}`,
-        text: mailBody,
-      },
       uid: user.uid,
       email: user.email ?? null,
       appVersion: env.appVersion,

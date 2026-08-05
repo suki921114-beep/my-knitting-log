@@ -29,3 +29,8 @@ android/key.properties
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase Functions
+functions/node_modules
+functions/package-lock.json
+.firebase/

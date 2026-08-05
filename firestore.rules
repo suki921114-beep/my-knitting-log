@@ -55,18 +55,14 @@ service cloud.firestore {
     //   create: 본인 uid 로만, 최소한의 형식 검증
     //   read/update/delete: 전부 금지 (다른 사람 의견을 볼 수 없다)
     //   → 운영자는 Firebase 콘솔과 메일 알림으로 확인한다
-    //
-    // ⚠️ to 는 Trigger Email 확장이 읽는 '받는 사람' 이다.
-    //    클라이언트가 정하는 값이므로 운영자 주소로 못 박는다.
-    //    풀어 두면 누구에게나 메일을 보내는 발송기로 악용될 수 있다.
-    //    (확장은 Admin SDK 로 동작해 규칙을 우회하므로 delivery 필드는 쓸 수 있다)
+    //     (메일은 functions/index.js 의 notifyFeedback 이 보낸다.
+    //      받는 주소를 서버가 정하므로 클라이언트가 손댈 수 없다)
     match /bugReports/{reportId} {
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.description is string
                     && request.resource.data.description.size() > 0
-                    && request.resource.data.description.size() < 5000
-                    && request.resource.data.to == ['knits2crochet@gmail.com'];
+                    && request.resource.data.description.size() < 5000;
       allow read, update, delete: if false;
     }
 

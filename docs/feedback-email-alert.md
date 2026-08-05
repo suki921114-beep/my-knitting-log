@@ -1,82 +1,99 @@
 # 의견이 들어오면 메일 받기
 
-사용자가 **설정 → 의견 보내기**에서 보내기를 누르면 Firestore `bugReports` 컬렉션에
-문서가 쌓인다. 그대로 두면 콘솔을 직접 열어봐야 알 수 있어 놓치기 쉽다.
+**설정 → 의견 보내기**에서 보내기를 누르면 Firestore `bugReports` 에 문서가 쌓인다.
+그대로 두면 콘솔을 직접 열어봐야 알 수 있어 놓치기 쉽다.
 
-Firebase 확장 **Trigger Email from Firestore** 를 붙이면 문서가 생길 때마다
-메일이 온다. 서버 코드는 필요 없다.
+`functions/index.js` 의 **notifyFeedback** 이 그 문서를 보고 메일을 보낸다.
 
-앱은 이미 신고 문서에 확장이 읽는 두 필드를 함께 넣고 있다.
+> Firebase Extensions(Trigger Email)를 쓰는 방법도 있지만,
+> **2027년 3월 31일에 종료**된다. 그래서 직접 만들었다.
 
-```jsonc
-{
-  "to": ["knits2crochet@gmail.com"],
-  "message": {
-    "subject": "[뜨개일기 v1.0.0] 버그 신고",
-    "text": "…내용 + 환경 + 오류 기록 요약…"
-  },
-  // 아래는 콘솔에서 자세히 볼 때 쓰는 원본
-  "description": "…", "kind": "bug", "errorLogs": [ … ]
-}
+**받는 주소와 보내는 계정은 서버가 정한다.** 앱은 관여하지 않으므로,
+누가 앱을 뜯어 고쳐도 남에게 메일을 보내는 발송기로 쓸 수 없다.
+
+---
+
+## 한 번만 하면 되는 준비
+
+### 1. Gmail 앱 비밀번호
+
+1. [Google 계정 → 보안](https://myaccount.google.com/security) → **2단계 인증** 켜기
+2. 같은 화면에서 **앱 비밀번호** 검색 → 새로 만들기 (이름: `뜨개일기 알림`)
+3. 나오는 **16자리**를 복사 (공백은 빼고 붙여 쓴다)
+
+### 2. Firebase CLI 설치 + 로그인
+
+PowerShell 에서:
+
+```powershell
+npm install -g firebase-tools
+firebase login
 ```
 
+브라우저가 열리면 Firebase 계정으로 로그인한다.
+
+### 3. 계정 정보를 Secret 으로 등록
+
+코드에 비밀번호를 넣지 않는다. Google Secret Manager 에 넣고 함수가 꺼내 쓴다.
+
+```powershell
+cd C:\Users\ddoro\Desktop\suki\my-knitting-log-main\my-knitting-log-main
+
+firebase functions:secrets:set GMAIL_USER
+# 물어보면: knits2crochet@gmail.com
+
+firebase functions:secrets:set GMAIL_PASS
+# 물어보면: 위에서 만든 앱 비밀번호 16자리
+```
+
+### 4. 배포
+
+```powershell
+cd functions
+npm install
+cd ..
+firebase deploy --only functions
+```
+
+처음 배포할 때 필요한 API 를 켤지 물어보면 **Y**.
+2~3분 걸린다.
+
 ---
 
-## 1. 보낼 메일 계정 준비 (Gmail 기준)
+## 확인
 
-확장은 SMTP 서버로 메일을 보낸다. Gmail 을 쓰려면 **앱 비밀번호**가 필요하다.
+앱에서 의견을 하나 보내 본다. 1분 안에 메일이 오면 성공.
 
-1. [Google 계정 → 보안](https://myaccount.google.com/security) → **2단계 인증**을 켠다 (이미 켜져 있으면 넘어감)
-2. 같은 화면에서 **앱 비밀번호** 검색 → 새로 만들기 → 이름 아무거나 (예: `뜨개일기 알림`)
-3. 나오는 **16자리**를 복사해 둔다 (공백은 빼고 붙여 쓴다)
+안 오면 로그를 본다.
 
-> Gmail 은 하루 발송량 제한이 있다. 의견 알림 정도면 충분하지만,
-> 나중에 양이 많아지면 SendGrid·Mailgun 같은 전용 서비스로 바꾸면 된다.
+```powershell
+firebase functions:log --only notifyFeedback
+```
 
----
+흔한 실패:
 
-## 2. 확장 설치
-
-Firebase 콘솔 → 왼쪽 메뉴 **Extensions** → **Trigger Email from Firestore** 검색 → 설치
-
-설정값은 이렇게 넣는다.
-
-| 항목 | 값 |
+| 로그 내용 | 원인 |
 |---|---|
-| **SMTP connection URI** | `smtps://knits2crochet@gmail.com@smtp.gmail.com:465` |
-| **SMTP password** | 위에서 만든 앱 비밀번호 16자리 |
-| **Email documents collection** | `bugReports` |
-| **Default FROM address** | `knits2crochet@gmail.com` |
-| **Default REPLY-TO address** | (비워도 됨) |
-| **Users collection** / **Templates collection** | (비워 둔다) |
+| `Invalid login` | 앱 비밀번호 오타, 또는 2단계 인증 미설정 |
+| `Secret ... not found` | 3번을 건너뛰었다 |
+| 로그가 아예 없음 | 배포가 안 됐거나 컬렉션 이름이 다르다 |
 
-> URI 안의 `@` 가 두 번 나오는 게 맞다. 사용자 이름에 `@` 가 들어가서다.
-> 비밀번호는 URI 에 넣지 말고 **SMTP password 칸에 따로** 넣는다.
+메일 전송이 실패해도 **의견 자체는 Firestore 에 그대로 남는다.**
 
 ---
 
-## 3. 규칙 다시 게시
+## 고칠 때
 
-`firestore.rules` 에 `to` 를 운영자 주소로 고정하는 조건이 추가됐다.
-**Firestore → 규칙**에 통째로 붙여넣고 게시한다.
+메일 문구나 형식을 바꾸려면 `functions/index.js` 만 고치고 다시 배포한다.
 
-이게 없으면 클라이언트가 `to` 를 아무 주소로나 바꿔 **스팸 발송기로 쓸 수 있다.**
-반드시 함께 반영할 것.
-
----
-
-## 4. 확인
-
-앱에서 의견을 하나 보내 본다.
-
-- 1~2분 안에 메일이 오면 성공
-- 안 오면 Firestore 의 그 문서에 확장이 남긴 **`delivery` 필드**를 본다.
-  `state: SUCCESS` / `ERROR` 와 실패 사유가 적혀 있다.
-- 흔한 실패: 앱 비밀번호 오타, 2단계 인증 미설정, 컬렉션 이름 오타
+```powershell
+firebase deploy --only functions
+```
 
 ---
 
 ## 비용
 
-확장은 Cloud Functions 로 동작한다. 의견 한 건당 함수 호출 한 번이라
-개인 규모에서는 무료 한도 안에 들어간다. 예산 알림은 이미 걸어 두었다.
+의견 한 건당 함수 호출 한 번이라 개인 규모에서는 무료 한도 안이다.
+Secret Manager 는 버전당 월 $0.06 수준(2개 = 약 $0.12).
+예산 알림은 이미 걸어 두었다.
