@@ -28,13 +28,13 @@ export default function Privacy() {
             <li>이용자가 추가한 사진(기기에 저장되며, 클라우드 백업 시 함께 저장됩니다)</li>
             <li>마지막 백업 시각, 자동 백업 모드, 휴지통 상태 등 동작 메타</li>
             <li>
-              <strong className="text-foreground">버그 신고를 보낼 때에 한해</strong>: 이용자가 작성한 신고 내용,
+              <strong className="text-foreground">의견을 보낼 때에 한해</strong>: 이용자가 작성한 신고 내용,
               앱 버전, 기기·브라우저 정보, 화면 크기, 오류 발생 시각과 오류 메시지
             </li>
           </ul>
           <p className="mt-1 text-muted-foreground">
-            ※ 오류 정보는 자동으로 수집되지 않습니다. 설정 → 버그 신고에서 이용자가 직접
-            '신고 보내기' 를 눌렀을 때만 전송됩니다.
+            ※ 오류 정보는 자동으로 수집되지 않습니다. 설정 → 의견 보내기에서 이용자가 직접
+            '보내기' 를 눌렀을 때만 전송됩니다.
           </p>
         </Section>
 
@@ -56,7 +56,7 @@ export default function Privacy() {
               다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.
             </li>
             <li>
-              버그 신고는 Google Cloud Firestore 에 별도로 저장되며, 운영자만 열람할 수 있습니다.
+              보내주신 의견은 Google Cloud Firestore 에 별도로 저장되며, 운영자만 열람할 수 있습니다.
               문제 해결 후 또는 1년 이내에 삭제합니다.
             </li>
           </ul>

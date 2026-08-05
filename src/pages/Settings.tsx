@@ -132,16 +132,16 @@ export default function Settings() {
         />
       </Section>
 
-      {/* 4. 버그 신고 */}
-    <Section title="버그 신고">
-      <MenuCard
-        icon={Bug}
-        tone="muted"
-        title="버그 신고"
-        desc="문제 상황과 에러 로그 복사하기"
-        onClick={() => navigate('/settings/bug-report')}
-      />
-    </Section>
+      {/* 4. 의견 보내기 — 버그 신고와 개선 제안을 함께 받는다 */}
+      <Section title="의견 보내기">
+        <MenuCard
+          icon={Bug}
+          tone="muted"
+          title="의견 보내기"
+          desc="불편한 점이나 있으면 좋겠는 기능을 알려주세요"
+          onClick={() => navigate('/settings/bug-report')}
+        />
+      </Section>
 
       {/* 앱 정보 — 방침/약관/오픈소스는 여기 안에 묶어 둔다 */}
       <div className="border-t border-border/60 pt-2">

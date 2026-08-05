@@ -62,6 +62,14 @@ export async function calculatePatternFetchDiff(userId: string, force = false): 
     if (!remote.cloudId) continue;
 
     const local = localMap.get(remote.cloudId);
+    // 클라우드에서 '삭제됨' 인데 이 기기에 없다면 받아올 이유가 없다.
+    // (예전에는 그대로 추가해서, 휴지통을 비운 뒤 가져오기를 하면 되살아났다.
+    //  새 기기에 남의 휴지통이 딸려 오는 것도 막는다)
+    if (remote.isDeleted && !local) {
+      diff.unchanged++;
+      continue;
+    }
+
     if (!local) {
       diff.toAdd.push(remote);
     } else if (force || (remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) {

@@ -2,10 +2,11 @@
 // 휴지통 자동 영구삭제
 // ----------------------------------------------------------------------------
 // soft delete(isDeleted=true) 된 항목은 deletedAt 으로부터 보관 기간이 지나면
-// 이 기기에서 자동으로 hard delete 된다.
-// 클라우드의 묘비(isDeleted=true 문서)는 그대로 남아 다른 기기에서 부활하지 않는다.
+// 기기와 클라우드 양쪽에서 완전히 사라진다.
+// (부활 방지는 sync/fetchRules 의 판정이 담당한다 — 묘비를 남기지 않는다)
 
 import { db } from '@/lib/db';
+import { purgeFromCloud } from '@/lib/sync/purge';
 
 /** 휴지통 보관 기간 (일) */
 export const TRASH_RETENTION_DAYS = 7;
@@ -93,6 +94,13 @@ export async function purgeExpiredTrash(nowMs: number = Date.now()): Promise<num
       }
 
       if (expiredIds.length) {
+        // 클라우드 먼저 — 지울 대상의 cloudId 가 필요해서 로컬 삭제 전에 읽는다
+        const expiredSet = new Set(expiredIds);
+        await purgeFromCloud(
+          rows
+            .filter(r => expiredSet.has(r.id))
+            .map(r => ({ table: name, cloudId: r.cloudId })),
+        );
         await table.bulkDelete(expiredIds);
         purged += expiredIds.length;
       }

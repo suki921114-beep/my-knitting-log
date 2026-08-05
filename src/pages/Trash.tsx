@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { purgeFromCloud } from '@/lib/sync/purge';
 import { purgeExpiredTrash, trashDaysLeft, TRASH_RETENTION_DAYS } from '@/lib/autoPurge';
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/components/ui/sonner';
@@ -11,10 +12,9 @@ import { EmptyState } from '@/components/Mascot';
 // ----------------------------------------------------------------------------
 // 휴지통 — soft delete 된 모든 entity 를 한 곳에서 보고 복원/영구삭제
 // ----------------------------------------------------------------------------
-// 복원: isDeleted=false 로 update → 자동 백업 → 다른 기기에서도 복원
-// 영구 삭제: 로컬 hard delete (db.X.delete). 클라우드 묘비(isDeleted=true) 는
-//          그대로 남아 다른 기기 가져오기 시 부활 방지. 클라우드 문서까지 삭제
-//          하려면 별도 단계 필요 (다음 작업).
+// 복원: isDeleted=false 로 update. [백업] 을 누르면 다른 기기에서도 복원된다.
+// 영구 삭제: 기기에서 hard delete + 클라우드 문서/사진까지 함께 삭제.
+//          부활 방지는 sync/fetchRules 가 담당한다 (묘비를 남기지 않는다).
 
 type TableName = 'yarns' | 'patterns' | 'needles' | 'notions' | 'projects' | 'rowCounters' | 'projectGauges' | 'logs';
 
@@ -64,17 +64,17 @@ export default function Trash() {
       for (const name of tables) {
         const table = (db as any)[name];
         // isDeleted 가 true 인 것만 — 실수로 살아있는 기록을 지우지 않도록 방어
-        const ids = (await table.filter((x: any) => x.isDeleted === true).toArray())
-          .map((x: any) => x.id)
-          .filter((id: unknown): id is number => typeof id === 'number');
-        if (ids.length) {
-          await table.bulkDelete(ids);
-          removed += ids.length;
+        const rows = (await table.filter((x: any) => x.isDeleted === true).toArray())
+          .filter((x: any) => typeof x.id === 'number');
+        if (rows.length) {
+          await purgeFromCloud(rows.map((x: any) => ({ table: name, cloudId: x.cloudId })));
+          await table.bulkDelete(rows.map((x: any) => x.id));
+          removed += rows.length;
         }
       }
       toast.success(`${removed}개를 영구 삭제했어요`, {
         id: 'trash-action',
-        description: '이 기기에서 완전히 지웠습니다.',
+        description: '기기와 클라우드에서 완전히 지웠습니다.',
       });
     } catch (e) {
       console.error('[Trash] 전체 비우기 실패:', e);
@@ -103,10 +103,14 @@ export default function Trash() {
     if (!pendingPurge) return;
     setPurging(true);
     try {
-      await (db as any)[pendingPurge.table].delete(pendingPurge.id);
+      const table = (db as any)[pendingPurge.table];
+      // 클라우드 삭제에 cloudId 가 필요하므로 로컬에서 지우기 전에 읽는다
+      const row = await table.get(pendingPurge.id);
+      await purgeFromCloud([{ table: pendingPurge.table, cloudId: row?.cloudId }]);
+      await table.delete(pendingPurge.id);
       toast.success('영구 삭제했어요', {
         id: 'trash-action',
-        description: '이 기기에서 완전히 지웠습니다.',
+        description: '기기와 클라우드에서 완전히 지웠습니다.',
       });
     } catch (e) {
       console.error('[Trash] 영구 삭제 실패:', e);
@@ -126,7 +130,7 @@ export default function Trash() {
 
       {total > 0 && (
         <div className="rounded-xl border border-warm/40 bg-warm/10 px-3 py-2.5 text-[11.5px] leading-relaxed text-ink">
-          삭제 후 <strong>{TRASH_RETENTION_DAYS}일</strong>이 지나면 이 기기에서 자동으로 영구 삭제됩니다.
+          삭제 후 <strong>{TRASH_RETENTION_DAYS}일</strong>이 지나면 기기와 클라우드에서 자동으로 완전히 삭제됩니다.
           되살리려면 그 전에 복원해 주세요.
         </div>
       )}
@@ -244,16 +248,16 @@ export default function Trash() {
       )}
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        ※ <strong>자동 정리</strong>: 삭제 후 {TRASH_RETENTION_DAYS}일이 지난 항목은 이 기기에서 자동으로 영구 삭제됩니다.<br />
-        ※ <strong>복원</strong>: 다음 자동 백업으로 다른 기기에도 다시 보입니다.<br />
-        ※ <strong>영구 삭제</strong>: 이 기기에서 완전히 지웁니다. 클라우드의 삭제 기록은 그대로 남아 다른 기기에서도 부활하지 않아요.
+        ※ <strong>자동 정리</strong>: 삭제 후 {TRASH_RETENTION_DAYS}일이 지난 항목은 기기와 클라우드에서 자동으로 완전히 삭제됩니다.<br />
+        ※ <strong>복원</strong>: 되살린 뒤 [백업] 을 누르면 다른 기기에서도 다시 보입니다.<br />
+        ※ <strong>영구 삭제</strong>: 기기와 클라우드에서 완전히 지웁니다. 되돌릴 수 없어요.
       </p>
 
       <ConfirmDialog
         open={pendingPurge !== null}
         onOpenChange={(o) => !o && setPendingPurge(null)}
         title={pendingPurge ? `"${pendingPurge.label}" 을(를) 영구 삭제할까요?` : ''}
-        description="이 기기에서 즉시 사라지고 휴지통에서도 복원할 수 없어요. 클라우드 백업에는 삭제 기록만 남습니다."
+        description="기기와 클라우드에서 완전히 사라지고 복원할 수 없어요."
         confirmLabel="영구 삭제"
         cancelLabel="취소"
         destructive
@@ -266,7 +270,7 @@ export default function Trash() {
         open={emptyStep === 1}
         onOpenChange={(o) => !o && setEmptyStep(0)}
         title="휴지통을 비울까요?"
-        description={`휴지통에 있는 ${total}개 항목을 이 기기에서 완전히 지웁니다. 휴지통에 없는 기록은 그대로 남아요.`}
+        description={`휴지통에 있는 ${total}개 항목을 기기와 클라우드에서 완전히 지웁니다. 휴지통에 없는 기록은 그대로 남아요.`}
         confirmLabel="다음"
         cancelLabel="취소"
         destructive
@@ -279,7 +283,7 @@ export default function Trash() {
         open={emptyStep === 2}
         onOpenChange={(o) => !o && setEmptyStep(0)}
         title="되돌릴 수 없어요. 계속할까요?"
-        description="지운 뒤에는 복원할 수 없습니다. 클라우드 백업에는 삭제 기록만 남아요."
+        description="지운 뒤에는 복원할 수 없습니다. 클라우드에 올려 둔 사진도 함께 지워집니다."
         confirmLabel="휴지통 비우기"
         cancelLabel="취소"
         destructive

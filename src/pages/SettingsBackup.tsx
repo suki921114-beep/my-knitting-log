@@ -135,7 +135,7 @@ export default function SettingsBackup() {
     const failed = takeFailedPhotoDownloads();
     if (!failed) return;
     toast.warning(`사진 ${failed}장을 받아오지 못했어요`, {
-      description: '다음 가져오기에서 다시 시도해요. 계속 실패하면 설정 → 버그 신고의 로그를 보내주세요.',
+      description: '다음 가져오기에서 다시 시도해요. 계속 실패하면 설정 → 의견 보내기에서 알려주세요.',
       duration: 9000,
     });
   }

@@ -21,7 +21,19 @@ export interface BugReportResult {
   reason?: 'not-signed-in' | 'offline' | 'empty' | 'failed';
 }
 
-export async function submitBugReport(description: string): Promise<BugReportResult> {
+/** 의견 종류 — 버그와 개선 제안을 한 화면에서 받는다 */
+export type FeedbackKind = 'bug' | 'idea' | 'etc';
+
+export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
+  bug: '버그 신고',
+  idea: '개선 제안',
+  etc: '기타 의견',
+};
+
+export async function submitBugReport(
+  description: string,
+  kind: FeedbackKind = 'bug',
+): Promise<BugReportResult> {
   const text = description.trim();
   if (!text) return { ok: false, reason: 'empty' };
 
@@ -46,6 +58,7 @@ export async function submitBugReport(description: string): Promise<BugReportRes
   try {
     await addDoc(collection(firestore, 'bugReports'), {
       description: text,
+      kind,
       uid: user.uid,
       email: user.email ?? null,
       appVersion: env.appVersion,

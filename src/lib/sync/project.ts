@@ -829,6 +829,14 @@ export async function calculateProjectFetchDiff(userId: string, force = false): 
   for (const remote of remoteProjects) {
     if (!remote.cloudId) continue;
     const local = localMap.get(remote.cloudId);
+
+    // 클라우드에서 '삭제됨' 인데 이 기기에 없다면 받아올 이유가 없다.
+    // (예전에는 그대로 추가해서, 휴지통을 비운 뒤 가져오기를 하면 되살아났다)
+    if (remote.isDeleted && !local) {
+      diff.unchanged++;
+      continue;
+    }
+
     if (!local) {
       diff.toAdd.push(remote);
     } else {
