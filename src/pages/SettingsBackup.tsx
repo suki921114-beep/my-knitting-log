@@ -29,6 +29,8 @@ import {
   calculateNotionFetchDiff, executeNotionFetch,
   calculateProjectSyncDiff, executeProjectSync,
   calculateProjectFetchDiff, executeProjectFetch,
+  calculateLogSyncDiff, executeLogSync,
+  calculateLogFetchDiff, executeLogFetch,
 } from '@/lib/sync';
 import {
   type AutoSyncMode,
@@ -131,6 +133,7 @@ export default function SettingsBackup() {
       const needleDiff = await calculateNeedleFetchDiff(user.uid);
       const notionDiff = await calculateNotionFetchDiff(user.uid);
       const projectDiff = await calculateProjectFetchDiff(user.uid);
+      const logDiff = await calculateLogFetchDiff(user.uid);
 
       toast.dismiss(tid);
 
@@ -140,6 +143,7 @@ export default function SettingsBackup() {
         { label: '바늘', a: needleDiff.toAdd.length, b: needleDiff.toUpdate.length, same: needleDiff.unchanged },
         { label: '부자재', a: notionDiff.toAdd.length, b: notionDiff.toUpdate.length, same: notionDiff.unchanged },
         { label: '프로젝트', a: projectDiff.toAdd.length, b: projectDiff.toUpdate.length, same: projectDiff.unchanged },
+        { label: '일기', a: logDiff.toAdd.length, b: logDiff.toUpdate.length, same: logDiff.unchanged },
       ];
 
       const ok = await confirm({
@@ -177,9 +181,15 @@ export default function SettingsBackup() {
       const projectResult = await executeProjectFetch(projectDiff);
       toast.success(`프로젝트 가져오기 완료 · ${fetchToastDetail(projectResult)}`, { id: prtid });
 
+      // 일기는 프로젝트 cloudId 를 참조하므로 프로젝트를 받은 뒤에 실행한다
+      const ltid = 'fetch-log';
+      toast.loading('일기 가져오는 중…', { id: ltid });
+      const logResult = await executeLogFetch(logDiff);
+      toast.success(`일기 가져오기 완료 · ${fetchToastDetail(logResult)}`, { id: ltid });
+
       const failedTotal =
         yarnResult.failed + patternResult.failed + needleResult.failed +
-        notionResult.failed + projectResult.failed;
+        notionResult.failed + projectResult.failed + logResult.failed;
 
       const result: LastResult = {
         mode: 'fetch',
@@ -190,6 +200,7 @@ export default function SettingsBackup() {
           { label: '바늘', stat: needleResult },
           { label: '부자재', stat: notionResult },
           { label: '프로젝트', stat: projectResult },
+          { label: '일기', stat: logResult },
         ],
       };
       persistResult(result);
@@ -236,6 +247,7 @@ export default function SettingsBackup() {
       const needleDiff = await calculateNeedleSyncDiff(user.uid);
       const notionDiff = await calculateNotionSyncDiff(user.uid);
       const projectDiff = await calculateProjectSyncDiff(user.uid);
+      const logDiff = await calculateLogSyncDiff(user.uid);
 
       toast.dismiss(tid);
 
@@ -245,6 +257,7 @@ export default function SettingsBackup() {
         { label: '바늘', a: needleDiff.toUpload.length, b: needleDiff.toDownload.length, same: needleDiff.unchanged },
         { label: '부자재', a: notionDiff.toUpload.length, b: notionDiff.toDownload.length, same: notionDiff.unchanged },
         { label: '프로젝트', a: projectDiff.toUpload.length, b: projectDiff.toDownload.length, same: projectDiff.unchanged },
+        { label: '일기', a: logDiff.toUpload.length, b: logDiff.toDownload.length, same: logDiff.unchanged },
       ];
 
       const ok = await confirm({
@@ -282,9 +295,14 @@ export default function SettingsBackup() {
       const projectResult = await executeProjectSync(user.uid, projectDiff);
       toast.success(`프로젝트 백업 완료 · ${syncToastDetail(projectResult)}`, { id: prtid });
 
+      const ltid = 'sync-log';
+      toast.loading('일기 백업 중…', { id: ltid });
+      const logResult = await executeLogSync(user.uid, logDiff);
+      toast.success(`일기 백업 완료 · ${syncToastDetail(logResult)}`, { id: ltid });
+
       const failedTotal =
         yarnResult.failed + patternResult.failed + needleResult.failed +
-        notionResult.failed + projectResult.failed;
+        notionResult.failed + projectResult.failed + logResult.failed;
 
       const result: LastResult = {
         mode: 'sync',
@@ -295,6 +313,7 @@ export default function SettingsBackup() {
           { label: '바늘', stat: needleResult },
           { label: '부자재', stat: notionResult },
           { label: '프로젝트', stat: projectResult },
+          { label: '일기', stat: logResult },
         ],
       };
       persistResult(result);

@@ -13,3 +13,5 @@ export * from './pattern';
 export * from './needle';
 export * from './notion';
 export * from './project';
+// 일기는 projectId 를 cloudId 로 바꿔 올리므로 프로젝트 뒤에 동기화해야 한다
+export * from './log';

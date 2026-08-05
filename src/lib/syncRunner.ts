@@ -15,11 +15,13 @@ import {
   calculateNeedleSyncDiff, executeNeedleSync,
   calculateNotionSyncDiff, executeNotionSync,
   calculateProjectSyncDiff, executeProjectSync,
+  calculateLogSyncDiff, executeLogSync,
   calculateYarnFetchDiff, executeYarnFetch,
   calculatePatternFetchDiff, executePatternFetch,
   calculateNeedleFetchDiff, executeNeedleFetch,
   calculateNotionFetchDiff, executeNotionFetch,
   calculateProjectFetchDiff, executeProjectFetch,
+  calculateLogFetchDiff, executeLogFetch,
 } from './sync';
 import { pauseDirtyTracking, resumeDirtyTracking } from './syncDirty';
 
@@ -194,13 +196,17 @@ export async function runFullSync(userId: string): Promise<{ result: LastResult;
   const needleResult = await executeNeedleSync(userId, needleDiff);
   const notionResult = await executeNotionSync(userId, notionDiff);
   const projectResult = await executeProjectSync(userId, projectDiff);
+  // 일기는 프로젝트 cloudId 를 참조하므로 프로젝트 동기화 뒤에 계산·실행한다
+  const logDiff = await calculateLogSyncDiff(userId);
+  const logResult = await executeLogSync(userId, logDiff);
 
   const failed =
     yarnResult.failed +
     patternResult.failed +
     needleResult.failed +
     notionResult.failed +
-    projectResult.failed;
+    projectResult.failed +
+    logResult.failed;
 
   const result: LastResult = {
     mode: 'sync',
@@ -211,6 +217,7 @@ export async function runFullSync(userId: string): Promise<{ result: LastResult;
       { label: '바늘', stat: needleResult },
       { label: '부자재', stat: notionResult },
       { label: '프로젝트', stat: projectResult },
+      { label: '일기', stat: logResult },
     ],
   };
   return { result, failed };
@@ -228,13 +235,17 @@ export async function runFullFetch(userId: string): Promise<{ result: LastResult
   const needleResult = await executeNeedleFetch(needleDiff);
   const notionResult = await executeNotionFetch(notionDiff);
   const projectResult = await executeProjectFetch(projectDiff);
+  // 프로젝트를 먼저 받아야 일기가 올바른 프로젝트에 붙는다
+  const logDiff = await calculateLogFetchDiff(userId);
+  const logResult = await executeLogFetch(logDiff);
 
   const failed =
     yarnResult.failed +
     patternResult.failed +
     needleResult.failed +
     notionResult.failed +
-    projectResult.failed;
+    projectResult.failed +
+    logResult.failed;
 
   const result: LastResult = {
     mode: 'fetch',
@@ -245,6 +256,7 @@ export async function runFullFetch(userId: string): Promise<{ result: LastResult
       { label: '바늘', stat: needleResult },
       { label: '부자재', stat: notionResult },
       { label: '프로젝트', stat: projectResult },
+      { label: '일기', stat: logResult },
     ],
   };
   return { result, failed };

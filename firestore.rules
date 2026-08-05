@@ -12,6 +12,7 @@ rules_version = '2';
 //   users/{uid}/needles/{cloudId}
 //   users/{uid}/notions/{cloudId}
 //   users/{uid}/projects/{cloudId}
+//   users/{uid}/logs/{cloudId}      (다이어리 기록)
 //
 // 적용 방법은 docs/firestore-rules.md 참고.
 
@@ -23,7 +24,7 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // 사용자 문서 및 그 하위 전체 (yarns / patterns / needles / notions / projects …)
+    // 사용자 문서 및 그 하위 전체 (yarns / patterns / needles / notions / projects / logs …)
     // {document=**} 로 하위 컬렉션이 늘어나도 자동 커버된다.
     match /users/{uid} {
       allow read, write: if isOwner(uid);
