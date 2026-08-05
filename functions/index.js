@@ -14,8 +14,12 @@ const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const nodemailer = require('nodemailer');
 
+// 보내는 계정. 앱 비밀번호를 만든 그 계정이어야 한다 —
+// 다른 주소를 넣으면 Gmail 이 535(Invalid login) 로 거절한다.
 const GMAIL_USER = defineSecret('GMAIL_USER');
 const GMAIL_PASS = defineSecret('GMAIL_PASS');
+// 알림을 받을 주소. 없으면 보내는 계정으로 보낸다(자기 자신에게).
+const ALERT_TO = defineSecret('ALERT_TO');
 
 /** 메일 본문이 지나치게 길어지지 않도록 자른다 */
 const MAX_BODY = 8000;
@@ -29,7 +33,7 @@ const KIND_LABEL = {
 exports.notifyFeedback = onDocumentCreated(
   {
     document: 'bugReports/{reportId}',
-    secrets: [GMAIL_USER, GMAIL_PASS],
+    secrets: [GMAIL_USER, GMAIL_PASS, ALERT_TO],
     // 의견은 드물게 들어온다. 폭주해도 비용이 튀지 않게 상한을 둔다.
     maxInstances: 3,
   },
@@ -66,6 +70,8 @@ exports.notifyFeedback = onDocumentCreated(
 
     const user = GMAIL_USER.value();
     const pass = GMAIL_PASS.value();
+    // ALERT_TO 를 등록하지 않았으면 보내는 계정 자신에게 보낸다
+    const to = ALERT_TO.value() || user;
 
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -77,7 +83,7 @@ exports.notifyFeedback = onDocumentCreated(
     try {
       await transporter.sendMail({
         from: `뜨개일기 <${user}>`,
-        to: user, // 운영자 본인에게. 앱이 정하지 않는다.
+        to, // 서버가 정한다. 앱은 관여하지 않는다.
         // 사용자 이메일이 있으면 메일에서 바로 답장할 수 있게 한다
         replyTo: data.email || undefined,
         subject: `[뜨개일기 v${version}] ${kind}`,
