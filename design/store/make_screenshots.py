@@ -32,6 +32,10 @@ FONT_BOLD = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
 FONT_REG = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 KR_INDEX = 2  # ttc 안에서 한국어 자형
 
+# 기분 이모지 원본 — 기록 작성 화면의 이모지 줄(🧶😄🔥😮‍💨😴🎉)을 찍어 두면
+# 여섯 칸으로 잘라 다이어리 배경에 흩뿌린다. 없으면 아래 도형으로 대체한다.
+MOOD_STRIP = Path(__file__).parent / "assets" / "moods.png"
+
 # 배지 왼쪽에 넣을 문어 아이콘.
 # 아이콘 배경색(#A88BC7)이 배지 색과 같아 경계 없이 얹힌다.
 ICON = Path(__file__).resolve().parents[2] / "public" / "icon-192.png"
@@ -258,9 +262,59 @@ MOOD_LAYOUT = [
 ]
 
 
+def slice_mood_strip() -> list[Image.Image]:
+    """이모지 줄 사진을 여섯 칸으로 잘라 낸다. 칸마다 여백을 다듬는다."""
+    strip = Image.open(MOOD_STRIP).convert("RGBA")
+    bg = strip.getpixel((1, 1))[:3]
+    cell_w = strip.width // 6
+    out = []
+
+    for i in range(6):
+        cell = strip.crop((i * cell_w, 0, (i + 1) * cell_w, strip.height))
+        # 배경과 다른 픽셀만 남겨 실제 아이콘 크기를 찾는다
+        px = cell.convert("RGB")
+        mask = Image.new("L", cell.size, 0)
+        mpx = mask.load()
+        cpx = px.load()
+        for yy in range(cell.height):
+            for xx in range(cell.width):
+                r, g, b = cpx[xx, yy]
+                if abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) > 24:
+                    mpx[xx, yy] = 255
+        box = mask.getbbox()
+        if box:
+            pad = 4
+            box = (max(0, box[0] - pad), max(0, box[1] - pad),
+                   min(cell.width, box[2] + pad), min(cell.height, box[3] + pad))
+            cell = cell.crop(box)
+        out.append(cell)
+    return out
+
+
+def fade(img: Image.Image, alpha: int) -> Image.Image:
+    """장식이므로 흐리게 — 글자와 화면을 방해하면 안 된다"""
+    faded = img.copy()
+    a = faded.getchannel("A").point(lambda v: v * alpha // 255)
+    faded.putalpha(a)
+    return faded
+
+
 def scatter_moods(canvas: Image.Image):
-    for kind, x, y, size, alpha in MOOD_LAYOUT:
-        canvas.alpha_composite(mood_mark(kind, size, alpha), (x, y))
+    cells = slice_mood_strip() if MOOD_STRIP.exists() else None
+
+    for i, (kind, x, y, size, alpha) in enumerate(MOOD_LAYOUT):
+        if cells:
+            cell = cells[i % len(cells)]
+            scale = size / max(cell.size)
+            mark = cell.resize(
+                (max(1, round(cell.width * scale)), max(1, round(cell.height * scale))),
+                Image.LANCZOS,
+            )
+            # 사진에서 잘라 온 것은 원본이 진하므로 더 눌러 준다
+            mark = fade(mark, min(255, alpha * 4))
+        else:
+            mark = mood_mark(kind, size, alpha)
+        canvas.alpha_composite(mark, (x, y))
 
 
 def draw_copy(canvas: Image.Image, draw: ImageDraw.ImageDraw,
