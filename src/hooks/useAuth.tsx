@@ -38,6 +38,14 @@ export function describeAuthError(error: unknown): string {
     "12501": "사용자가 로그인을 취소했습니다.",
     "7": "네트워크 오류입니다.",
   };
+
+  // Credential Manager 계열 오류는 code 대신 메시지로만 온다
+  if (/no credentials available/i.test(msg)) {
+    return "Google 로그인 실패 | 기기에서 사용할 수 있는 Google 계정을 찾지 못했습니다. 폰 설정 → 계정에 Google 계정이 추가되어 있는지 확인해 주세요.";
+  }
+  if (/canceled|cancelled/i.test(msg)) {
+    return "Google 로그인을 취소했습니다.";
+  }
   const hint = code != null ? hints[String(code)] : undefined;
 
   return [
@@ -48,6 +56,29 @@ export function describeAuthError(error: unknown): string {
   ]
     .filter(Boolean)
     .join(" | ");
+}
+
+/**
+ * 안드로이드 Google 로그인.
+ *
+ * 플러그인 8.x 는 기본으로 Credential Manager 를 쓰는데, 기기에 저장된
+ * 자격증명을 못 찾으면 "No credentials available" 로 실패한다.
+ * 계정이 분명히 있는데도 나는 경우가 있어(Play 서비스 상태, 기업 정책,
+ * 일부 제조사 ROM 등) 실패하면 예전 GoogleSignIn 인텐트 방식으로 재시도한다.
+ */
+async function signInWithGoogleNative() {
+  try {
+    return await FirebaseAuthentication.signInWithGoogle();
+  } catch (error) {
+    const msg = String((error as { message?: string })?.message ?? error);
+    console.warn("[auth] Credential Manager 실패 — 예전 방식으로 재시도:", msg);
+    captureError(
+      `Credential Manager 실패, 폴백 시도 | ${msg}`,
+      "signInWithGoogle/credentialManager",
+    );
+    // useCredentialManager: false → GoogleSignIn 인텐트(계정 선택 화면)로 진행
+    return await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -66,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       if (Capacitor.isNativePlatform()) {
-        const result = await FirebaseAuthentication.signInWithGoogle();
+        const result = await signInWithGoogleNative();
 
         const idToken = result.credential?.idToken;
         const accessToken = result.credential?.accessToken;

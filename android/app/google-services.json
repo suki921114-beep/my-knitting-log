@@ -22,11 +22,35 @@
           }
         },
         {
+          "client_id": "270728801613-98fkn8vsoi07arrg3unbt0j5ubfq6tkv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.suki.knittinglog",
+            "certificate_hash": "8d76b0f6ba3cdc526294057cc43da6279722949f"
+          }
+        },
+        {
+          "client_id": "270728801613-f36o869nmr2fs5oasj8r8cc1vlp34kt3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.suki.knittinglog",
+            "certificate_hash": "b1e923a4f6c731948d725850c6deb444a67d2cd1"
+          }
+        },
+        {
           "client_id": "270728801613-lhhaq77mif2l1icsgroh9osomaosfa00.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.suki.knittinglog",
             "certificate_hash": "7a23e3cdffe0f9c448295345b83496822dd45d05"
+          }
+        },
+        {
+          "client_id": "270728801613-p2u41ovnd4jl06t3hg38u5gjdbf2a85k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.suki.knittinglog",
+            "certificate_hash": "f5d9e702c817ca70e0969704fa620b8beddee065"
           }
         },
         {
