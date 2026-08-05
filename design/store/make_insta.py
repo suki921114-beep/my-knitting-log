@@ -157,49 +157,38 @@ def build_card(stems, line1, line2, sub, out_path: Path):
 def build_cover(out_path: Path):
     """1장 — 모집 표지.
 
-    피드에서 이 한 장만 보고 넘길지 말지가 정해진다.
-    무슨 앱인지 · 뭘 부탁하는지 · 뭘 주는지가 다 보여야 한다.
+    피드에서 스크롤을 멈추게 하는 게 전부인 장이다.
+    이름 · 무슨 앱인지 · 무엇을 부탁하는지 넷만 두고 크게 키운다.
+    조건과 혜택은 다음 장과 본문에서 말하면 된다.
     """
     canvas = backdrop()
     draw = ImageDraw.Draw(canvas)
 
     # 단추 장식 — (x, y, 크기, 색 번호, 투명도)
     for x, yy, size, ci, a in [
-        (48, 74, 128, 0, 255), (184, 158, 72, 1, 230), (908, 96, 92, 3, 235),
-        (30, 452, 66, 2, 205), (986, 408, 58, 1, 195), (874, 906, 106, 2, 235),
-        (112, 924, 80, 3, 225),
+        (44, 66, 146, 0, 255), (196, 168, 82, 1, 232), (892, 82, 108, 3, 238),
+        (24, 442, 74, 2, 205), (988, 396, 64, 1, 195), (856, 878, 128, 2, 238),
+        (96, 906, 96, 3, 228), (470, 966, 62, 1, 190),
     ]:
         canvas.alpha_composite(button(size, BUTTONS[ci], a), (x, yy))
 
     if ICON.exists():
-        icon = Image.open(ICON).convert("RGBA").resize((116, 116), Image.LANCZOS)
-        canvas.alpha_composite(icon, ((S - 116) // 2, 96))
+        icon = Image.open(ICON).convert("RGBA").resize((232, 232), Image.LANCZOS)
+        canvas.alpha_composite(icon, ((S - 232) // 2, 176))
 
-    y = 228
-    y += center(draw, y, "뜨개일기", font(FONT_BOLD, 44), LILAC) + 10
-    y += center(draw, y, "뜨개 프로젝트 관리 앱", font(FONT_REG, 30), MUTED) + 34
+    y = 452
+    y += center(draw, y, "뜨개일기", font(FONT_BOLD, 116), INK) + 18
+    y += center(draw, y, "뜨개 프로젝트 관리 앱", font(FONT_REG, 46), MUTED) + 62
 
     # 배지
-    f = font(FONT_BOLD, 34)
+    f = font(FONT_BOLD, 52)
     label = "BETA TESTER CALL"
     tw = draw.textbbox((0, 0), label, font=f)[2]
     th = draw.textbbox((0, 0), label, font=f)[3]
-    bw, bh = tw + 76, th + 38
+    bw, bh = tw + 104, th + 52
     bx = (S - bw) // 2
     draw.rounded_rectangle((bx, y, bx + bw, y + bh), radius=bh // 2, fill=LILAC)
-    draw.text((bx + 38, y + 15), label, font=f, fill=(255, 255, 255))
-    y += bh + 40
-
-    y += center(draw, y, "뜨개인 환영!", font(FONT_REG, 46), MUTED) + 12
-    y += center(draw, y, "먼저 써 보실래요?", font(FONT_BOLD, 86), INK) + 26
-    y += center(draw, y, "정식 출시 전에 함께 써 보고 의견을 들려주세요", font(FONT_REG, 30), MUTED) + 44
-
-    draw.rounded_rectangle((156, y, S - 156, y + 140), radius=34, fill=(255, 255, 255, 228))
-    center(draw, y + 30, "2주간 테스트해 주시면", font(FONT_REG, 32), MUTED)
-    center(draw, y + 76, "커피 상품권을 드려요", font(FONT_BOLD, 42), LILAC)
-
-    center(draw, S - 104, "안드로이드만 참여 가능", font(FONT_REG, 29), MUTED)
-    center(draw, S - 62, "프로필 링크에서 신청", font(FONT_BOLD, 30), LILAC)
+    draw.text((bx + 52, y + 22), label, font=f, fill=(255, 255, 255))
 
     OUT.mkdir(parents=True, exist_ok=True)
     canvas.convert("RGB").save(out_path, "PNG")
