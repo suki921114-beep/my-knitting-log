@@ -44,6 +44,14 @@ interface ConfirmDialogProps {
   onConfirm: () => void | Promise<void>;
   /** 외부에서 진행 중 표시할 때 사용 (버튼 비활성화) */
   busy?: boolean;
+  /**
+   * 확인 후 자동으로 닫을지. 기본 true.
+   *
+   * 2단계 확인처럼 onConfirm 이 "다음 다이얼로그 열기" 인 경우에는 false 로 둘 것.
+   * true 이면 onConfirm 이 켠 상태를 이 컴포넌트가 곧바로 되돌려 버려서
+   * 다음 단계가 뜨지 않는다.
+   */
+  closeOnConfirm?: boolean;
 }
 
 export function ConfirmDialog({
@@ -56,6 +64,7 @@ export function ConfirmDialog({
   destructive = true,
   onConfirm,
   busy = false,
+  closeOnConfirm = true,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -75,7 +84,7 @@ export function ConfirmDialog({
               try {
                 await onConfirm();
               } finally {
-                onOpenChange(false);
+                if (closeOnConfirm) onOpenChange(false);
               }
             }}
             className={

@@ -138,6 +138,9 @@ export default function SettingsData() {
         confirmLabel="다음"
         cancelLabel="취소"
         destructive
+        // 2단계를 여는 것이 목적이므로 여기서 닫으면 안 된다.
+        // (닫으면 onOpenChange 가 clearStep 을 0 으로 되돌려 2단계가 뜨지 않는다)
+        closeOnConfirm={false}
         onConfirm={() => setClearStep(2)}
       />
 
