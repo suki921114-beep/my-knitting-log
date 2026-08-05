@@ -13,7 +13,7 @@
 3) python3 design/store/make_screenshots.py
    → design/store/out/ 에 결과가 생긴다.
 
-원본은 비율이 달라도 된다. 폭에 맞춰 줄이고, 남으면 아래를 잘라 낸다.
+원본은 비율이 달라도 된다. 화면 전체가 들어가도록 폭·높이에 맞춰 줄인다 (자르지 않음).
 """
 
 from pathlib import Path
@@ -35,52 +35,54 @@ KR_INDEX = 2  # ttc 안에서 한국어 자형
 # ── 화면별 카피 ──────────────────────────────────────────────────────────────
 # 파일 이름(확장자 제외)으로 찾는다. 순서를 바꾸거나 장수를 늘려도
 # 카피가 엉키지 않게 하기 위해서다.
-#   값: (윗줄, 아랫줄 강조, 보조 설명)
+#   값: (배지, 윗줄, 아랫줄 강조, 보조 설명)  — 배지와 보조는 비워도 된다
 SHOTS = {
     "01-home": (
-        "지금 뜨고 있는 것들을", "한 화면에",
-        "여러 개를 동시에 떠도 헷갈리지 않아요",
+        "혹시 나는 전생에 문어였을까!?",
+        "마음만은 모터 손!",
+        "뜨개인의 프로젝트 관리 앱",
+        "",
     ),
     "02-01-project": (
-        "실·도안·바늘까지", "프로젝트 한 곳에",
+        "", "실·도안·바늘까지", "프로젝트 한 곳에",
         "무엇으로 떴는지 나중에도 알 수 있어요",
     ),
     "02-02-counter-gauge": (
-        "내 게이지에 맞게", "코수를 다시 계산",
+        "", "내 게이지에 맞게", "코수를 다시 계산",
         "도안과 손이 달라도 사이즈가 맞아요",
     ),
     "02-counter": (
-        "한 손으로 세는", "단수 카운터",
+        "", "한 손으로 세는", "단수 카운터",
         "숫자를 눌러 바로 고칠 수도 있어요",
     ),
     "03-diary": (
-        "오늘 뭘 떴는지", "일기처럼 기록",
+        "", "오늘 뭘 떴는지", "일기처럼 기록",
         "달력으로 지나온 날들을 돌아봐요",
     ),
     "04-library": (
-        "실·도안·바늘·부자재", "내 뜨개 서랍",
+        "", "실·도안·바늘·부자재", "내 뜨개 서랍",
         "한 번 넣어두면 계속 꺼내 써요",
     ),
     "04-01-library-yarn": (
-        "남은 실이 얼마나", "실장 정리",
+        "", "남은 실이 얼마나", "실장 정리",
         "색·굵기·권장 게이지까지 적어둘 수 있어요",
     ),
     "04-02.library-pattern": (
-        "사둔 도안을", "잊지 않게",
+        "", "사둔 도안을", "잊지 않게",
         "어떤 프로젝트에 썼는지 함께 봐요",
     ),
     "04-03.library-nedlee": (
-        "있는 바늘, 없는 바늘", "한눈에",
+        "", "있는 바늘, 없는 바늘", "한눈에",
         "같은 호수를 또 사지 않도록",
     ),
     "05-backup": (
-        "사진까지 안전하게", "클라우드 백업",
+        "", "사진까지 안전하게", "클라우드 백업",
         "폰과 태블릿에서 같은 기록을 봐요",
     ),
 }
 
 # 이름이 목록에 없을 때 쓸 기본값
-FALLBACK = ("", "뜨개일기", "뜨개하는 사람을 위한 기록장")
+FALLBACK = ("", "", "뜨개일기", "뜨개하는 사람을 위한 기록장")
 
 BASE = Path(__file__).parent
 RAW = BASE / "raw"
@@ -126,7 +128,20 @@ def round_corners(img: Image.Image, radius: int) -> Image.Image:
     return out
 
 
-def build(raw_path: Path, line1: str, line2: str, sub: str, out_path: Path):
+def draw_badge(canvas: Image.Image, draw: ImageDraw.ImageDraw, y: int, text: str) -> int:
+    """라일락 알약 안에 흰 글씨 — 눈이 가장 먼저 닿는 자리"""
+    f = fit_width(text, FONT_BOLD, 38, W - 260)
+    tw = draw.textbbox((0, 0), text, font=f)[2]
+    th = draw.textbbox((0, 0), text, font=f)[3]
+    pad_x, pad_y = 42, 22
+    bw, bh = tw + pad_x * 2, th + pad_y * 2
+    x = (W - bw) // 2
+    draw.rounded_rectangle((x, y, x + bw, y + bh), radius=bh // 2, fill=LILAC)
+    draw.text((x + pad_x, y + pad_y - 4), text, font=f, fill=(255, 255, 255))
+    return bh
+
+
+def build(raw_path: Path, badge: str, line1: str, line2: str, sub: str, out_path: Path):
     canvas = Image.new("RGBA", (W, H), IVORY + (255,))
     draw = ImageDraw.Draw(canvas)
 
@@ -137,15 +152,21 @@ def build(raw_path: Path, line1: str, line2: str, sub: str, out_path: Path):
     canvas.alpha_composite(band.filter(ImageFilter.GaussianBlur(30)), (0, 0))
 
     # ── 카피 ────────────────────────────────────────────────────────────
-    y = 130
-    f1 = fit_width(line1, FONT_REG, 52, W - 180)
-    y += center(draw, y, line1, f1, MUTED) + 18
+    y = 120
+    if badge:
+        y += draw_badge(canvas, draw, y, badge) + 34
+
+    if line1:
+        f1 = fit_width(line1, FONT_REG, 52, W - 180)
+        y += center(draw, y, line1, f1, MUTED) + 18
 
     f2 = fit_width(line2, FONT_BOLD, 82, W - 150)
     y += center(draw, y, line2, f2, INK) + 26
 
-    f3 = fit_width(sub, FONT_REG, 34, W - 200)
-    y += center(draw, y, sub, f3, MUTED) + 60
+    if sub:
+        f3 = fit_width(sub, FONT_REG, 34, W - 200)
+        y += center(draw, y, sub, f3, MUTED)
+    y += 56
 
     # ── 기기 화면 ────────────────────────────────────────────────────────
     # 화면은 절대 자르지 않는다. 아래 탭바(홈·다이어리·프로젝트…)가 잘리면
