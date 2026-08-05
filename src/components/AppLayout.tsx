@@ -3,6 +3,7 @@ import { Home, BookHeart, Notebook, Package, Settings } from 'lucide-react';
 import { useAutoSync } from '@/hooks/useAutoSync';
 import { useAndroidBackButton } from '@/hooks/useAndroidBackButton';
 import OfflineBanner from '@/components/OfflineBanner';
+import { SHOW_AUTO_BACKUP } from '@/lib/featureFlags';
 
 const tabs = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -13,8 +14,9 @@ const tabs = [
 ];
 
 export default function AppLayout() {
-  // 로그인 + 모드/네트워크 조건 충족 시 앱 진입 직후 한 번 자동 백업
-  useAutoSync();
+  // 로그인 + 모드/네트워크 조건 충족 시 앱 진입 직후 한 번 자동 백업.
+  // SHOW_AUTO_BACKUP 이 false 인 동안에는 켜고 끌 방법이 없으므로 실행도 막는다.
+  useAutoSync(SHOW_AUTO_BACKUP);
   // 안드로이드 하드웨어 뒤로가기 — 기본값은 앱 종료라 직접 처리한다
   useAndroidBackButton();
 

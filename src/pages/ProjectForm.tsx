@@ -6,7 +6,6 @@ import { statusLabel } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
 import { syncLinks } from '@/lib/linkSync';
-import PrivacyNote from '@/components/PrivacyNote';
 import YarnPicker, { YarnLink } from '@/components/YarnPicker';
 import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
 import { MultiImageInput } from '@/components/ImageInput';
@@ -351,7 +350,6 @@ export default function ProjectForm() {
         <textarea className={`${inputCls} min-h-[64px] resize-y`} value={finishedNote} onChange={e => setFinishedNote(e.target.value)} placeholder="다 만들고 나면 적어보세요." />
       </Field>
 
-      <PrivacyNote kind="memo" />
 
       <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex gap-2">

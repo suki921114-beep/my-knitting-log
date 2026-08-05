@@ -12,8 +12,8 @@ export default function Privacy() {
           시행일: <LegalPlaceholder value={EFFECTIVE_DATE} fallback="출시일 미정" variant="inline" />
         </p>
         <p className="text-[12px] text-muted-foreground">
-          본 방침은 서비스 운영 상황에 따라 변경될 수 있으며, 중요한 변경 사항이 있을 경우 시행일과 함께 안내됩니다. 서비스 운영 중 변경될 수 있으며,
-          중요한 변경이 있을 때는 시행일과 함께 갱신됩니다.
+          본 방침은 서비스 운영 상황에 따라 변경될 수 있으며, 중요한 변경이 있을 때는
+          시행일과 함께 갱신하여 안내합니다.
         </p>
 
         <Section title="1. 서비스명">
@@ -81,13 +81,13 @@ export default function Privacy() {
             클라우드의 동기화 기록도 다음 동기화 시 동일 상태로 반영됩니다.
           </p>
           <p>
-            계정 삭제(아래 7항) 요청 시에는 합리적인 기간 안에 모든 백업 데이터를 함께 삭제합니다.
+            계정 삭제(아래 7항) 시에는 클라우드에 저장된 기록과 사진을 모두 함께 삭제합니다.
           </p>
         </Section>
 
         <Section title="7. 이용자의 권리 (조회·수정·삭제·탈퇴)">
           <ul className="ml-4 list-disc space-y-1">
-            <li>설정 → 백업 및 동기화의 'JSON 파일로 내보내기' 로 본인 데이터 조회/이전 가능</li>
+            <li>설정 → 백업 및 동기화의 '내 기기로 내보내기' 로 본인 데이터 조회/이전 가능</li>
             <li>설정 → 데이터 관리의 휴지통에서 삭제된 항목 영구 삭제 가능</li>
             <li>설정 → 데이터 관리의 '전체 삭제' 로 이 기기의 모든 데이터를 한 번에 삭제 가능</li>
             <li>
@@ -108,7 +108,10 @@ export default function Privacy() {
             다만 서비스 제공을 위해 아래 인프라(처리 위탁)를 사용합니다.
           </p>
           <ul className="ml-4 mt-1 list-disc space-y-1">
-            <li>Google LLC — Firebase Authentication (로그인), Firestore (백업 데이터 저장)</li>
+            <li>
+              Google LLC — Firebase Authentication (로그인), Firestore (기록 데이터 저장),
+              Cloud Storage (사진 저장)
+            </li>
             <li>Vercel Inc. — 웹 호스팅 (HTTPS 트래픽)</li>
           </ul>
           <p className="mt-1 text-muted-foreground">
@@ -120,9 +123,6 @@ export default function Privacy() {
           <p>개인정보 관련 문의/탈퇴 요청은 아래 이메일로 보내주세요.</p>
           <p className="mt-1">
             <LegalPlaceholder value={OPERATOR_EMAIL} fallback="문의 이메일은 정식 출시 시 공개될 예정입니다." />
-          </p>
-          <p className="mt-1 text-[11.5px] text-muted-foreground">
-          
           </p>
         </Section>
 

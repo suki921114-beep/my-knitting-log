@@ -13,8 +13,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // 하단은 탭바와 제스처 바에 가려 메시지가 잘린다. 위쪽에 띄우되
       // 상태표시줄(노치) 아래로 충분히 내려 잘리지 않게 한다.
       position="top-center"
-      // 상태표시줄(노치) 아래로 넉넉히 — 붙어 있으면 잘려 보인다
-      offset="calc(var(--app-safe-top, 0px) + 28px)"
+      // 상태표시줄(노치) 아래로 넉넉히 — 붙어 있으면 답답하고 잘려 보인다.
+      // ⚠️ sonner 는 좁은 화면에서 offset 대신 mobileOffset 을 쓴다.
+      //    둘 다 주지 않으면 폰에서는 전혀 반영되지 않는다.
+      offset="calc(var(--app-safe-top, 0px) + 48px)"
+      mobileOffset="calc(var(--app-safe-top, 0px) + 48px)"
       // 한 번에 하나만. 여러 장이 겹쳐 보이면 카드가 여러 개 뜬 것처럼 읽힌다.
       expand={false}
       visibleToasts={1}

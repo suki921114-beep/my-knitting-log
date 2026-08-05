@@ -53,7 +53,12 @@ function pickSchedule(reason: DirtyReason | null) {
   return { debounceMs: GENERAL_DEBOUNCE_MS, maxWaitMs: GENERAL_MAXWAIT_MS };
 }
 
-export function useAutoSync() {
+/**
+ * @param enabled false 면 아무것도 하지 않는다.
+ *        자동 백업 UI 를 감춘 동안(SHOW_AUTO_BACKUP=false) 사용자가 끌 방법이
+ *        없으므로, 예전에 켜 둔 설정이 남아 있어도 실행되지 않게 막는다.
+ */
+export function useAutoSync(enabled = true) {
   const { user, loading } = useAuth();
 
   const userRef = useRef(user);
@@ -64,6 +69,7 @@ export function useAutoSync() {
   const initialFiredRef = useRef(false);
 
   useEffect(() => {
+    if (!enabled) return;
     if (loading) return;
     if (!user) return;
 
@@ -204,5 +210,5 @@ export function useAutoSync() {
         maxWaitTimer.current = null;
       }
     };
-  }, [user, loading]);
+  }, [user, loading, enabled]);
 }

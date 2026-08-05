@@ -21,3 +21,20 @@
  * upload/download 두 함수만 교체하면 된다.
  */
 export const ENABLE_CLOUD_PHOTO_SYNC = true;
+
+/**
+ * 자동 백업 UI 를 보여줄지.
+ *
+ * false — 추후 프리미엄 기능으로 검토 중이라 화면에서만 감춘다.
+ * 로직(useAutoSync, syncRunner)은 그대로 두었으므로 true 로 바꾸면 바로 돌아온다.
+ * 감춘 동안에는 자동 백업이 실행되지 않도록 훅 호출도 이 값으로 막는다.
+ */
+export const SHOW_AUTO_BACKUP = false;
+
+/**
+ * 백업/가져오기 후 항목별 수치 카드를 보여줄지.
+ *
+ * false — 일반 사용자에게는 필요 없는 정보다.
+ * 동기화 문제를 파고들 때 true 로 바꾸면 다시 보인다.
+ */
+export const SHOW_SYNC_RESULT = false;

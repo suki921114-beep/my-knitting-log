@@ -49,6 +49,7 @@ import {
   runFullRestore,
 } from '@/lib/syncRunner';
 import { readUsage, takeSkippedPhotos, takeFailedPhotoDownloads } from '@/lib/cloudUsage';
+import { SHOW_AUTO_BACKUP, SHOW_SYNC_RESULT } from '@/lib/featureFlags';
 import {
   FREE_QUOTA_BYTES,
   MAX_PHOTO_BYTES,
@@ -63,6 +64,17 @@ import {
   subscribeSyncDirty,
   getLastAutoBackupAt,
 } from '@/lib/syncDirty';
+
+/**
+ * 백업은 '올리기' 만 한다.
+ *
+ * 예전에는 백업 한 번에 업로드와 다운로드를 함께 했다. 그러다 보니 데이터를
+ * 전체 삭제한 뒤 [백업] 을 누르면 클라우드에서 도로 내려와 지운 것이 되살아났다.
+ * 받아오는 것은 [가져오기] 와 [클라우드 상태로 되돌리기] 가 맡는다.
+ */
+function uploadOnly<T extends { toDownload: unknown[] }>(diff: T): T {
+  return { ...diff, toDownload: [] };
+}
 
 function syncToastDetail(stat: EntitySyncStat) {
   const parts = [`↑ ${stat.uploaded}`, `↓ ${stat.downloaded}`, `· ${stat.unchanged}`];
@@ -314,27 +326,27 @@ export default function SettingsBackup() {
     try {
       toast.loading('백업 대상 분석 중…', { id: tid });
 
-      const yarnDiff = await calculateYarnSyncDiff(user.uid);
-      const patternDiff = await calculatePatternSyncDiff(user.uid);
-      const needleDiff = await calculateNeedleSyncDiff(user.uid);
-      const notionDiff = await calculateNotionSyncDiff(user.uid);
-      const projectDiff = await calculateProjectSyncDiff(user.uid);
-      const logDiff = await calculateLogSyncDiff(user.uid);
+      const yarnDiff = uploadOnly(await calculateYarnSyncDiff(user.uid));
+      const patternDiff = uploadOnly(await calculatePatternSyncDiff(user.uid));
+      const needleDiff = uploadOnly(await calculateNeedleSyncDiff(user.uid));
+      const notionDiff = uploadOnly(await calculateNotionSyncDiff(user.uid));
+      const projectDiff = uploadOnly(await calculateProjectSyncDiff(user.uid));
+      const logDiff = uploadOnly(await calculateLogSyncDiff(user.uid));
 
       toast.dismiss(tid);
 
       const rows: DiffRow[] = [
-        { label: '실', a: yarnDiff.toUpload.length, b: yarnDiff.toDownload.length, same: yarnDiff.unchanged },
-        { label: '도안', a: patternDiff.toUpload.length, b: patternDiff.toDownload.length, same: patternDiff.unchanged },
-        { label: '바늘', a: needleDiff.toUpload.length, b: needleDiff.toDownload.length, same: needleDiff.unchanged },
-        { label: '부자재', a: notionDiff.toUpload.length, b: notionDiff.toDownload.length, same: notionDiff.unchanged },
-        { label: '프로젝트', a: projectDiff.toUpload.length, b: projectDiff.toDownload.length, same: projectDiff.unchanged },
-        { label: '일기', a: logDiff.toUpload.length, b: logDiff.toDownload.length, same: logDiff.unchanged },
+        { label: '실', a: yarnDiff.toUpload.length, b: 0, same: yarnDiff.unchanged },
+        { label: '도안', a: patternDiff.toUpload.length, b: 0, same: patternDiff.unchanged },
+        { label: '바늘', a: needleDiff.toUpload.length, b: 0, same: needleDiff.unchanged },
+        { label: '부자재', a: notionDiff.toUpload.length, b: 0, same: notionDiff.unchanged },
+        { label: '프로젝트', a: projectDiff.toUpload.length, b: 0, same: projectDiff.unchanged },
+        { label: '일기', a: logDiff.toUpload.length, b: 0, same: logDiff.unchanged },
       ];
 
       const ok = await confirm({
-        title: '지금 백업할까요?',
-        description: <DiffTable rows={rows} aLabel="업로드" bLabel="다운로드" />,
+        title: '이 기기의 기록을 클라우드에 올릴까요?',
+        description: <DiffTable rows={rows} aLabel="올릴 항목" bLabel="변경 없음" hideB={true} />,
         confirmLabel: '백업',
         destructive: false,
       });
@@ -462,8 +474,7 @@ export default function SettingsBackup() {
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           </span>
           <div className="min-w-0 flex-1 text-left">
-            <div className="text-[13.5px] font-semibold text-foreground">JSON 파일로 내보내기</div>
-            <div className="text-[11.5px] text-muted-foreground">사진까지 전부 담긴 백업 파일을 기기에 저장</div>
+            <div className="text-[13.5px] font-semibold text-foreground">내 기기로 내보내기</div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -476,8 +487,7 @@ export default function SettingsBackup() {
             <Upload className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1 text-left">
-            <div className="text-[13.5px] font-semibold text-foreground">JSON 파일에서 가져오기</div>
-            <div className="text-[11.5px] text-muted-foreground">백업 파일을 현재 데이터에 병합</div>
+            <div className="text-[13.5px] font-semibold text-foreground">내 기기에서 가져오기</div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -506,10 +516,6 @@ export default function SettingsBackup() {
               클라우드 백업
               <PhotoWarningPopover />
             </h3>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              사진까지 함께 올라가서 폰과 태블릿에서 같은 기록을 볼 수 있어요.
-            </p>
-
             <UsageGauge usage={usage} />
             <div className="mt-4 flex gap-2">
               <button
@@ -556,8 +562,10 @@ export default function SettingsBackup() {
         </div>
       )}
 
-      {/* 자동 백업 설정 */}
-      {user && <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} dirty={dirty} lastAutoBackup={lastAutoBackup} />}
+      {/* 자동 백업 — 추후 프리미엄 기능으로 검토 중이라 UI 만 감춰 둔다 (코드는 유지) */}
+      {SHOW_AUTO_BACKUP && user && (
+        <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} dirty={dirty} lastAutoBackup={lastAutoBackup} />
+      )}
 
       {/* 되돌리기 1단계 */}
       <ConfirmDialog
@@ -591,8 +599,8 @@ export default function SettingsBackup() {
         onConfirm={handleRestore}
       />
 
-      {/* 마지막 결과 */}
-      {lastResult && <LastResultCard result={lastResult} />}
+      {/* 마지막 백업 결과 — 사용자가 알 필요는 없어 감춰 둔다 (진단이 필요하면 다시 켠다) */}
+      {SHOW_SYNC_RESULT && lastResult && <LastResultCard result={lastResult} />}
     </div>
   );
 }
@@ -617,13 +625,9 @@ function UsageGauge({ usage }: { usage: StorageUsage }) {
           style={{ width: `${Math.max(pct, usage.bytes > 0 ? 2 : 0)}%` }}
         />
       </div>
-      <p className="mt-1.5 text-[11px] text-muted-foreground">
-        {usage.photoCount > 0
-          ? `사진 ${usage.photoCount}장 보관 중 · 약 ${Math.floor(
-              (FREE_QUOTA_BYTES - usage.bytes) / (200 * 1024),
-            ).toLocaleString()}장 더 올릴 수 있어요`
-          : '아직 올린 사진이 없어요. [백업]을 누르면 함께 올라갑니다.'}
-      </p>
+      {usage.photoCount > 0 && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">사진 {usage.photoCount}장 보관 중</p>
+      )}
     </div>
   );
 }
@@ -942,14 +946,25 @@ interface DiffRow {
   same: number;
 }
 
-function DiffTable({ rows, aLabel, bLabel }: { rows: DiffRow[]; aLabel: string; bLabel: string }) {
+/** @param hideB 백업(올리기 전용)처럼 두 번째 열이 항상 0 일 때 감춘다 */
+function DiffTable({
+  rows,
+  aLabel,
+  bLabel,
+  hideB,
+}: {
+  rows: DiffRow[];
+  aLabel: string;
+  bLabel: string;
+  hideB?: boolean;
+}) {
   return (
     <div className="mt-1 space-y-1.5">
       <div className="flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
         <span>항목</span>
         <span className="flex gap-3 tabular-nums">
           <span className="w-12 text-right">{aLabel}</span>
-          <span className="w-12 text-right">{bLabel}</span>
+          {!hideB && <span className="w-12 text-right">{bLabel}</span>}
           <span className="w-12 text-right">변경없음</span>
         </span>
       </div>
@@ -958,7 +973,9 @@ function DiffTable({ rows, aLabel, bLabel }: { rows: DiffRow[]; aLabel: string; 
           <span className="font-medium text-foreground">{r.label}</span>
           <span className="flex gap-3 tabular-nums">
             <span className={`w-12 text-right ${r.a > 0 ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>{r.a}</span>
-            <span className={`w-12 text-right ${r.b > 0 ? 'font-semibold text-accent-foreground' : 'text-muted-foreground'}`}>{r.b}</span>
+            {!hideB && (
+              <span className={`w-12 text-right ${r.b > 0 ? 'font-semibold text-accent-foreground' : 'text-muted-foreground'}`}>{r.b}</span>
+            )}
             <span className="w-12 text-right text-muted-foreground">{r.same}</span>
           </span>
         </div>
