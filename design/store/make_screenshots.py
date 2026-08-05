@@ -32,6 +32,10 @@ FONT_BOLD = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
 FONT_REG = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 KR_INDEX = 2  # ttc 안에서 한국어 자형
 
+# 배지 왼쪽에 넣을 문어 아이콘.
+# 아이콘 배경색(#A88BC7)이 배지 색과 같아 경계 없이 얹힌다.
+ICON = Path(__file__).resolve().parents[2] / "public" / "icon-192.png"
+
 # ── 화면별 카피 ──────────────────────────────────────────────────────────────
 # 파일 이름(확장자 제외)으로 찾는다. 순서를 바꾸거나 장수를 늘려도
 # 카피가 엉키지 않게 하기 위해서다.
@@ -39,8 +43,8 @@ KR_INDEX = 2  # ttc 안에서 한국어 자형
 SHOTS = {
     "01-home": (
         "혹시 나는 전생에 문어였을까!?",
-        "마음만은 모터 손!",
-        "뜨개인의 프로젝트 관리 앱",
+        "뜨개인을 위한",
+        "프로젝트 관리 앱",
         "",
     ),
     "02-01-project": (
@@ -129,15 +133,28 @@ def round_corners(img: Image.Image, radius: int) -> Image.Image:
 
 
 def draw_badge(canvas: Image.Image, draw: ImageDraw.ImageDraw, y: int, text: str) -> int:
-    """라일락 알약 안에 흰 글씨 — 눈이 가장 먼저 닿는 자리"""
-    f = fit_width(text, FONT_BOLD, 38, W - 260)
+    """라일락 알약 안에 문어 아이콘과 흰 글씨 — 눈이 가장 먼저 닿는 자리"""
+    f = fit_width(text, FONT_BOLD, 38, W - 340)
     tw = draw.textbbox((0, 0), text, font=f)[2]
     th = draw.textbbox((0, 0), text, font=f)[3]
-    pad_x, pad_y = 42, 22
-    bw, bh = tw + pad_x * 2, th + pad_y * 2
+
+    pad_x, pad_y = 40, 22
+    bh = th + pad_y * 2
+    icon_size = bh - 18
+    gap = 16
+    has_icon = ICON.exists()
+
+    bw = pad_x * 2 + tw + ((icon_size + gap) if has_icon else 0)
     x = (W - bw) // 2
     draw.rounded_rectangle((x, y, x + bw, y + bh), radius=bh // 2, fill=LILAC)
-    draw.text((x + pad_x, y + pad_y - 4), text, font=f, fill=(255, 255, 255))
+
+    cursor = x + pad_x
+    if has_icon:
+        icon = Image.open(ICON).convert("RGBA").resize((icon_size, icon_size), Image.LANCZOS)
+        canvas.alpha_composite(icon, (cursor, y + (bh - icon_size) // 2))
+        cursor += icon_size + gap
+
+    draw.text((cursor, y + pad_y - 4), text, font=f, fill=(255, 255, 255))
     return bh
 
 
