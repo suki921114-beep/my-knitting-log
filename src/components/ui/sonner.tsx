@@ -10,6 +10,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // 하단은 탭바와 제스처 바에 가려 메시지가 잘린다. 위쪽에 띄우고
+      // 상태표시줄만큼 내려 준다.
+      position="top-center"
+      offset="calc(env(safe-area-inset-top, 0px) + 12px)"
       toastOptions={{
         classNames: {
           toast:

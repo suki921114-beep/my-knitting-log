@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { clearErrorLogs, getErrorLogs } from '@/lib/errorLog';
+import { readSigningInfo, type SigningInfoResult } from '@/lib/signingInfo';
 import { collectEnvInfo, APP_VERSION } from '@/lib/appVersion';
 import { OPERATOR_EMAIL } from '@/lib/legalPlaceholders';
 import PageHeader from '@/components/PageHeader';
@@ -21,11 +22,17 @@ export default function BugReport() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
+  const [signing, setSigning] = useState<SigningInfoResult | null>(null);
+
   const env = collectEnvInfo();
+
+  useEffect(() => {
+    readSigningInfo().then(setSigning);
+  }, []);
 
   function reportText() {
     return JSON.stringify(
-      { description: description.trim(), ...env, errorLogs: logs },
+      { description: description.trim(), ...env, signing, errorLogs: logs },
       null,
       2,
     );
@@ -176,6 +183,34 @@ export default function BugReport() {
           최근 에러 로그 <span className="tabular-nums text-foreground">{logs.length}개</span>
         </div>
       </div>
+
+      {signing && (
+        <details className="card-soft p-4">
+          <summary className="cursor-pointer text-[13px] font-bold text-foreground">
+            앱 서명 정보 (로그인 문제 진단용)
+          </summary>
+          <div className="mt-2 space-y-2 text-[11px]">
+            <div>
+              <div className="text-muted-foreground">패키지</div>
+              <div className="select-text break-all text-foreground">{signing.packageName}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">웹 클라이언트 ID</div>
+              <div className="select-text break-all text-foreground">
+                {signing.webClientId ?? '(없음)'}
+              </div>
+            </div>
+            {signing.certificates.map((cert, i) => (
+              <div key={cert.sha1}>
+                <div className="text-muted-foreground">
+                  서명 인증서 SHA-1 {signing.certificates.length > 1 ? `#${i + 1}` : ''}
+                </div>
+                <div className="select-text break-all font-mono text-foreground">{cert.sha1}</div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {logs.length > 0 && (
         <details className="card-soft p-4">
