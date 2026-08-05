@@ -37,3 +37,5 @@ functions/package-lock.json
 design/store/raw/*
 !design/store/raw/README.md
 design/store/out/
+design/store/assets/*
+!design/store/assets/README.md

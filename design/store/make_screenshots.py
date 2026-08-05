@@ -287,7 +287,33 @@ def slice_mood_strip() -> list[Image.Image]:
             box = (max(0, box[0] - pad), max(0, box[1] - pad),
                    min(cell.width, box[2] + pad), min(cell.height, box[3] + pad))
             cell = cell.crop(box)
-        out.append(cell)
+        out.append(drop_background(cell))
+    return out
+
+
+def drop_background(cell: Image.Image) -> Image.Image:
+    """이모지만 남기고 뒤판(동그란 회색 칩과 여백)을 투명하게.
+
+    바깥 네 귀퉁이에서 물 붓듯 번져 나가며 지운다. 색을 기준으로 한 번에
+    지우면 이모지 안의 흰 부분에 구멍이 생기는데, 이 방식은 바깥과 이어진
+    영역만 지워서 그럴 일이 없다.
+    """
+    KEY = (255, 0, 255)
+    rgb = cell.convert("RGB")
+    for corner in ((0, 0), (cell.width - 1, 0), (0, cell.height - 1),
+                   (cell.width - 1, cell.height - 1)):
+        try:
+            ImageDraw.floodfill(rgb, corner, KEY, thresh=42)
+        except Exception:
+            pass
+
+    out = cell.convert("RGBA")
+    px_rgb = rgb.load()
+    px_out = out.load()
+    for yy in range(out.height):
+        for xx in range(out.width):
+            if px_rgb[xx, yy] == KEY:
+                px_out[xx, yy] = (0, 0, 0, 0)
     return out
 
 
