@@ -190,39 +190,53 @@ function ProjectCarousel({
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
     const el = ref.current;
     if (!el) return;
-    // 마우스가 카드 밖으로 나가도 계속 이벤트를 받도록 붙잡아 둔다
-    el.setPointerCapture(e.pointerId);
+    // 여기서는 아직 아무것도 붙잡지 않는다. 그냥 누른 것일 수도 있으니까.
     drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, moved: false };
-    setDragging(true);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const el = ref.current;
     if (!el || !drag.current.active) return;
     const dx = e.clientX - drag.current.startX;
-    if (Math.abs(dx) > 4) drag.current.moved = true;
+
+    // 문턱을 넘은 뒤에야 '드래그' 로 인정한다.
+    // 누르자마자 붙잡으면(setPointerCapture) 클릭이 컨테이너로 가로채져서
+    // 카드 안의 +/- 버튼이 눌리지 않는다. 실제로 그 버그가 있었다.
+    if (!drag.current.moved) {
+      if (Math.abs(dx) <= 4) return;
+      drag.current.moved = true;
+      el.setPointerCapture(e.pointerId);
+      setDragging(true);
+    }
+
     el.scrollLeft = drag.current.startScroll - dx;
   }
 
   function endDrag(e?: React.PointerEvent<HTMLDivElement>) {
     if (!drag.current.active) return;
     drag.current.active = false;
-    setDragging(false);
 
     const el = ref.current;
-    if (!el) return;
+    // 실제로 끌지 않았다면(=그냥 클릭) 아무것도 건드리지 않는다
+    if (!drag.current.moved || !el) return;
+
+    setDragging(false);
     if (e && el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
     // 스냅이 다시 켜진 뒤에 이동해야 중간에서 튕기지 않는다
     const target = Math.round(el.scrollLeft / el.clientWidth);
     requestAnimationFrame(() => goTo(target));
   }
 
-  /** 끌고 나서 손을 뗀 클릭은 카드 열기로 치지 않는다 */
+  /**
+   * 끌고 나서 손을 뗀 클릭은 카드 열기로 치지 않는다.
+   * moved 는 여기서 지우지 않고 다음 pointerdown 에서 초기화한다 —
+   * 드래그로 끝나 클릭이 아예 오지 않는 경우가 있어서, 여기서 지우면
+   * 플래그가 남아 바로 다음 클릭이 삼켜진다.
+   */
   function onClickCapture(e: React.MouseEvent) {
     if (drag.current.moved) {
       e.stopPropagation();
       e.preventDefault();
-      drag.current.moved = false;
     }
   }
 

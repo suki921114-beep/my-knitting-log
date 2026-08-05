@@ -51,16 +51,22 @@ service cloud.firestore {
                       );
     }
 
-    // 버그 신고 — 로그인한 사용자가 '보내기' 를 눌렀을 때만 생성된다.
+    // 의견 보내기 — 로그인한 사용자가 '보내기' 를 눌렀을 때만 생성된다.
     //   create: 본인 uid 로만, 최소한의 형식 검증
-    //   read/update/delete: 전부 금지 (다른 사람 신고를 볼 수 없다)
-    //   → 운영자는 Firebase 콘솔에서 확인한다
+    //   read/update/delete: 전부 금지 (다른 사람 의견을 볼 수 없다)
+    //   → 운영자는 Firebase 콘솔과 메일 알림으로 확인한다
+    //
+    // ⚠️ to 는 Trigger Email 확장이 읽는 '받는 사람' 이다.
+    //    클라이언트가 정하는 값이므로 운영자 주소로 못 박는다.
+    //    풀어 두면 누구에게나 메일을 보내는 발송기로 악용될 수 있다.
+    //    (확장은 Admin SDK 로 동작해 규칙을 우회하므로 delivery 필드는 쓸 수 있다)
     match /bugReports/{reportId} {
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.description is string
                     && request.resource.data.description.size() > 0
-                    && request.resource.data.description.size() < 5000;
+                    && request.resource.data.description.size() < 5000
+                    && request.resource.data.to == ['knits2crochet@gmail.com'];
       allow read, update, delete: if false;
     }
 
