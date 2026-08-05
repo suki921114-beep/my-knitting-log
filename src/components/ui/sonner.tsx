@@ -16,8 +16,15 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // 상태표시줄(노치) 아래로 넉넉히 — 붙어 있으면 답답하고 잘려 보인다.
       // ⚠️ sonner 는 좁은 화면에서 offset 대신 mobileOffset 을 쓴다.
       //    둘 다 주지 않으면 폰에서는 전혀 반영되지 않는다.
-      offset="calc(var(--app-safe-top, 0px) + 48px)"
-      mobileOffset="calc(var(--app-safe-top, 0px) + 48px)"
+      // ⚠️ 값을 하나만 주면 위아래좌우 전부에 적용된다. 그러면 sonner 가
+      //    좁은 화면에서 폭을 `100% - 좌우여백*2` 로 계산하므로 카드가 확 좁아진다.
+      //    위쪽만 크게 두고 좌우는 따로 지정한다.
+      offset={{ top: 'calc(var(--app-safe-top, 0px) + 28px)' }}
+      mobileOffset={{
+        top: 'calc(var(--app-safe-top, 0px) + 28px)',
+        left: '14px',
+        right: '14px',
+      }}
       // 한 번에 하나만. 여러 장이 겹쳐 보이면 카드가 여러 개 뜬 것처럼 읽힌다.
       expand={false}
       visibleToasts={1}
