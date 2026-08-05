@@ -128,7 +128,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 function Actions({ editing, onSave, onRemove }: { editing: boolean; onSave: () => void; onRemove: () => void }) {
   return (
-    <div className="sticky bottom-20 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
+    <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
       <div className="flex gap-2">
         {editing && (
           <button onClick={onRemove} className="rounded-full border border-destructive/30 px-4 py-2.5 text-sm text-destructive">

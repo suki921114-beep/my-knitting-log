@@ -40,7 +40,7 @@ export default function Terms() {
           <ul className="ml-4 mt-1 list-disc space-y-1">
             <li>모든 데이터가 항상 즉시 클라우드에 반영됨</li>
             <li>모든 기기에서 항상 동일한 데이터를 즉시 볼 수 있음</li>
-            <li>개별 사진/대용량 파일이 클라우드에 백업됨 (현재 사진은 무료 백업 미포함)</li>
+            <li>모든 사진이 항상 클라우드에 백업됨 (계정당 1GB 상한이 있으며, 초과분은 기기에만 남습니다)</li>
           </ul>
           <p className="mt-1 font-semibold">
             중요한 데이터는 이용자가 별도로(예: JSON 파일 내보내기) 백업해 둘 책임이 있습니다.

@@ -8,7 +8,7 @@ import { Download, X, AlertTriangle } from 'lucide-react';
 // ----------------------------------------------------------------------------
 // 사진 백업 리마인더
 // ----------------------------------------------------------------------------
-// 사진은 클라우드에 올라가지 않고 이 기기 IndexedDB 에만 있다.
+// 사진은 클라우드에도 올라가지만 1GB 상한이 있다. JSON 내보내기는 상한이 없다.
 // 앱 삭제 / 브라우저 저장소 정리 / 기기 교체 시 그대로 사라진다.
 // 사진이 쌓였는데 오래 내보내기를 안 했으면 홈에서 한 번 알려 준다.
 
@@ -84,13 +84,13 @@ export default function BackupReminder() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-200">
-            사진 {photoCount}장이 이 기기에만 있어요
+백업한 지 오래됐어요 · 사진 {photoCount}장
           </p>
           <p className="mt-1 text-[11.5px] leading-relaxed text-amber-800/90 dark:text-amber-300/80">
             {neverBackedUp
               ? '아직 백업 파일을 저장한 적이 없어요.'
               : `마지막 백업이 ${backupDays}일 전이에요.`}{' '}
-            사진은 클라우드 백업에 포함되지 않아, 앱을 지우거나 기기를 바꾸면 사라집니다.
+JSON 파일로 내보내면 사진까지 통째로, 용량 제한 없이 보관할 수 있어요.
           </p>
           <Link
             to="/settings/backup"

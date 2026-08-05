@@ -111,7 +111,7 @@ export default function LogForm() {
   }
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4">
       <PageHeader title={editing ? '기록 수정' : '오늘의 기록'} back />
       {dialog}
 
@@ -192,7 +192,7 @@ export default function LogForm() {
         <MultiImageInput values={urls} onChange={next => setPhotos(reconcilePhotos(photos, next))} max={4} />
       </FieldDiv>
 
-      <div className="sticky bottom-20 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex gap-2">
           {editing && (
             <button

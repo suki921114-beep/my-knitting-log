@@ -21,7 +21,15 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <OfflineBanner />
-      <main className="flex-1 mx-auto w-full max-w-2xl px-4 pb-28 pt-6 animate-fade-in">
+      {/*
+        하단 탭바가 fixed 라 본문이 그 아래로 숨는다.
+        탭바 높이(약 4.5rem) + 제스처 바(safe-area) + 여유 를 확보한다.
+        페이지마다 따로 pb 를 주지 않아도 되도록 여기서 한 번에 처리.
+      */}
+      <main
+        className="flex-1 mx-auto w-full max-w-2xl px-4 pt-6 animate-fade-in"
+        style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <Outlet />
       </main>
       <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-card/90 backdrop-blur-xl">

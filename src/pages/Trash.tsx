@@ -48,6 +48,42 @@ export default function Trash() {
     label: string;
   } | null>(null);
   const [purging, setPurging] = useState(false);
+  // 전체 비우기 — 하나씩 지우기엔 번거로우므로 2단계 확인 후 한 번에
+  const [emptyStep, setEmptyStep] = useState<0 | 1 | 2>(0);
+  const [emptying, setEmptying] = useState(false);
+
+  /** 휴지통에 있는 모든 항목을 이 기기에서 완전히 지운다 */
+  async function emptyTrash() {
+    setEmptying(true);
+    try {
+      const tables: TableName[] = [
+        'yarns', 'patterns', 'needles', 'notions',
+        'projects', 'rowCounters', 'projectGauges', 'logs',
+      ];
+      let removed = 0;
+      for (const name of tables) {
+        const table = (db as any)[name];
+        // isDeleted 가 true 인 것만 — 실수로 살아있는 기록을 지우지 않도록 방어
+        const ids = (await table.filter((x: any) => x.isDeleted === true).toArray())
+          .map((x: any) => x.id)
+          .filter((id: unknown): id is number => typeof id === 'number');
+        if (ids.length) {
+          await table.bulkDelete(ids);
+          removed += ids.length;
+        }
+      }
+      toast.success(`${removed}개를 영구 삭제했어요`, {
+        id: 'trash-action',
+        description: '이 기기에서 완전히 지웠습니다.',
+      });
+    } catch (e) {
+      console.error('[Trash] 전체 비우기 실패:', e);
+      toast.error('전체 비우기 실패', { id: 'trash-action', description: '잠시 후 다시 시도해 주세요.' });
+    } finally {
+      setEmptying(false);
+      setEmptyStep(0);
+    }
+  }
 
   async function restore(table: TableName, id: number, label: string) {
     const t = Date.now();
@@ -56,7 +92,7 @@ export default function Trash() {
       deletedAt: null,
       updatedAt: t,
     });
-    toast.success(`${label}을(를) 복원했어요`);
+    toast.success(`${label}을(를) 복원했어요`, { id: 'trash-action' });
   }
 
   function askPurge(table: TableName, id: number, label: string) {
@@ -69,11 +105,13 @@ export default function Trash() {
     try {
       await (db as any)[pendingPurge.table].delete(pendingPurge.id);
       toast.success('영구 삭제했어요', {
+        id: 'trash-action',
         description: '이 기기에서 완전히 지웠습니다.',
       });
     } catch (e) {
       console.error('[Trash] 영구 삭제 실패:', e);
       toast.error('영구 삭제 실패', {
+        id: 'trash-action',
         description: '잠시 후 다시 시도해 주세요.',
       });
     } finally {
@@ -91,6 +129,23 @@ export default function Trash() {
           삭제 후 <strong>{TRASH_RETENTION_DAYS}일</strong>이 지나면 이 기기에서 자동으로 영구 삭제됩니다.
           되살리려면 그 전에 복원해 주세요.
         </div>
+      )}
+
+      {total > 0 && (
+        <button
+          type="button"
+          onClick={() => setEmptyStep(1)}
+          disabled={emptying}
+          className="card-danger flex w-full items-center gap-3 p-3.5 text-left bg-card disabled:opacity-50"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+            <Trash2 className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-destructive">휴지통 비우기</div>
+            <div className="text-[11px] text-destructive/70">{total}개를 한 번에 영구 삭제해요</div>
+          </div>
+        </button>
       )}
 
       {total === 0 ? (
@@ -204,6 +259,32 @@ export default function Trash() {
         destructive
         busy={purging}
         onConfirm={runPurge}
+      />
+
+      {/* 전체 비우기 1단계 */}
+      <ConfirmDialog
+        open={emptyStep === 1}
+        onOpenChange={(o) => !o && setEmptyStep(0)}
+        title="휴지통을 비울까요?"
+        description={`휴지통에 있는 ${total}개 항목을 이 기기에서 완전히 지웁니다. 휴지통에 없는 기록은 그대로 남아요.`}
+        confirmLabel="다음"
+        cancelLabel="취소"
+        destructive
+        closeOnConfirm={false}
+        onConfirm={() => setEmptyStep(2)}
+      />
+
+      {/* 전체 비우기 2단계 */}
+      <ConfirmDialog
+        open={emptyStep === 2}
+        onOpenChange={(o) => !o && setEmptyStep(0)}
+        title="되돌릴 수 없어요. 계속할까요?"
+        description="지운 뒤에는 복원할 수 없습니다. 클라우드 백업에는 삭제 기록만 남아요."
+        confirmLabel="휴지통 비우기"
+        cancelLabel="취소"
+        destructive
+        busy={emptying}
+        onConfirm={emptyTrash}
       />
     </div>
   );

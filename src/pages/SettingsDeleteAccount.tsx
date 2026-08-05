@@ -123,7 +123,7 @@ export default function SettingsDeleteAccount() {
   }
 
   return (
-    <div className="space-y-5 pb-28">
+    <div className="space-y-5">
       <PageHeader title="계정 삭제" back subtitle={user.email || undefined} />
 
       {/* 경고 */}
@@ -169,8 +169,8 @@ export default function SettingsDeleteAccount() {
             이 기기에 저장된 기록도 함께 삭제
           </span>
           <span className="mt-0.5 block text-[11.5px] leading-relaxed text-muted-foreground">
-            체크를 해제하면 클라우드 계정만 지우고, 이 기기의 기록은 남겨 둡니다.
-            사진은 원래 이 기기에만 있으므로 체크를 해제하면 사진이 보존됩니다.
+            체크를 해제하면 클라우드 데이터만 지우고, 이 기기의 기록은 남겨 둡니다.
+            클라우드에 올라간 사진은 어느 쪽이든 함께 삭제됩니다.
           </span>
         </span>
       </label>

@@ -13,10 +13,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // 하단은 탭바와 제스처 바에 가려 메시지가 잘린다. 위쪽에 띄우되
       // 상태표시줄(노치) 아래로 충분히 내려 잘리지 않게 한다.
       position="top-center"
-      offset="calc(var(--app-safe-top, 0px) + 16px)"
-      // 여러 단계를 진행할 때 카드가 화면을 덮지 않도록 겹쳐 쌓고 개수를 제한한다
+      // 상태표시줄(노치) 아래로 넉넉히 — 붙어 있으면 잘려 보인다
+      offset="calc(var(--app-safe-top, 0px) + 28px)"
+      // 한 번에 하나만. 여러 장이 겹쳐 보이면 카드가 여러 개 뜬 것처럼 읽힌다.
       expand={false}
-      visibleToasts={3}
+      visibleToasts={1}
       toastOptions={{
         classNames: {
           toast:

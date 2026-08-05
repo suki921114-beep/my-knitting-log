@@ -151,7 +151,7 @@ export default function BugReport() {
   }
 
   return (
-    <div className="space-y-5 pb-28">
+    <div className="space-y-5">
       <PageHeader title="버그 신고" back />
       {dialog}
 

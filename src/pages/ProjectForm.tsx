@@ -342,8 +342,7 @@ export default function ProjectForm() {
           onChange={(urls) => setPhotos(reconcilePhotos(photos, urls))}
         />
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          ※ 사진은 현재 이 기기에만 저장됩니다. 클라우드 백업에는 사진이 포함되지 않아요.
-          기기를 바꾸기 전에는 설정 → 백업에서 <strong>JSON 내보내기</strong>를 해두세요 — 여기엔 사진도 함께 저장됩니다.
+          ※ 사진은 클라우드에 <strong>1GB까지</strong> 함께 백업돼요. 남은 용량은 설정 → 백업에서 볼 수 있어요.
         </p>
       </Field>
 
@@ -354,7 +353,7 @@ export default function ProjectForm() {
 
       <PrivacyNote kind="memo" />
 
-      <div className="sticky bottom-20 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex gap-2">
           {editing && (
             <button onClick={remove} className="inline-flex items-center justify-center rounded-full border border-destructive/30 px-4 py-2.5 text-sm text-destructive">

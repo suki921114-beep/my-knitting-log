@@ -35,7 +35,7 @@ export default function Settings() {
   }, []) ?? 0;
 
   return (
-    <div className="space-y-6 pb-28">
+    <div className="space-y-6">
       <PageHeader title="설정" />
       {dialog}
 

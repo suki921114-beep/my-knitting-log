@@ -256,7 +256,7 @@ export default function ProjectDetail() {
               ))}
           </div>
           <p className="mt-2 text-[10.5px] text-muted-foreground/80">
-            사진은 이 기기에만 저장돼요 · 무료 백업 미포함
+            사진도 클라우드에 함께 백업돼요 · 1GB까지
           </p>
         </Section>
       )}

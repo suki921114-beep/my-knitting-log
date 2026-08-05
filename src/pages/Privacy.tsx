@@ -25,7 +25,7 @@ export default function Privacy() {
           <ul className="ml-4 mt-1 list-disc space-y-1">
             <li>Google 계정 식별자(UID), 이메일, 표시 이름, 프로필 사진 URL</li>
             <li>이용자가 직접 입력한 뜨개 기록 데이터: 실/도안/바늘/부자재/프로젝트/단수 카운터/게이지/메모 등</li>
-            <li>이용자가 추가한 사진(현재는 이 기기 안에만 저장됩니다)</li>
+            <li>이용자가 추가한 사진(기기에 저장되며, 클라우드 백업 시 함께 저장됩니다)</li>
             <li>마지막 백업 시각, 자동 백업 모드, 휴지통 상태 등 동작 메타</li>
             <li>
               <strong className="text-foreground">버그 신고를 보낼 때에 한해</strong>: 이용자가 작성한 신고 내용,
@@ -51,7 +51,10 @@ export default function Privacy() {
           <ul className="ml-4 list-disc space-y-1">
             <li>이용자의 기기(브라우저 내부 저장소) — 모든 입력 데이터의 1차 저장소</li>
             <li>Google Cloud Firestore — 로그인한 이용자의 UID 경로 아래에만 저장. 다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.</li>
-            <li>사진은 현재 클라우드에 저장하지 않으며, 이 기기 안에만 보관됩니다.</li>
+            <li>
+              Google Cloud Storage — 이용자가 클라우드 백업을 실행하면 사진이 본인 UID 경로 아래에 저장됩니다.
+              다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.
+            </li>
             <li>
               버그 신고는 Google Cloud Firestore 에 별도로 저장되며, 운영자만 열람할 수 있습니다.
               문제 해결 후 또는 1년 이내에 삭제합니다.
@@ -61,8 +64,10 @@ export default function Privacy() {
 
         <Section title="5. 사진 정책">
           <p>
-            현재 무료 백업에는 사진이 포함되지 않으며, 사진은 이용자의 기기 안에만 저장됩니다.
-            여러 기기에서 동일한 사진을 보고 싶다면 향후 제공될 수 있는 유료 기능을 이용해야 합니다.
+            사진은 기기에 저장되며, 이용자가 클라우드 백업을 실행하면 Google Cloud Storage 에도
+            함께 저장되어 다른 기기에서 볼 수 있습니다. 클라우드 보관 용량은 계정당 1GB 이며,
+            남은 용량은 설정 → 백업에서 확인할 수 있습니다. 용량을 넘으면 초과한 사진은
+            업로드되지 않고 기기에만 남습니다.
           </p>
           <p className="mt-1 text-muted-foreground">
             ※ 프리미엄 사진 백업 기능이 도입되면 본 방침을 갱신하고 이용자에게 별도로 안내합니다.
