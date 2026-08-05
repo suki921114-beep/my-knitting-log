@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import PageHeader from '@/components/PageHeader';
 import { db, exportAll, importAll } from '@/lib/db';
 import {
@@ -46,6 +46,16 @@ import {
   endSyncRun,
   getNetworkKind,
 } from '@/lib/syncRunner';
+import { readUsage, takeSkippedPhotos } from '@/lib/cloudUsage';
+import {
+  FREE_QUOTA_BYTES,
+  MAX_PHOTO_BYTES,
+  EMPTY_USAGE,
+  formatBytes,
+  usageRatio,
+  describeRejection,
+  type StorageUsage,
+} from '@/lib/quota';
 import {
   clearSyncDirty,
   subscribeSyncDirty,
@@ -74,6 +84,7 @@ export default function SettingsBackup() {
   const [autoMode, setAutoMode] = useState<AutoSyncMode>('off');
   const [dirty, setDirty] = useState(false);
   const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
+  const [usage, setUsage] = useState<StorageUsage>(EMPTY_USAGE);
 
   useEffect(() => {
     setLastResult(loadLastResult());
@@ -82,6 +93,26 @@ export default function SettingsBackup() {
     const unsub = subscribeSyncDirty(setDirty);
     return unsub;
   }, []);
+
+  // 사진 보관 사용량 — 로그인 후, 그리고 백업/가져오기가 끝날 때마다 새로 읽는다
+  const refreshUsage = useCallback(async () => {
+    if (!user) return setUsage(EMPTY_USAGE);
+    setUsage(await readUsage(user.uid));
+  }, [user]);
+
+  useEffect(() => {
+    void refreshUsage();
+  }, [refreshUsage]);
+
+  /** 상한에 걸려 못 올린 사진이 있으면 알려 준다 */
+  function notifySkippedPhotos() {
+    const skipped = takeSkippedPhotos();
+    if (!skipped) return;
+    toast.warning(`사진 ${skipped.count}장을 올리지 못했어요`, {
+      description: describeRejection(skipped.reason),
+      duration: 9000,
+    });
+  }
 
   function persistResult(result: LastResult) {
     setLastResult(result);
@@ -211,6 +242,7 @@ export default function SettingsBackup() {
     } finally {
       setIsFetching(false);
       endSyncRun();
+      void refreshUsage();
     }
   };
 
@@ -319,6 +351,8 @@ export default function SettingsBackup() {
     } finally {
       setIsSyncing(false);
       endSyncRun();
+      notifySkippedPhotos();
+      void refreshUsage();
     }
   };
 
@@ -424,8 +458,10 @@ export default function SettingsBackup() {
               <PhotoWarningPopover />
             </h3>
             <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              로그인한 계정으로 클라우드와 양방향 동기화합니다.
+              사진까지 함께 올라가서 폰과 태블릿에서 같은 기록을 볼 수 있어요.
             </p>
+
+            <UsageGauge usage={usage} />
             <div className="mt-4 flex gap-2">
               <button
                 onClick={handleFetch}
@@ -468,8 +504,39 @@ export default function SettingsBackup() {
   );
 }
 
+/** 사진 보관 사용량 막대 — 320MB / 1GB */
+function UsageGauge({ usage }: { usage: StorageUsage }) {
+  const ratio = usageRatio(usage.bytes);
+  const pct = Math.round(ratio * 100);
+  const nearFull = ratio >= 0.9;
+
+  return (
+    <div className="mt-3.5">
+      <div className="flex items-baseline justify-between text-[11.5px]">
+        <span className="font-semibold text-foreground">사진 보관함</span>
+        <span className={`tabular-nums ${nearFull ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+          {formatBytes(usage.bytes)} / {formatBytes(FREE_QUOTA_BYTES)}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border">
+        <div
+          className={`h-full rounded-full transition-all ${nearFull ? 'bg-amber-500' : 'bg-primary'}`}
+          style={{ width: `${Math.max(pct, usage.bytes > 0 ? 2 : 0)}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        {usage.photoCount > 0
+          ? `사진 ${usage.photoCount}장 보관 중 · 약 ${Math.floor(
+              (FREE_QUOTA_BYTES - usage.bytes) / (200 * 1024),
+            ).toLocaleString()}장 더 올릴 수 있어요`
+          : '아직 올린 사진이 없어요. [백업]을 누르면 함께 올라갑니다.'}
+      </p>
+    </div>
+  );
+}
+
 /**
- * 클라우드 백업 옆의 ! 아이콘 — 눌러서 사진 미포함 경고를 띄운다.
+ * 클라우드 백업 옆의 ! 아이콘 — 눌러서 사진 보관 안내를 띄운다.
  * 모바일에서도 동작하도록 hover 툴팁이 아닌 popover(탭) 방식.
  */
 function PhotoWarningPopover({ label }: { label?: string }) {
@@ -489,14 +556,19 @@ function PhotoWarningPopover({ label }: { label?: string }) {
         <div className="flex items-start gap-2">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <div className="space-y-1.5">
-            <p className="font-semibold text-foreground">무료 백업은 사진이 포함되지 않습니다</p>
+            <p className="font-semibold text-foreground">사진은 1GB까지 보관돼요</p>
             <p className="text-muted-foreground">
-              클라우드에는 글자 기록만 올라가요. 프로젝트 사진, 실·도안·부자재 이미지는 이 기기에만
-              남아 있어 기기를 바꾸면 사라집니다.
+              프로젝트 사진도 함께 올라가서 폰과 태블릿에서 같은 기록을 볼 수 있어요.
+              사진 한 장은 보통 200KB 정도라 <strong className="text-foreground">4,000장 남짓</strong>{' '}
+              담깁니다.
             </p>
             <p className="text-muted-foreground">
-              사진까지 보관하려면 위의 <strong className="text-foreground">JSON 파일로 내보내기</strong>를
-              사용하세요. 사진 클라우드 백업은 추후 프리미엄 기능으로 제공될 예정입니다.
+              1GB를 넘으면 넘친 사진만 올라가지 않고, <strong className="text-foreground">기기에는 그대로 남습니다.</strong>{' '}
+              사진 한 장이 {formatBytes(MAX_PHOTO_BYTES)}를 넘어도 올라가지 않아요.
+            </p>
+            <p className="text-muted-foreground">
+              용량과 상관없이 전부 보관하려면 위의{' '}
+              <strong className="text-foreground">JSON 파일로 내보내기</strong>를 함께 쓰세요.
             </p>
           </div>
         </div>

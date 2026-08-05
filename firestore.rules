@@ -6,13 +6,10 @@ rules_version = '2';
 // 원칙: 로그인한 본인의 users/{uid} 하위만 읽고 쓸 수 있다.
 //       그 외 모든 경로는 기본 거부.
 //
-// 실제 사용 중인 경로 (src/lib/sync/*.ts 기준):
-//   users/{uid}/yarns/{cloudId}
-//   users/{uid}/patterns/{cloudId}
-//   users/{uid}/needles/{cloudId}
-//   users/{uid}/notions/{cloudId}
-//   users/{uid}/projects/{cloudId}
-//   users/{uid}/logs/{cloudId}      (다이어리 기록)
+// ⚠️ 예전에는 users/{uid}/{document=**} 로 하위 전체를 열어 두었다.
+//    Firestore 규칙은 하나라도 허용하면 통과시키므로, 그 넓은 규칙이 남아 있으면
+//    아래 meta/storageUsage 의 까다로운 조건이 무력해진다.
+//    그래서 컬렉션을 하나씩 명시한다. 새 컬렉션을 추가하면 여기에도 추가할 것.
 //
 // 적용 방법은 docs/firestore-rules.md 참고.
 
@@ -24,14 +21,34 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // 사용자 문서 및 그 하위 전체 (yarns / patterns / needles / notions / projects / logs …)
-    // {document=**} 로 하위 컬렉션이 늘어나도 자동 커버된다.
+    // 사용자 문서 본체
     match /users/{uid} {
       allow read, write: if isOwner(uid);
+    }
 
-      match /{document=**} {
-        allow read, write: if isOwner(uid);
-      }
+    // 일반 데이터 컬렉션 — 본인 것만
+    match /users/{uid}/yarns/{docId}    { allow read, write: if isOwner(uid); }
+    match /users/{uid}/patterns/{docId} { allow read, write: if isOwner(uid); }
+    match /users/{uid}/needles/{docId}  { allow read, write: if isOwner(uid); }
+    match /users/{uid}/notions/{docId}  { allow read, write: if isOwner(uid); }
+    match /users/{uid}/projects/{docId} { allow read, write: if isOwner(uid); }
+    match /users/{uid}/logs/{docId}     { allow read, write: if isOwner(uid); }
+
+    // 사진 보관 사용량 (users/{uid}/meta/storageUsage).
+    // storage.rules 가 이 문서를 읽어 총량 상한을 적용하므로, 파일은 그대로 둔 채
+    // 숫자만 0 으로 되돌리는 것을 막는다 — 용량이 줄어들려면 사진 수도 줄어야 한다.
+    match /users/{uid}/meta/{docId} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid)
+                   && request.resource.data.bytes is number
+                   && request.resource.data.photoCount is number
+                   && request.resource.data.bytes >= 0
+                   && request.resource.data.photoCount >= 0
+                   && (
+                        resource == null
+                        || request.resource.data.bytes >= resource.data.bytes
+                        || request.resource.data.photoCount < resource.data.photoCount
+                      );
     }
 
     // 버그 신고 — 로그인한 사용자가 '보내기' 를 눌렀을 때만 생성된다.

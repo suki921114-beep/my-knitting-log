@@ -20,11 +20,24 @@ import {
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { auth, firestore, googleProvider } from '@/lib/firebase';
+import { deleteObject, listAll, ref as storageRef } from 'firebase/storage';
+import { auth, firestore, googleProvider, storage } from '@/lib/firebase';
 import { clearAll } from '@/lib/db';
 
-/** users/{uid} 하위에서 삭제할 컬렉션 목록 — sync 모듈이 쓰는 경로와 동일 */
-const USER_COLLECTIONS = ['yarns', 'patterns', 'needles', 'notions', 'projects'] as const;
+/**
+ * users/{uid} 하위에서 삭제할 컬렉션 목록 — sync 모듈이 쓰는 경로와 동일.
+ * ⚠️ 새 컬렉션을 만들면 여기에도 반드시 추가할 것. 빠뜨리면 탈퇴 후에도
+ *    클라우드에 데이터가 남는다.
+ */
+const USER_COLLECTIONS = [
+  'yarns',
+  'patterns',
+  'needles',
+  'notions',
+  'projects',
+  'logs',
+  'meta',
+] as const;
 
 export type DeleteAccountProgress = (message: string) => void;
 
@@ -57,11 +70,32 @@ export async function deleteCloudData(uid: string, onProgress?: DeleteAccountPro
       await deleteDoc(d.ref);
     }
   }
+  // 사진은 Firestore 가 아니라 Storage 에 있다. 문서만 지우면 파일이 남아
+  // 계속 용량을 차지하고, 개인정보도 남는다.
+  onProgress?.('클라우드 사진 삭제 중…');
+  try {
+    await deleteStorageFolder(`users/${uid}/projectPhotos`);
+  } catch (e) {
+    console.warn('[deleteAccount] 사진 삭제 실패:', e);
+  }
+
   onProgress?.('클라우드 사용자 문서 삭제 중…');
   try {
     await deleteDoc(doc(firestore, 'users', uid));
   } catch {
     // users/{uid} 문서 자체는 없을 수 있다 (하위 컬렉션만 쓰는 구조) — 무시
+  }
+}
+
+/** Storage 폴더를 재귀적으로 비운다 */
+async function deleteStorageFolder(path: string): Promise<void> {
+  const folder = storageRef(storage, path);
+  const listed = await listAll(folder);
+  for (const item of listed.items) {
+    await deleteObject(item);
+  }
+  for (const prefix of listed.prefixes) {
+    await deleteStorageFolder(prefix.fullPath);
   }
 }
 

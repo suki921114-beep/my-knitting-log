@@ -10,6 +10,8 @@ import { db } from '@/lib/db';
 import type { GaugeMode, Project, ProjectPhoto } from '@/lib/db';
 import { uploadPhotoDataUrl, downloadPhotoAsDataUrl } from './photoStorage';
 import { ENABLE_CLOUD_PHOTO_SYNC } from '@/lib/featureFlags';
+import { readUsage, writeUsage, reportSkippedPhoto } from '@/lib/cloudUsage';
+import { canUpload, dataUrlBytes, EMPTY_USAGE } from '@/lib/quota';
 import {
   sanitizeForFirestore,
   type FetchResult,
@@ -333,6 +335,10 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
   const updatedPhotos: ProjectPhoto[] = [];
   const photoPayloads: ProjectSyncPayload["photos"] = [];
 
+  // 1인당 보관 용량 상한. 넘으면 업로드만 건너뛰고 로컬 사진은 그대로 둔다.
+  const usage = ENABLE_CLOUD_PHOTO_SYNC ? await readUsage(userId) : { ...EMPTY_USAGE };
+  let usageChanged = false;
+
   if (ENABLE_CLOUD_PHOTO_SYNC) for (const ph of localPhotos) {
     const photo: ProjectPhoto = {
       cloudId: ph.cloudId || crypto.randomUUID(),
@@ -346,13 +352,25 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
     };
 
     // 신규 사진 — Storage 업로드
-    if (!photo.storagePath && photo.dataUrl) {
-      try {
-        photo.storagePath = await uploadPhotoDataUrl(userId, project.cloudId!, photo);
-        photo.updatedAt = Date.now();
-      } catch (e) {
-        console.error('[Project Sync] 사진 업로드 실패:', e);
-        // storagePath 없는 채로 보존 — 다음 백업 때 재시도
+    if (!photo.storagePath && photo.dataUrl && !photo.isDeleted) {
+      const bytes = dataUrlBytes(photo.dataUrl);
+      const verdict = canUpload(usage, bytes);
+
+      if (!verdict.ok) {
+        // 올리지 않을 뿐, 로컬 photos 에는 그대로 남아 이 기기에서는 계속 보인다.
+        // 용량을 비우거나 상한이 늘면 다음 백업에서 자동으로 재시도된다.
+        reportSkippedPhoto(verdict.reason!);
+      } else {
+        try {
+          photo.storagePath = await uploadPhotoDataUrl(userId, project.cloudId!, photo);
+          photo.updatedAt = Date.now();
+          usage.bytes += bytes;
+          usage.photoCount += 1;
+          usageChanged = true;
+        } catch (e) {
+          console.error('[Project Sync] 사진 업로드 실패:', e);
+          // storagePath 없는 채로 보존 — 다음 백업 때 재시도
+        }
       }
     }
 
@@ -376,6 +394,15 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
   // 플래그 false 면 updatedPhotos 가 비어 있으므로 update 하지 않는다 (로컬 보존)
   if (ENABLE_CLOUD_PHOTO_SYNC && (updatedPhotos.length || (project.photos && project.photos.length))) {
     await db.projects.update(projectId, { photos: updatedPhotos } as any);
+  }
+
+  // 사용량 문서 갱신 — 실패해도 백업 자체는 계속 진행한다
+  if (usageChanged) {
+    try {
+      await writeUsage(userId, usage);
+    } catch (e) {
+      console.warn('[Project Sync] 사용량 기록 실패:', e);
+    }
   }
 
 

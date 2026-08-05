@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// ----------------------------------------------------------------------------
+// 뜨개일기 — Firebase Storage 보안 규칙 (사진 보관)
+// ----------------------------------------------------------------------------
+// 경로: users/{uid}/projectPhotos/{projectCloudId}/{photoCloudId}.{ext}
+//
+// 세 겹으로 막는다.
+//   1) 본인 경로만 읽고 쓴다
+//   2) 사진 한 장은 2MB 미만, 이미지 파일만  ← 규칙에서 완전히 강제된다
+//   3) 총량은 users/{uid}/meta/storageUsage 의 bytes 로 판단
+//
+// 3번은 클라이언트가 기록하는 값에 기대므로 완전한 방어는 아니다.
+// (firestore.rules 에서 임의로 0 으로 되돌리는 것은 막아 두었다)
+// 마지막 안전장치는 Google Cloud 예산 알림이다 — docs/photo-cloud-backup.md 참고.
+//
+// ⚠️ src/lib/quota.ts 의 MAX_PHOTO_BYTES / FREE_QUOTA_BYTES 와 값을 맞출 것.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function usagePath(uid) {
+      return /databases/(default)/documents/users/$(uid)/meta/storageUsage;
+    }
+
+    // 사용량 문서가 아직 없으면(=첫 업로드) 통과시킨다
+    function withinQuota(uid) {
+      return !firestore.exists(usagePath(uid))
+             || firestore.get(usagePath(uid)).data.bytes < 1073741824; // 1GB
+    }
+
+    // 읽기/목록 — 계정 삭제 시 폴더를 훑어 지우려면 list 권한이 필요하다.
+    // (Storage 규칙에서 list 는 read 에 포함되고, 목록을 요청하는 경로에
+    //  매칭되는 규칙이 있어야 하므로 {allPaths=**} 로 잡는다)
+    match /users/{uid}/projectPhotos/{allPaths=**} {
+      allow read: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    match /users/{uid}/projectPhotos/{projectId}/{fileName} {
+      allow write: if isOwner(uid)
+                   && request.resource.size < 2 * 1024 * 1024          // 장당 2MB
+                   && request.resource.contentType.matches('image/.*')
+                   && withinQuota(uid);
+    }
+
+    // 그 외 모든 경로는 거부
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
