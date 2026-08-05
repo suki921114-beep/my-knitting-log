@@ -1,0 +1,21 @@
+[
+  {
+    "origin": [
+      "https://localhost",
+      "capacitor://localhost",
+      "http://localhost:5173",
+      "http://localhost:8080",
+      "https://my-knitting-log.vercel.app"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Content-Range",
+      "Accept-Ranges",
+      "Authorization",
+      "x-goog-meta-*"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

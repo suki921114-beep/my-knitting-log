@@ -50,6 +50,43 @@
 
 ---
 
+## 4. 버킷 CORS 설정 ← 이걸 빼면 사진을 못 받는다
+
+**업로드는 되는데 다운로드만 안 되는** 증상의 원인이다.
+
+앱은 Capacitor WebView 안에서 돌고, 출처가 `https://localhost` 다.
+Storage 버킷은 기본적으로 낯선 출처의 다운로드를 막기 때문에, 브라우저가
+요청 자체를 차단하고 `Failed to fetch` 만 남긴다. 규칙(권한)과는 별개 문제라
+`storage.rules` 를 아무리 고쳐도 해결되지 않는다.
+
+[Google Cloud Shell](https://console.cloud.google.com/) 오른쪽 위 터미널 아이콘을 눌러
+브라우저에서 바로 실행할 수 있다.
+
+```bash
+cat > cors.json <<'EOF'
+[
+  {
+    "origin": ["https://localhost", "capacitor://localhost",
+               "http://localhost:5173", "http://localhost:8080",
+               "https://my-knitting-log.vercel.app"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"],
+    "maxAgeSeconds": 3600
+  }
+]
+EOF
+
+gcloud storage buckets update gs://my-knitting-log.firebasestorage.app --cors-file=cors.json
+
+# 확인
+gcloud storage buckets describe gs://my-knitting-log.firebasestorage.app --format="default(cors_config)"
+```
+
+같은 내용이 저장소의 `storage-cors.json` 에 있다.
+**웹 주소가 바뀌면 origin 목록에 추가하고 다시 실행할 것.**
+
+---
+
 ## 상한이 어떻게 걸리는가
 
 세 겹이다.

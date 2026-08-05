@@ -494,7 +494,7 @@ async function mergeRemotePhotos(
 
     if (!dataUrl && remotePh.storagePath) {
       try {
-        dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath);
+        dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath, remotePh.contentType);
         downloaded++;
       } catch (e) {
         failed++;
