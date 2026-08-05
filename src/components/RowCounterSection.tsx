@@ -58,6 +58,8 @@ function CounterCard({ counter }: { counter: RowCounter }) {
   const [editingGoal, setEditingGoal] = useState(false);
   const [name, setName] = useState(counter.name);
   const [goalStr, setGoalStr] = useState(counter.goal?.toString() || '');
+  const [editingCount, setEditingCount] = useState(false);
+  const [countStr, setCountStr] = useState(String(counter.count));
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,6 +114,14 @@ function CounterCard({ counter }: { counter: RowCounter }) {
     setEditing(false);
     if (trimmed !== counter.name) await update({ name: trimmed });
   }
+  /** 직접 입력한 단수 저장 — 비었거나 숫자가 아니면 원래 값으로 되돌린다 */
+  async function saveCount() {
+    setEditingCount(false);
+    const n = parseInt(countStr, 10);
+    if (Number.isNaN(n)) return;
+    const next = Math.max(0, n);
+    if (next !== counter.count) await update({ count: next });
+  }
   async function saveGoal() {
     setEditingGoal(false);
     const n = parseInt(goalStr, 10);
@@ -165,12 +175,37 @@ function CounterCard({ counter }: { counter: RowCounter }) {
         </div>
       </div>
 
-      {/* Big count */}
+      {/* Big count — 숫자를 눌러 직접 입력할 수 있다.
+          한참 뜨다가 중간부터 세거나, 잘못 누른 걸 바로잡을 때 +/- 만으로는 번거롭다. */}
       <div className="text-center">
-        <div className="text-[34px] font-extrabold leading-none tracking-tight text-foreground tabular-nums">
-          {counter.count}
-          <span className="ml-0.5 text-[13px] font-bold text-muted-foreground">단</span>
-        </div>
+        {editingCount ? (
+          <input
+            autoFocus
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={countStr}
+            onChange={e => setCountStr(e.target.value)}
+            onFocus={e => e.currentTarget.select()}
+            onBlur={saveCount}
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveCount();
+              if (e.key === 'Escape') { setCountStr(String(counter.count)); setEditingCount(false); }
+            }}
+            aria-label="단수 직접 입력"
+            className="w-full rounded-lg border border-input bg-card px-1 py-0.5 text-center text-[30px] font-extrabold leading-none tracking-tight tabular-nums outline-none focus:border-ring/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setCountStr(String(counter.count)); setEditingCount(true); }}
+            aria-label={`현재 ${counter.count}단, 눌러서 직접 입력`}
+            className="w-full text-[34px] font-extrabold leading-none tracking-tight text-foreground tabular-nums"
+          >
+            {counter.count}
+            <span className="ml-0.5 text-[13px] font-bold text-muted-foreground">단</span>
+          </button>
+        )}
       </div>
 
       {/* Goal / progress */}

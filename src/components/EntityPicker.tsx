@@ -218,7 +218,9 @@ function PickerModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-4 sm:rounded-3xl"
+        /* vh 는 주소창·키보드 높이를 반영하지 않아 시트가 화면 밖으로 나간다
+           (저장 버튼이 잘림). dvh 를 쓰고, 아래는 제스처 바만큼 더 띄운다. */
+        className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:rounded-3xl sm:pb-5"
         onClick={e => e.stopPropagation()}
       >
         {!creating ? (
