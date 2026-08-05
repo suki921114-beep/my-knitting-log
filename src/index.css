@@ -223,7 +223,11 @@
 
   /* 날짜칸은 iOS 에서 지정한 폭을 무시하고 내용만큼 벌어져 옆 칸을 밀어낸다.
      기본 모양새를 끄고 줄어들 수 있게 해야 두 칸이 나란히 선다.
-     값이 비었을 때 높이가 0 이 되는 것도 함께 막는다. */
+
+     다만 모양새를 끄면 값이 비었을 때 글줄 자체가 없어져 높이가 폭삭 주저앉는다.
+     그러면 옆에 있는 사이즈·게이지 칸보다 눈에 띄게 납작해 보인다.
+     그래서 최소 높이를 옆 칸과 같은 값으로 직접 박아둔다 —
+     글줄 1.25rem + 위아래 여백 0.625rem 씩 + 테두리 1px 씩. */
   input[type='date'],
   input[type='time'],
   input[type='datetime-local'] {
@@ -231,7 +235,8 @@
     appearance: none;
     display: block;
     min-width: 0;
-    min-height: 1.5em;
+    min-height: calc(1.25rem + 1.25rem + 2px);
+    line-height: 1.25rem;
     text-align: left;
   }
 }
