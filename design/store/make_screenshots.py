@@ -148,15 +148,15 @@ def build(raw_path: Path, line1: str, line2: str, sub: str, out_path: Path):
     y += center(draw, y, sub, f3, MUTED) + 60
 
     # ── 기기 화면 ────────────────────────────────────────────────────────
+    # 화면은 절대 자르지 않는다. 아래 탭바(홈·다이어리·프로젝트…)가 잘리면
+    # 앱이 어떻게 생겼는지 전달되지 않는다. 폭·높이 중 더 빡빡한 쪽에 맞춘다.
     shot = Image.open(raw_path).convert("RGB")
-    target_w = 760
-    target_h = H - y - 60           # 남은 높이를 모두 쓴다
-    scale = target_w / shot.width
-    shot = shot.resize((target_w, int(shot.height * scale)), Image.LANCZOS)
-    if shot.height > target_h:      # 길면 아래를 잘라 낸다
-        shot = shot.crop((0, 0, target_w, target_h))
+    max_w = 780
+    max_h = H - y - 40
+    scale = min(max_w / shot.width, max_h / shot.height)
+    shot = shot.resize((round(shot.width * scale), round(shot.height * scale)), Image.LANCZOS)
 
-    x = (W - target_w) // 2
+    x = (W - shot.width) // 2
     rounded_shadow(canvas, (x, y, shot.width, shot.height), 36)
     canvas.alpha_composite(round_corners(shot, 36), (x, y))
 
