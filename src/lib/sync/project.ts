@@ -406,6 +406,9 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
   }
 
 
+  // 다른 기기는 이 값만 보고 "받을 게 있는지" 판단한다.
+  // ⚠️ photos 를 빠뜨리면, 사진만 추가했을 때 프로젝트가 '변경 없음' 으로 보여
+  //    다른 기기가 사진을 영영 받아 가지 못한다.
   const projectPayloadUpdatedAt = Math.max(
     project.updatedAt ?? 0,
     ...projectYarns.map(x => x.updatedAt ?? 0),
@@ -414,6 +417,7 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
     ...projectNotions.map(x => x.updatedAt ?? 0),
     ...rowCounterPayloads.map(x => x.updatedAt ?? 0),
     ...gaugePayloads.map(x => x.updatedAt ?? 0),
+    ...photoPayloads.map(x => x.updatedAt ?? 0),
   );
 
   return {
@@ -498,10 +502,23 @@ async function mergeRemotePhotos(
 }
 
 async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
-  // 사진 다운로드는 IDB 외부 fetch 라 트랜잭션 도중 await 시 트랜잭션이 자동
-  // 종료됨. 현재 ENABLE_CLOUD_PHOTO_SYNC=false 라 mergeRemotePhotos 가 호출되지
-  // 않아 외부 await 가 없으므로 트랜잭션 안에서 안전. 향후 true 로 켜질 때는
-  // photos 처리만 트랜잭션 밖으로 빼야 한다 (TODO).
+  // ⚠️ 사진 다운로드는 IndexedDB 가 아닌 네트워크 fetch 다.
+  //    Dexie 트랜잭션 안에서 IDB 가 아닌 Promise 를 await 하면 트랜잭션이
+  //    그 자리에서 자동 커밋되어, 뒤이은 쓰기가 전부 실패한다.
+  //    그래서 사진은 반드시 트랜잭션 "밖에서" 먼저 받아 두고, 트랜잭션 안에서는
+  //    이미 만들어진 배열을 저장하기만 한다.
+  const preexisting = await db.projects.where('cloudId').equals(remote.cloudId).first();
+  const preexistingPhotos: ProjectPhoto[] = (preexisting?.photos as any) || [];
+  const photoCache = new Map<string, ProjectPhoto>(
+    preexistingPhotos.filter(p => p.cloudId).map(p => [p.cloudId, p]),
+  );
+
+  // 플래그가 꺼져 있으면 원격 photos 를 무시하고 로컬 사진을 그대로 보존한다
+  // (가져오기 때문에 사진이 사라지는 일 방지)
+  const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
+    ? await mergeRemotePhotos(remote.photos || [], photoCache)
+    : preexistingPhotos;
+
   await db.transaction(
     'rw',
     [
@@ -536,18 +553,8 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload) {
     };
 
     let projectId: number;
-    // 기존 로컬 사진 (dataUrl 캐시 보존용 — 이미 받은 사진 재다운로드 방지)
-    const existingPhotos: ProjectPhoto[] = (existing?.photos as any) || [];
-    const existingByCloudId = new Map<string, ProjectPhoto>(
-      existingPhotos.filter(p => p.cloudId).map(p => [p.cloudId, p]),
-    );
-
-    // remote.photos 메타 + 로컬 캐시 병합
-    // 플래그 false 면 remote.photos 무시하고 기존 로컬 photos 그대로 보존
-    // (가져오기 때문에 사진이 사라지는 일 방지)
-    const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
-      ? await mergeRemotePhotos(remote.photos || [], existingByCloudId)
-      : existingPhotos;
+    // mergedPhotos 는 트랜잭션 밖에서 이미 준비해 두었다 (위 주석 참고).
+    // 여기서 네트워크를 타면 트랜잭션이 끊긴다.
 
     if (existing) {
       await db.projects.update(existing.id!, {
