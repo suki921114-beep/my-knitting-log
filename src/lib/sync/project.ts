@@ -10,7 +10,12 @@ import { db } from '@/lib/db';
 import type { GaugeMode, Project, ProjectPhoto } from '@/lib/db';
 import { uploadPhotoDataUrl, downloadPhotoAsDataUrl } from './photoStorage';
 import { ENABLE_CLOUD_PHOTO_SYNC } from '@/lib/featureFlags';
-import { readUsage, writeUsage, reportSkippedPhoto } from '@/lib/cloudUsage';
+import {
+  readUsage,
+  writeUsage,
+  reportSkippedPhoto,
+  reportFailedPhotoDownload,
+} from '@/lib/cloudUsage';
 import { canUpload, dataUrlBytes, EMPTY_USAGE } from '@/lib/quota';
 import { captureError } from '@/lib/errorLog';
 import {
@@ -445,7 +450,18 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
   };
 }
 
+/**
+ * 이 기기 기준 "프로젝트가 마지막으로 바뀐 시각".
+ *
+ * 클라우드 payload 의 updatedAt 과 같은 방식으로 계산해야 한다.
+ * ⚠️ 사진을 빠뜨리면, 사진을 올린 직후 로컬이 원격보다 '오래된' 것처럼 보여
+ *    자기가 올린 사진을 매번 다시 내려받는다.
+ */
 async function getProjectLocalSyncUpdatedAt(projectId: number, fallback = 0) {
+  const project = await db.projects.get(projectId);
+  const photoTimes = ((project?.photos as ProjectPhoto[] | undefined) || []).map(
+    p => p.updatedAt ?? 0,
+  );
   const [
     projectYarns,
     projectPatterns,
@@ -469,6 +485,7 @@ async function getProjectLocalSyncUpdatedAt(projectId: number, fallback = 0) {
     ...projectNotions.map(x => x.updatedAt ?? 0),
     ...rowCounters.map(x => x.updatedAt ?? 0),
     ...projectGauges.map(x => x.updatedAt ?? 0),
+    ...photoTimes,
   );
 }
 
@@ -476,28 +493,17 @@ async function getProjectLocalSyncUpdatedAt(projectId: number, fallback = 0) {
 async function mergeRemotePhotos(
   remotePhotos: ProjectSyncPayload['photos'],
   existingByCloudId: Map<string, ProjectPhoto>,
-  projectName = '',
 ): Promise<ProjectPhoto[]> {
   const merged: ProjectPhoto[] = [];
-  // 어디서 끊기는지 알기 위한 집계 — 설정 → 버그 신고에서 확인할 수 있다
-  let cachedCount = 0;
-  let downloaded = 0;
-  let failed = 0;
-  let noPath = 0;
-
   for (const remotePh of remotePhotos) {
     const cached = existingByCloudId.get(remotePh.cloudId);
     let dataUrl = cached?.dataUrl;
-    if (dataUrl) cachedCount++;
-
-    if (!dataUrl && !remotePh.storagePath) noPath++;
-
     if (!dataUrl && remotePh.storagePath) {
       try {
         dataUrl = await downloadPhotoAsDataUrl(remotePh.storagePath, remotePh.contentType);
-        downloaded++;
       } catch (e) {
-        failed++;
+        // 사진 하나가 실패해도 나머지 가져오기는 계속한다. 대신 화면에 알린다.
+        reportFailedPhotoDownload();
         console.error('[Project Fetch] 사진 다운로드 실패:', remotePh.storagePath, e);
         captureError(
           `사진 다운로드 실패 | ${remotePh.storagePath} | ${String((e as { code?: string })?.code ?? '')} ${String((e as Error)?.message ?? e)}`,
@@ -517,10 +523,6 @@ async function mergeRemotePhotos(
     });
   }
 
-  captureError(
-    `사진 병합 | ${projectName} | 원격 ${remotePhotos.length}장 · 캐시 ${cachedCount} · 받음 ${downloaded} · 실패 ${failed} · 경로없음 ${noPath}`,
-    'projectFetch/photoSummary',
-  );
   return merged;
 }
 
@@ -539,7 +541,7 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload, force = false)
   // 플래그가 꺼져 있으면 원격 photos 를 무시하고 로컬 사진을 그대로 보존한다
   // (가져오기 때문에 사진이 사라지는 일 방지)
   const mergedPhotos: ProjectPhoto[] = ENABLE_CLOUD_PHOTO_SYNC
-    ? await mergeRemotePhotos(remote.photos || [], photoCache, remote.name)
+    ? await mergeRemotePhotos(remote.photos || [], photoCache)
     : preexistingPhotos;
 
   await db.transaction(
@@ -835,16 +837,6 @@ export async function calculateProjectFetchDiff(userId: string, force = false): 
         diff.toUpdate.push(remote);
       } else {
         diff.unchanged++;
-        // '변경 없음' 으로 걸러졌는데 원격에 사진이 있다면, 사진이 영영 안 넘어온다.
-        // 사진 시각이 프로젝트 updatedAt 에 반영됐는지 확인하기 위해 남긴다.
-        const remotePhotoCount = (remote.photos || []).length;
-        const localPhotoCount = ((local.photos as any) || []).length;
-        if (remotePhotoCount > localPhotoCount) {
-          captureError(
-            `사진이 있는데 건너뜀 | ${remote.name} | 원격사진 ${remotePhotoCount} vs 로컬 ${localPhotoCount} | 원격 ${remote.updatedAt} <= 로컬 ${localSyncUpdatedAt}`,
-            'projectFetch/skipped',
-          );
-        }
       }
     }
   }

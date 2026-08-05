@@ -48,7 +48,7 @@ import {
   getNetworkKind,
   runFullRestore,
 } from '@/lib/syncRunner';
-import { readUsage, takeSkippedPhotos } from '@/lib/cloudUsage';
+import { readUsage, takeSkippedPhotos, takeFailedPhotoDownloads } from '@/lib/cloudUsage';
 import {
   FREE_QUOTA_BYTES,
   MAX_PHOTO_BYTES,
@@ -114,6 +114,16 @@ export default function SettingsBackup() {
     if (!skipped) return;
     toast.warning(`사진 ${skipped.count}장을 올리지 못했어요`, {
       description: describeRejection(skipped.reason),
+      duration: 9000,
+    });
+  }
+
+  /** 받아오지 못한 사진이 있으면 알려 준다 — 조용히 넘어가면 사진이 없는 줄 안다 */
+  function notifyFailedPhotos() {
+    const failed = takeFailedPhotoDownloads();
+    if (!failed) return;
+    toast.warning(`사진 ${failed}장을 받아오지 못했어요`, {
+      description: '다음 가져오기에서 다시 시도해요. 계속 실패하면 설정 → 버그 신고의 로그를 보내주세요.',
       duration: 9000,
     });
   }
@@ -246,6 +256,7 @@ export default function SettingsBackup() {
     } finally {
       setIsFetching(false);
       endSyncRun();
+      notifyFailedPhotos();
       void refreshUsage();
     }
   };
@@ -279,6 +290,7 @@ export default function SettingsBackup() {
       setRestoring(false);
       setRestoreStep(0);
       endSyncRun();
+      notifyFailedPhotos();
       void refreshUsage();
     }
   };

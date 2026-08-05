@@ -34,6 +34,20 @@ export function takeSkippedPhotos() {
   return value;
 }
 
+// 가져오기에서 받지 못한 사진 — 조용히 넘어가면 사용자는 사진이 없는 줄 안다
+let failedDownloads = 0;
+
+export function reportFailedPhotoDownload() {
+  failedDownloads += 1;
+}
+
+/** 읽고 비운다 — 가져오기가 끝난 직후 한 번만 호출할 것 */
+export function takeFailedPhotoDownloads(): number {
+  const value = failedDownloads;
+  failedDownloads = 0;
+  return value;
+}
+
 function usageRef(uid: string) {
   return doc(firestore, `users/${uid}/meta/storageUsage`);
 }

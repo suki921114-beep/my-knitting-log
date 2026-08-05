@@ -7,7 +7,15 @@ import { coverPhotoUrl } from '@/lib/photo';
 import { formatLogDate } from '@/lib/logs';
 import BackupReminder from '@/components/BackupReminder';
 import Mascot, { EmptyState } from '@/components/Mascot';
-import { Plus, Minus, PenLine, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import {
+  Plus,
+  Minus,
+  PenLine,
+  Image as ImageIcon,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -156,6 +164,10 @@ function ProjectCarousel({
   const ref = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
 
+  // 마우스 끌어서 넘기기 — 터치는 브라우저가 알아서 하지만 데스크톱은 안 해준다.
+  // dragged 로 "끌었는지"를 기억해서, 놓는 순간 카드가 눌리지 않게 막는다.
+  const drag = useRef({ active: false, startX: 0, startScroll: 0, moved: false });
+
   function onScroll() {
     const el = ref.current;
     if (!el) return;
@@ -163,12 +175,63 @@ function ProjectCarousel({
     if (i !== idx) setIdx(i);
   }
 
+  function goTo(next: number) {
+    const el = ref.current;
+    if (!el) return;
+    const clamped = Math.max(0, Math.min(projects.length - 1, next));
+    el.scrollTo({ left: clamped * el.clientWidth, behavior: 'smooth' });
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // 터치/펜은 기본 스크롤이 더 자연스러우므로 건드리지 않는다
+    if (e.pointerType !== 'mouse') return;
+    const el = ref.current;
+    if (!el) return;
+    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, moved: false };
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const el = ref.current;
+    if (!el || !drag.current.active) return;
+    const dx = e.clientX - drag.current.startX;
+    if (Math.abs(dx) > 4) drag.current.moved = true;
+    el.scrollLeft = drag.current.startScroll - dx;
+    // 드래그 중 텍스트/이미지가 선택되거나 끌려가지 않도록
+    e.preventDefault();
+  }
+
+  function endDrag() {
+    if (!drag.current.active) return;
+    drag.current.active = false;
+    // 스냅 위치로 정렬
+    const el = ref.current;
+    if (el) goTo(Math.round(el.scrollLeft / el.clientWidth));
+  }
+
+  /** 끌고 나서 손을 뗀 클릭은 카드 열기로 치지 않는다 */
+  function onClickCapture(e: React.MouseEvent) {
+    if (drag.current.moved) {
+      e.stopPropagation();
+      e.preventDefault();
+      drag.current.moved = false;
+    }
+  }
+
+  const multiple = projects.length > 1;
+
   return (
-    <div>
+    <div className="relative">
       <div
         ref={ref}
         onScroll={onScroll}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerLeave={endDrag}
+        onClickCapture={onClickCapture}
+        className={`-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          multiple ? 'cursor-grab active:cursor-grabbing' : ''
+        }`}
       >
         {projects.map(p => (
           <div key={p.id} className="w-full shrink-0 snap-center">
@@ -177,11 +240,26 @@ function ProjectCarousel({
         ))}
       </div>
 
-      {projects.length > 1 && (
+      {/* 마우스 사용자를 위한 좌우 버튼 — 터치 화면에서는 숨긴다 */}
+      {multiple && (
+        <>
+          <CarouselArrow side="left" disabled={idx === 0} onClick={() => goTo(idx - 1)} />
+          <CarouselArrow
+            side="right"
+            disabled={idx === projects.length - 1}
+            onClick={() => goTo(idx + 1)}
+          />
+        </>
+      )}
+
+      {multiple && (
         <div className="mt-2.5 flex justify-center gap-1.5">
           {projects.map((p, i) => (
-            <span
+            <button
               key={p.id}
+              type="button"
+              aria-label={`${i + 1}번째 프로젝트 보기`}
+              onClick={() => goTo(i)}
               className={`h-1.5 rounded-full transition-all ${
                 i === idx ? 'w-4 bg-primary' : 'w-1.5 bg-border'
               }`}
@@ -190,6 +268,31 @@ function ProjectCarousel({
         </div>
       )}
     </div>
+  );
+}
+
+function CarouselArrow({
+  side,
+  disabled,
+  onClick,
+}: {
+  side: 'left' | 'right';
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const Icon = side === 'left' ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={side === 'left' ? '이전 프로젝트' : '다음 프로젝트'}
+      className={`absolute top-1/2 hidden -translate-y-1/2 rounded-full border bg-background/90 p-1.5 shadow-soft backdrop-blur transition hover:bg-background disabled:pointer-events-none disabled:opacity-0 [@media(hover:hover)]:block ${
+        side === 'left' ? '-left-1' : '-right-1'
+      }`}
+    >
+      <Icon className="h-4 w-4 text-foreground" />
+    </button>
   );
 }
 
