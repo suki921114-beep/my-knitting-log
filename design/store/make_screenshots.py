@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""
+스토어 스크린샷 만들기
+================================================================================
+기기에서 찍은 앱 화면에 배경과 한 줄 카피를 얹어, Play 스토어에 올릴
+1080x1920 이미지를 만든다.
+
+쓰는 법
+--------------------------------------------------------------------------------
+1) 기기에서 찍은 원본을 design/store/raw/ 에 넣는다.
+   파일 이름 앞의 숫자가 순서다.  예)  01-home.png  02-diary.png ...
+2) 아래 SHOTS 의 카피를 원본 순서와 맞춘다.
+3) python3 design/store/make_screenshots.py
+   → design/store/out/ 에 결과가 생긴다.
+
+원본은 비율이 달라도 된다. 폭에 맞춰 줄이고, 남으면 아래를 잘라 낸다.
+"""
+
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+# ── 출력 규격 ────────────────────────────────────────────────────────────────
+W, H = 1080, 1920
+
+# ── 색 (src/index.css 의 앱 팔레트와 맞춤) ──────────────────────────────────
+IVORY = (251, 249, 245)      # 배경 — 앱 배경과 같은 밀키 아이보리
+LILAC = (168, 139, 199)      # 포인트 — 앱 primary
+INK = (59, 49, 71)           # 본문 — 앱 foreground
+MUTED = (138, 128, 150)      # 보조 문구
+
+FONT_BOLD = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
+FONT_REG = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+KR_INDEX = 2  # ttc 안에서 한국어 자형
+
+# ── 화면별 카피 ──────────────────────────────────────────────────────────────
+# (윗줄, 아랫줄 강조, 보조 설명)
+SHOTS = [
+    ("지금 뜨고 있는 것들을", "한 화면에", "여러 개를 동시에 떠도 헷갈리지 않아요"),
+    ("한 손으로 세는", "단수 카운터", "숫자를 눌러 바로 고칠 수도 있어요"),
+    ("오늘 뭘 떴는지", "일기처럼 기록", "달력으로 지나온 날들을 돌아봐요"),
+    ("실·도안·바늘을", "한곳에 정리", "프로젝트에 연결해 두면 찾기 쉬워요"),
+    ("사진까지 안전하게", "클라우드 백업", "폰과 태블릿에서 같은 기록을 봐요"),
+]
+
+BASE = Path(__file__).parent
+RAW = BASE / "raw"
+OUT = BASE / "out"
+
+
+def font(path: str, size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(path, size, index=KR_INDEX)
+
+
+def fit_width(text: str, path: str, size: int, max_w: int) -> ImageFont.FreeTypeFont:
+    """글자가 길면 들어갈 때까지 크기를 줄인다"""
+    f = font(path, size)
+    while size > 20 and f.getbbox(text)[2] > max_w:
+        size -= 2
+        f = font(path, size)
+    return f
+
+
+def center(draw: ImageDraw.ImageDraw, y: int, text: str, f, fill):
+    w = draw.textbbox((0, 0), text, font=f)[2]
+    draw.text(((W - w) // 2, y), text, font=f, fill=fill)
+    return draw.textbbox((0, 0), text, font=f)[3]
+
+
+def rounded_shadow(canvas: Image.Image, box, radius: int):
+    """기기 화면 뒤에 은은한 그림자 — 배경에서 살짝 떠 보이게"""
+    x, y, w, h = box
+    pad = 40
+    layer = Image.new("RGBA", (w + pad * 2, h + pad * 2), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).rounded_rectangle(
+        (pad, pad, pad + w, pad + h), radius=radius, fill=(80, 60, 100, 60)
+    )
+    layer = layer.filter(ImageFilter.GaussianBlur(22))
+    canvas.alpha_composite(layer, (x - pad, y - pad + 10))
+
+
+def round_corners(img: Image.Image, radius: int) -> Image.Image:
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, *img.size), radius=radius, fill=255)
+    out = img.convert("RGBA")
+    out.putalpha(mask)
+    return out
+
+
+def build(raw_path: Path, line1: str, line2: str, sub: str, out_path: Path):
+    canvas = Image.new("RGBA", (W, H), IVORY + (255,))
+    draw = ImageDraw.Draw(canvas)
+
+    # 위쪽에 아주 옅은 라일락 띠 — 밋밋함을 덜어 준다.
+    # 경계가 또렷하면 인쇄물처럼 보여서 흐리게 풀어 준다.
+    band = Image.new("RGBA", (W, 700), (0, 0, 0, 0))
+    ImageDraw.Draw(band).ellipse((-260, -420, W + 260, 560), fill=LILAC + (24,))
+    canvas.alpha_composite(band.filter(ImageFilter.GaussianBlur(30)), (0, 0))
+
+    # ── 카피 ────────────────────────────────────────────────────────────
+    y = 130
+    f1 = fit_width(line1, FONT_REG, 52, W - 180)
+    y += center(draw, y, line1, f1, MUTED) + 18
+
+    f2 = fit_width(line2, FONT_BOLD, 82, W - 150)
+    y += center(draw, y, line2, f2, INK) + 26
+
+    f3 = fit_width(sub, FONT_REG, 34, W - 200)
+    y += center(draw, y, sub, f3, MUTED) + 60
+
+    # ── 기기 화면 ────────────────────────────────────────────────────────
+    shot = Image.open(raw_path).convert("RGB")
+    target_w = 760
+    target_h = H - y - 60           # 남은 높이를 모두 쓴다
+    scale = target_w / shot.width
+    shot = shot.resize((target_w, int(shot.height * scale)), Image.LANCZOS)
+    if shot.height > target_h:      # 길면 아래를 잘라 낸다
+        shot = shot.crop((0, 0, target_w, target_h))
+
+    x = (W - target_w) // 2
+    rounded_shadow(canvas, (x, y, shot.width, shot.height), 36)
+    canvas.alpha_composite(round_corners(shot, 36), (x, y))
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    canvas.convert("RGB").save(out_path, "PNG")
+    print(f"  {out_path.name}  ({line2})")
+
+
+def main():
+    if not RAW.exists():
+        print(f"원본 폴더가 없습니다: {RAW}")
+        print("기기에서 찍은 화면을 여기에 넣고 다시 실행하세요.")
+        return
+
+    raws = sorted(p for p in RAW.iterdir() if p.suffix.lower() in {".png", ".jpg", ".jpeg"})
+    if not raws:
+        print(f"{RAW} 안에 이미지가 없습니다.")
+        return
+
+    print(f"원본 {len(raws)}장으로 스토어 이미지를 만듭니다.")
+    for i, raw in enumerate(raws):
+        line1, line2, sub = SHOTS[i] if i < len(SHOTS) else ("", "뜨개일기", "")
+        build(raw, line1, line2, sub, OUT / f"{i + 1:02d}-{raw.stem}.png")
+    print(f"\n완료 → {OUT}")
+
+
+if __name__ == "__main__":
+    main()

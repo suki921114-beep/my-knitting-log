@@ -34,3 +34,6 @@ android/key.properties
 functions/node_modules
 functions/package-lock.json
 .firebase/
+design/store/raw/*
+!design/store/raw/README.md
+design/store/out/
