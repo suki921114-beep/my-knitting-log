@@ -167,6 +167,9 @@ function ProjectCarousel({
   // 마우스 끌어서 넘기기 — 터치는 브라우저가 알아서 하지만 데스크톱은 안 해준다.
   // dragged 로 "끌었는지"를 기억해서, 놓는 순간 카드가 눌리지 않게 막는다.
   const drag = useRef({ active: false, startX: 0, startScroll: 0, moved: false });
+  // 드래그 중에는 스냅을 꺼야 한다. scroll-snap-type 이 mandatory 인 채로
+  // scrollLeft 를 직접 쓰면 브라우저가 곧바로 원래 칸으로 되돌려 버린다.
+  const [dragging, setDragging] = useState(false);
 
   function onScroll() {
     const el = ref.current;
@@ -184,10 +187,13 @@ function ProjectCarousel({
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     // 터치/펜은 기본 스크롤이 더 자연스러우므로 건드리지 않는다
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
     const el = ref.current;
     if (!el) return;
+    // 마우스가 카드 밖으로 나가도 계속 이벤트를 받도록 붙잡아 둔다
+    el.setPointerCapture(e.pointerId);
     drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, moved: false };
+    setDragging(true);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -196,16 +202,19 @@ function ProjectCarousel({
     const dx = e.clientX - drag.current.startX;
     if (Math.abs(dx) > 4) drag.current.moved = true;
     el.scrollLeft = drag.current.startScroll - dx;
-    // 드래그 중 텍스트/이미지가 선택되거나 끌려가지 않도록
-    e.preventDefault();
   }
 
-  function endDrag() {
+  function endDrag(e?: React.PointerEvent<HTMLDivElement>) {
     if (!drag.current.active) return;
     drag.current.active = false;
-    // 스냅 위치로 정렬
+    setDragging(false);
+
     const el = ref.current;
-    if (el) goTo(Math.round(el.scrollLeft / el.clientWidth));
+    if (!el) return;
+    if (e && el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    // 스냅이 다시 켜진 뒤에 이동해야 중간에서 튕기지 않는다
+    const target = Math.round(el.scrollLeft / el.clientWidth);
+    requestAnimationFrame(() => goTo(target));
   }
 
   /** 끌고 나서 손을 뗀 클릭은 카드 열기로 치지 않는다 */
@@ -227,11 +236,13 @@ function ProjectCarousel({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
-        onPointerLeave={endDrag}
+        onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
-        className={`-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-          multiple ? 'cursor-grab active:cursor-grabbing' : ''
-        }`}
+        // 카드 안의 이미지/텍스트를 브라우저가 대신 끌고 가려는 것을 막는다
+        onDragStart={e => e.preventDefault()}
+        className={`-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          dragging ? 'snap-none select-none' : 'snap-x snap-mandatory'
+        } ${multiple ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
         {projects.map(p => (
           <div key={p.id} className="w-full shrink-0 snap-center">
