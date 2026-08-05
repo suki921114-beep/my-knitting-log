@@ -22,6 +22,38 @@ import { toLocal, toRemote, type RemoteLog } from './logMap';
 
 export * from './logMap';
 
+export interface LogSyncDiff {
+  toUpload: KnitLog[];
+  toDownload: RemoteLog[];
+  unchanged: number;
+}
+
+export interface LogFetchDiff {
+  toAdd: RemoteLog[];
+  toUpdate: RemoteLog[];
+  unchanged: number;
+}
+
+// ----------------------------------------------------------------------------
+// projectId ↔ projectCloudId 매핑 (이 기기 기준)
+// ----------------------------------------------------------------------------
+
+async function projectCloudIdByLocalId(): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  for (const p of await db.projects.toArray()) {
+    if (p.id != null && p.cloudId) map.set(p.id, p.cloudId);
+  }
+  return map;
+}
+
+async function projectLocalIdByCloudId(): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  for (const p of await db.projects.toArray()) {
+    if (p.id != null && p.cloudId) map.set(p.cloudId, p.id);
+  }
+  return map;
+}
+
 async function readRemoteLogs(userId: string): Promise<RemoteLog[]> {
   const snapshot = await getDocs(collection(firestore, `users/${userId}/logs`));
   return snapshot.docs.map(d => d.data() as RemoteLog).filter(r => !!r.cloudId);

@@ -159,33 +159,22 @@ export default function SettingsBackup() {
 
       toast.loading('실 가져오는 중…', { id: tid });
       const yarnResult = await executeYarnFetch(yarnDiff);
-      toast.success(`실 가져오기 완료 · ${fetchToastDetail(yarnResult)}`, { id: tid });
 
-      const ptid = 'fetch-pattern';
-      toast.loading('도안 가져오는 중…', { id: ptid });
+      toast.loading('도안 가져오는 중…', { id: tid });
       const patternResult = await executePatternFetch(patternDiff);
-      toast.success(`도안 가져오기 완료 · ${fetchToastDetail(patternResult)}`, { id: ptid });
 
-      const ntid = 'fetch-needle';
-      toast.loading('바늘 가져오는 중…', { id: ntid });
+      toast.loading('바늘 가져오는 중…', { id: tid });
       const needleResult = await executeNeedleFetch(needleDiff);
-      toast.success(`바늘 가져오기 완료 · ${fetchToastDetail(needleResult)}`, { id: ntid });
 
-      const notid = 'fetch-notion';
-      toast.loading('부자재 가져오는 중…', { id: notid });
+      toast.loading('부자재 가져오는 중…', { id: tid });
       const notionResult = await executeNotionFetch(notionDiff);
-      toast.success(`부자재 가져오기 완료 · ${fetchToastDetail(notionResult)}`, { id: notid });
 
-      const prtid = 'fetch-project';
-      toast.loading('프로젝트(연결관계·카운터·게이지) 가져오는 중…', { id: prtid });
+      toast.loading('프로젝트(연결관계·카운터·게이지) 가져오는 중…', { id: tid });
       const projectResult = await executeProjectFetch(projectDiff);
-      toast.success(`프로젝트 가져오기 완료 · ${fetchToastDetail(projectResult)}`, { id: prtid });
 
       // 일기는 프로젝트 cloudId 를 참조하므로 프로젝트를 받은 뒤에 실행한다
-      const ltid = 'fetch-log';
-      toast.loading('일기 가져오는 중…', { id: ltid });
+      toast.loading('일기 가져오는 중…', { id: tid });
       const logResult = await executeLogFetch(logDiff);
-      toast.success(`일기 가져오기 완료 · ${fetchToastDetail(logResult)}`, { id: ltid });
 
       const failedTotal =
         yarnResult.failed + patternResult.failed + needleResult.failed +
@@ -207,10 +196,12 @@ export default function SettingsBackup() {
 
       if (failedTotal > 0) {
         toast.warning(`가져오기 완료 · 실패 ${failedTotal}건`, {
+          id: tid,
           description: '아래 결과 카드를 확인하세요.',
         });
       } else {
         toast.success('가져오기 완료', {
+          id: tid,
           description: '아래 결과 카드에서 항목별 수치를 확인할 수 있어요.',
         });
       }
@@ -273,32 +264,21 @@ export default function SettingsBackup() {
 
       toast.loading('실 백업 중…', { id: tid });
       const yarnResult = await executeYarnSync(user.uid, yarnDiff);
-      toast.success(`실 백업 완료 · ${syncToastDetail(yarnResult)}`, { id: tid });
 
-      const ptid = 'sync-pattern';
-      toast.loading('도안 백업 중…', { id: ptid });
+      toast.loading('도안 백업 중…', { id: tid });
       const patternResult = await executePatternSync(user.uid, patternDiff);
-      toast.success(`도안 백업 완료 · ${syncToastDetail(patternResult)}`, { id: ptid });
 
-      const ntid = 'sync-needle';
-      toast.loading('바늘 백업 중…', { id: ntid });
+      toast.loading('바늘 백업 중…', { id: tid });
       const needleResult = await executeNeedleSync(user.uid, needleDiff);
-      toast.success(`바늘 백업 완료 · ${syncToastDetail(needleResult)}`, { id: ntid });
 
-      const notid = 'sync-notion';
-      toast.loading('부자재 백업 중…', { id: notid });
+      toast.loading('부자재 백업 중…', { id: tid });
       const notionResult = await executeNotionSync(user.uid, notionDiff);
-      toast.success(`부자재 백업 완료 · ${syncToastDetail(notionResult)}`, { id: notid });
 
-      const prtid = 'sync-project';
-      toast.loading('프로젝트(연결관계·카운터·게이지) 백업 중…', { id: prtid });
+      toast.loading('프로젝트(연결관계·카운터·게이지) 백업 중…', { id: tid });
       const projectResult = await executeProjectSync(user.uid, projectDiff);
-      toast.success(`프로젝트 백업 완료 · ${syncToastDetail(projectResult)}`, { id: prtid });
 
-      const ltid = 'sync-log';
-      toast.loading('일기 백업 중…', { id: ltid });
+      toast.loading('일기 백업 중…', { id: tid });
       const logResult = await executeLogSync(user.uid, logDiff);
-      toast.success(`일기 백업 완료 · ${syncToastDetail(logResult)}`, { id: ltid });
 
       const failedTotal =
         yarnResult.failed + patternResult.failed + needleResult.failed +
@@ -324,10 +304,12 @@ export default function SettingsBackup() {
 
       if (failedTotal > 0) {
         toast.warning(`백업 완료 · 실패 ${failedTotal}건`, {
+          id: tid,
           description: '아래 결과 카드를 확인하세요.',
         });
       } else {
         toast.success('백업 완료', {
+          id: tid,
           description: '아래 결과 카드에서 항목별 수치를 확인할 수 있어요.',
         });
       }

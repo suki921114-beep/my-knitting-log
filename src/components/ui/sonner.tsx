@@ -10,10 +10,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      // 하단은 탭바와 제스처 바에 가려 메시지가 잘린다. 위쪽에 띄우고
-      // 상태표시줄만큼 내려 준다.
+      // 하단은 탭바와 제스처 바에 가려 메시지가 잘린다. 위쪽에 띄우되
+      // 상태표시줄(노치) 아래로 충분히 내려 잘리지 않게 한다.
       position="top-center"
-      offset="calc(env(safe-area-inset-top, 0px) + 12px)"
+      offset="calc(var(--app-safe-top, 0px) + 16px)"
+      // 여러 단계를 진행할 때 카드가 화면을 덮지 않도록 겹쳐 쌓고 개수를 제한한다
+      expand={false}
+      visibleToasts={3}
       toastOptions={{
         classNames: {
           toast:
