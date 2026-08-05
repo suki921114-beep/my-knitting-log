@@ -71,7 +71,18 @@ export function ConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
+          {/*
+            description 은 선택이지만 설명이 아예 없으면 스크린 리더 사용자는
+            제목만 듣고 무슨 일이 일어나는지 알 수 없다. 없을 때는 최소한의
+            안내를 화면에 보이지 않게 넣어 둔다.
+          */}
+          {description ? (
+            <AlertDialogDescription>{description}</AlertDialogDescription>
+          ) : (
+            <AlertDialogDescription className="sr-only">
+              계속할지 확인해 주세요.
+            </AlertDialogDescription>
+          )}
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{cancelLabel}</AlertDialogCancel>
