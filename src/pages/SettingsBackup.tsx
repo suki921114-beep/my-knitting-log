@@ -50,6 +50,7 @@ import {
 } from '@/lib/syncRunner';
 import { readUsage, takeSkippedPhotos, takeFailedPhotoDownloads } from '@/lib/cloudUsage';
 import { SHOW_AUTO_BACKUP, SHOW_SYNC_RESULT } from '@/lib/featureFlags';
+import { markCloudBackup, markFileBackup } from '@/lib/backupClock';
 import {
   FREE_QUOTA_BYTES,
   MAX_PHOTO_BYTES,
@@ -393,6 +394,9 @@ export default function SettingsBackup() {
 
       if (failedTotal === 0) {
         clearSyncDirty();
+        // 홈의 백업 알림이 이 시각을 본다. 클라우드에 올렸는데도
+        // "백업한 지 오래됐다"고 재촉하면 짜증만 난다.
+        markCloudBackup();
       }
 
       if (failedTotal > 0) {
@@ -429,8 +433,7 @@ export default function SettingsBackup() {
       a.download = `knit-backup-${d}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      const now = new Date().toISOString();
-      localStorage.setItem('lastBackupAt', now);
+      markFileBackup();
       toast.success('백업 파일을 저장했습니다');
     } finally {
       setBusy(false);

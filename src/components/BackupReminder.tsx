@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
 import { Download, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { daysSinceLastBackup } from '@/lib/backupClock';
 
 // ----------------------------------------------------------------------------
 // 사진 백업 리마인더
@@ -17,8 +18,6 @@ import { useAuth } from '@/hooks/useAuth';
 //    사진을 보관할 수 있다"고 말하면 거짓말이 된다. 이 경우에는 용량 상한(1GB)
 //    때문에 한 벌 더 받아두면 좋다는 쪽으로만 권한다.
 
-/** 마지막 JSON 내보내기 시각 (SettingsBackup 의 handleExport 가 기록) */
-const LAST_BACKUP_KEY = 'lastBackupAt';
 /** 사용자가 "나중에" 를 누른 시각 */
 const SNOOZE_KEY = 'backupReminderSnoozedAt';
 
@@ -42,11 +41,12 @@ export default function BackupReminder() {
   const { user } = useAuth();
   const signedIn = !!user;
   const [dismissed, setDismissed] = useState(false);
-  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  // 클라우드 백업과 파일 백업 중 더 최근 것 기준. 한 번도 안 했으면 null.
+  const [backupDays, setBackupDays] = useState<number | null | undefined>(undefined);
   const [snoozedAt, setSnoozedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    setLastBackup(localStorage.getItem(LAST_BACKUP_KEY));
+    setBackupDays(daysSinceLastBackup());
     setSnoozedAt(localStorage.getItem(SNOOZE_KEY));
   }, []);
 
@@ -65,7 +65,8 @@ export default function BackupReminder() {
   const snoozedDays = daysSince(snoozedAt);
   if (snoozedDays !== null && snoozedDays < SNOOZE_DAYS) return null;
 
-  const backupDays = daysSince(lastBackup);
+  // 아직 읽기 전이면 아무것도 내보이지 않는다 (깜빡임 방지)
+  if (backupDays === undefined) return null;
   const neverBackedUp = backupDays === null;
   if (!neverBackedUp && backupDays < REMIND_AFTER_DAYS) return null;
 
@@ -91,14 +92,14 @@ export default function BackupReminder() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-200">
-            {signedIn ? '백업 파일도 받아두시겠어요?' : '이 기기에만 저장돼 있어요'} · 사진 {photoCount}장
+            백업한 지 오래됐어요 · 사진 {photoCount}장
           </p>
           <p className="mt-1 text-[11.5px] leading-relaxed text-amber-800/90 dark:text-amber-300/80">
             {neverBackedUp
-              ? '아직 백업 파일을 저장한 적이 없어요.'
-              : `마지막으로 파일을 받은 지 ${backupDays}일 됐어요.`}{' '}
+              ? '아직 한 번도 백업하지 않았어요.'
+              : `마지막 백업이 ${backupDays}일 전이에요.`}{' '}
             {signedIn
-              ? '사진은 클라우드에 올라가 있지만 무료 용량은 1GB예요. 파일로 한 벌 더 받아두면 용량과 상관없이 남습니다.'
+              ? '클라우드에 올리거나 파일로 내려받아 두면 기기를 바꿔도 남아요.'
               : '로그인하지 않으면 사진은 이 기기에만 남아요. 파일로 내보내면 사진까지 통째로 보관할 수 있어요.'}
           </p>
           <Link
@@ -106,7 +107,7 @@ export default function BackupReminder() {
             className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-amber-700"
           >
             <Download className="h-3.5 w-3.5" />
-            백업 파일 저장
+            지금 백업하기
           </Link>
         </div>
       </div>
