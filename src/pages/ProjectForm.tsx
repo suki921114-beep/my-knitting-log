@@ -351,7 +351,7 @@ export default function ProjectForm() {
         <EntityPicker kind="notion" links={notionLinks} onChange={setNotionLinks} />
       </Field>
 
-      {/* 프로젝트에는 대표 한 장만. 과정 사진은 뜨개 기록에 날짜와 함께 붙인다 —
+      {/* 프로젝트에는 대표 한 장만. 과정 사진은 다이어리에 날짜와 함께 붙인다 —
           그래야 나중에 언제 어디까지 떴는지 되짚을 수 있다. */}
       <Field label="대표 사진" as="div">
         <ImageInput
@@ -360,7 +360,7 @@ export default function ProjectForm() {
           aspect="square"
         />
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          ※ 과정 사진은 <strong>뜨개 기록</strong>에 남겨주세요. 날짜별로 모여서 완성한 뒤 한눈에 돌아볼 수 있어요.
+          ※ 과정 사진은 <strong>다이어리</strong>에 남겨주세요. 날짜별로 모여서 완성한 뒤 한눈에 돌아볼 수 있어요.
           <br />
           ※ 사진은 클라우드에 <strong>1GB까지</strong> 함께 백업돼요. 남은 용량은 설정 → 백업에서 볼 수 있어요.
         </p>

@@ -7,8 +7,6 @@ import { Pencil, Image as ImageIcon, PenLine } from 'lucide-react';
 import { useState } from 'react';
 import RowCounterSection from '@/components/RowCounterSection';
 import ProjectGaugeSection from '@/components/ProjectGaugeSection';
-import LogCard from '@/components/LogCard';
-import { groupByDate, formatLogDate } from '@/lib/logs';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -52,6 +50,10 @@ export default function ProjectDetail() {
   const livePhotos = photos.filter((p: any) => !p.isDeleted);
   // 맨 위 카드에 쓸 대표 사진 — 아직 내려받는 중이면 dataUrl 이 없을 수 있다
   const cover = livePhotos.find((p: any) => p.dataUrl);
+  // 대표 정보 옆에 곁들일 최근 기록. 전체는 다이어리에서 본다.
+  const recentLogs = [...logs]
+    .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1))
+    .slice(0, 4);
 
   return (
     <div className="space-y-5">
@@ -76,33 +78,68 @@ export default function ProjectDetail() {
             <span className="text-[11.5px] text-muted-foreground">완료 {project.endDate}</span>
           )}
         </div>
-        {(cover || project.size || project.gauge) && (
-          <div className="flex gap-3.5 px-4 py-3.5">
-            {cover?.dataUrl && (
-              <button
-                type="button"
-                onClick={() => setLightbox(cover.dataUrl)}
-                className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl border bg-muted"
+        <div className="grid gap-3.5 px-4 py-3.5 sm:grid-cols-2 sm:gap-5">
+          {(cover || project.size || project.gauge) && (
+            <div className="flex gap-3.5">
+              {cover?.dataUrl && (
+                <button
+                  type="button"
+                  onClick={() => setLightbox(cover.dataUrl)}
+                  className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl border bg-muted"
+                >
+                  <img src={cover.dataUrl} alt="대표 사진" className="h-full w-full object-cover" />
+                </button>
+              )}
+              <dl className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 text-[12.5px]">
+                {project.size && (
+                  <div className="min-w-0">
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">사이즈</dt>
+                    <dd className="mt-0.5 truncate font-semibold text-foreground">{project.size}</dd>
+                  </div>
+                )}
+                {project.gauge && (
+                  <div className="min-w-0">
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">게이지</dt>
+                    <dd className="mt-0.5 truncate font-semibold text-foreground">{project.gauge}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
+          {/* 다이어리 요약 — 대표 정보 옆의 빈 자리를 쓴다.
+              여기서는 사진 없이 날짜와 글 한 줄만. 전체는 다이어리에서 본다. */}
+          <div className="min-w-0 border-t border-border/60 pt-3 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <h2 className="section-title px-0">다이어리</h2>
+              {logs.length > 0 && (
+                <Link to={`/diary?projectId=${pid}`} className="text-[11px] font-semibold text-primary underline underline-offset-2">
+                  더보기
+                </Link>
+              )}
+            </div>
+            {logs.length === 0 ? (
+              <Link
+                to={`/diary/new?projectId=${pid}`}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 py-2.5 text-[12px] font-semibold text-primary"
               >
-                <img src={cover.dataUrl} alt="대표 사진" className="h-full w-full object-cover" />
-              </button>
+                <PenLine className="h-3.5 w-3.5" /> 첫 기록 남기기
+              </Link>
+            ) : (
+              <ul className="space-y-1.5">
+                {recentLogs.map(l => (
+                  <li key={l.id}>
+                    <Link to={`/diary/${l.id}/edit`} className="flex items-baseline gap-2">
+                      <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">{l.date}</span>
+                      {l.mood && <span className="shrink-0 text-[13px] leading-none">{l.mood}</span>}
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink">{l.text}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
-            <dl className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 text-[12.5px]">
-              {project.size && (
-                <div className="min-w-0">
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">사이즈</dt>
-                  <dd className="mt-0.5 truncate font-semibold text-foreground">{project.size}</dd>
-                </div>
-              )}
-              {project.gauge && (
-                <div className="min-w-0">
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">게이지</dt>
-                  <dd className="mt-0.5 truncate font-semibold text-foreground">{project.gauge}</dd>
-                </div>
-              )}
-            </dl>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 완성 소감은 다 만든 뒤에 쓰는 글이라 완성일 때만 내놓는다 */}
@@ -113,34 +150,6 @@ export default function ProjectDetail() {
           </div>
         </Section>
       )}
-
-      <Section title={`뜨개 기록${logs.length ? ` · ${logs.length}` : ''}`}>
-        <Link
-          to={`/diary/new?projectId=${pid}`}
-          className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 py-2.5 text-[12.5px] font-semibold text-primary"
-        >
-          <PenLine className="h-3.5 w-3.5" /> 오늘 기록 남기기
-        </Link>
-        {logs.length === 0 ? (
-          <p className="rounded-xl bg-secondary/50 px-3 py-3.5 text-center text-[11.5px] text-muted-foreground">
-            아직 이 프로젝트의 기록이 없어요. 한 줄이면 충분해요.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {groupByDate(logs).map(g => (
-              <div key={g.date} className="space-y-1.5">
-                <div className="flex items-baseline gap-2 px-0.5">
-                  <span className="text-[12px] font-bold text-foreground">{formatLogDate(g.date)}</span>
-                  <span className="text-[10px] tabular-nums text-muted-foreground">{g.date}</span>
-                </div>
-                {g.items.map(l => (
-                  <LogCard key={l.id} log={l} />
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
 
       {/* 정해두고 잘 안 바뀌는 것들 — 한 줄에 둘씩 눌러 담는다.
           내용이 없는 칸은 아예 안 나오고, 추가는 수정 화면에서 한다. */}
@@ -172,31 +181,6 @@ export default function ProjectDetail() {
           </MiniSection>
         )}
 
-        {/* 바늘은 사진이 없어 줄글로 넣는다 — 여러 개여도 답답하지 않다 */}
-        {needleLinks.length > 0 && (
-          <MiniSection title="바늘">
-            {needleLinks.map(l => {
-              const n = needleMap.get(l.needleId);
-              const deleted = !!n?.isDeleted;
-              return (
-                <MaybeLink
-                  key={l.id}
-                  to={`/library/needles/${l.needleId}/edit`}
-                  isDeleted={deleted}
-                  className="card-soft block px-2.5 py-2"
-                >
-                  <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                    {n?.type} {n?.sizeMm && `· ${n.sizeMm}`}
-                  </div>
-                  <div className="truncate text-[10.5px] text-muted-foreground">
-                    {deleted ? '삭제됨' : [n?.brand, n?.material, n?.length].filter(Boolean).join(' · ') || '—'}
-                  </div>
-                </MaybeLink>
-              );
-            })}
-          </MiniSection>
-        )}
-
         {yarnLinks.length > 0 && (
           <MiniSection title="사용한 실">
             {yarnLinks.map(l => {
@@ -217,6 +201,31 @@ export default function ProjectDetail() {
                     <div className="truncate text-[10.5px] text-muted-foreground">
                       {[y?.colorName, `${l.usedGrams}g`].filter(Boolean).join(' · ')}
                     </div>
+                  </div>
+                </MaybeLink>
+              );
+            })}
+          </MiniSection>
+        )}
+
+        {/* 바늘은 사진이 없어 줄글로 넣는다 — 여러 개여도 답답하지 않다 */}
+        {needleLinks.length > 0 && (
+          <MiniSection title="바늘">
+            {needleLinks.map(l => {
+              const n = needleMap.get(l.needleId);
+              const deleted = !!n?.isDeleted;
+              return (
+                <MaybeLink
+                  key={l.id}
+                  to={`/library/needles/${l.needleId}/edit`}
+                  isDeleted={deleted}
+                  className="card-soft block px-2.5 py-2"
+                >
+                  <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                    {n?.type} {n?.sizeMm && `· ${n.sizeMm}`}
+                  </div>
+                  <div className="truncate text-[10.5px] text-muted-foreground">
+                    {deleted ? '삭제됨' : [n?.brand, n?.material, n?.length].filter(Boolean).join(' · ') || '—'}
                   </div>
                 </MaybeLink>
               );

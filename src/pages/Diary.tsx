@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { groupByDate, formatLogDate, todayStr } from '@/lib/logs';
@@ -17,8 +17,12 @@ const VIEW_KEY = 'diaryViewMode';
  * 기록 자체는 프로젝트 상세에서 쓴 것과 같은 데이터다 (입구만 둘).
  */
 export default function Diary() {
+  // 프로젝트 상세에서 '더보기'로 들어오면 그 프로젝트가 골라진 채로 열린다
+  const [params] = useSearchParams();
+  const fromProject = Number(params.get('projectId')) || null;
+
   const [view, setView] = useState<ViewMode>('calendar');
-  const [filter, setFilter] = useState<number | 'all'>('all');
+  const [filter, setFilter] = useState<number | 'all'>(fromProject ?? 'all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,7 +77,7 @@ export default function Diary() {
             {streak > 0 ? `${streak}일째 기록 중` : '오늘의 뜨개'}
           </p>
           <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight tracking-tight text-foreground">
-            뜨개일기
+            다이어리
           </h1>
         </div>
 
@@ -152,9 +156,31 @@ export default function Diary() {
               )}
             </section>
           ) : (
-            <p className="px-1 text-center text-[11.5px] text-muted-foreground">
-              날짜를 누르면 그날의 기록을 볼 수 있어요.
-            </p>
+            /* 날짜를 안 고르면 그동안 쌓인 기록을 그대로 아래에 펼친다.
+               달력만 덩그러니 있으면 뭘 눌러야 할지 몰라 그냥 나가게 된다. */
+            <div className="space-y-5">
+              <p className="px-1 text-center text-[11.5px] text-muted-foreground">
+                날짜를 누르면 그날의 기록만 볼 수 있어요.
+              </p>
+              {groups.map(g => (
+                <section key={g.date} className="space-y-2">
+                  <h2 className="flex items-baseline gap-2 px-0.5">
+                    <span className="text-[13px] font-bold text-foreground">{formatLogDate(g.date)}</span>
+                    <span className="text-[10.5px] tabular-nums text-muted-foreground">{g.date}</span>
+                  </h2>
+                  <div className="space-y-2">
+                    {g.items.map(l => (
+                      <LogCard
+                        key={l.id}
+                        log={l}
+                        projectName={l.projectId ? pmap.get(l.projectId)?.name : undefined}
+                        showProject={filter === 'all'}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           )}
         </div>
       ) : groups.length === 0 ? (

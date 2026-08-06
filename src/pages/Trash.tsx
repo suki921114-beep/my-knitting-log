@@ -217,7 +217,7 @@ export default function Trash() {
             onPurge={askPurge}
           />
           <Section
-            title="뜨개 기록"
+            title="다이어리"
             items={logs}
             getName={(l) => (l.text.length > 24 ? l.text.slice(0, 24) + '…' : l.text) || '기록'}
             getMeta={(l) => {
