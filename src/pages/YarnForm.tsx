@@ -190,42 +190,42 @@ export default function YarnForm() {
         <Field label="굵기"><input className={inp} value={f.weight} onChange={u('weight')} placeholder="fingering" /></Field>
       </div>
       <div className="space-y-2">
-        <span className="block text-xs font-medium text-muted-foreground">합수별 권장 바늘·게이지</span>
+        <span className="block text-xs font-medium text-muted-foreground">게이지 정보</span>
+        {/* 합 · 바늘 · 게이지 · 삭제를 한 줄에 — 위아래로 나뉘면 어느 합의 값인지 눈이 헤맨다 */}
         {recs.map((r, i) => (
-          <div key={i} className="card-soft space-y-2 p-3">
-            <div className="flex items-center gap-2">
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1">
               <input
                 type="number"
                 inputMode="numeric"
                 min={1}
-                className={`${inp} w-16 shrink-0 px-2 text-center`}
+                aria-label="합수"
+                className={`${inp} w-12 px-1 text-center`}
                 value={r.strands}
                 onChange={e => updateRec(i, { strands: e.target.value })}
               />
-              <span className="shrink-0 text-[12.5px] font-semibold text-muted-foreground">합</span>
-              <button
-                type="button"
-                onClick={() => removeRec(i)}
-                aria-label={`${r.strands || ''}합 지우기`}
-                className="ml-auto rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <span className="text-[12.5px] font-semibold text-muted-foreground">합</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                className={inp}
-                value={r.needleSize}
-                onChange={e => updateRec(i, { needleSize: e.target.value })}
-                placeholder="4.0mm / 5호"
-              />
-              <input
-                className={inp}
-                value={r.gauge}
-                onChange={e => updateRec(i, { gauge: e.target.value })}
-                placeholder="22코 30단 / 10cm"
-              />
-            </div>
+            <input
+              className={`${inp} min-w-0 flex-1 px-2.5`}
+              value={r.needleSize}
+              onChange={e => updateRec(i, { needleSize: e.target.value })}
+              placeholder="4.0mm"
+            />
+            <input
+              className={`${inp} min-w-0 flex-[1.4] px-2.5`}
+              value={r.gauge}
+              onChange={e => updateRec(i, { gauge: e.target.value })}
+              placeholder="22코 30단"
+            />
+            <button
+              type="button"
+              onClick={() => removeRec(i)}
+              aria-label={`${r.strands || ''}합 지우기`}
+              className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         ))}
         <button
@@ -233,7 +233,7 @@ export default function YarnForm() {
           onClick={addRec}
           className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border py-2.5 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/40 hover:text-primary"
         >
-          <Plus className="h-4 w-4" /> 합수 추가
+          <Plus className="h-4 w-4" /> 게이지 추가
         </button>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           ※ 같은 실이라도 합수에 따라 권장 바늘과 게이지가 달라져요. 1합, 2합을 따로 적어두면 도안 맞출 때 편합니다.
