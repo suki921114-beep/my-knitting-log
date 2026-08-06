@@ -4,7 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, Project, RowCounter } from '@/lib/db';
 import { useAllYarnStats } from '@/lib/yarnCalc';
 import { coverPhotoUrl } from '@/lib/photo';
-import { formatLogDate } from '@/lib/logs';
+import { formatLogDateFull } from '@/lib/logs';
+import LogCard from '@/components/LogCard';
 import BackupReminder from '@/components/BackupReminder';
 import Mascot, { EmptyState } from '@/components/Mascot';
 import {
@@ -66,6 +67,11 @@ export default function Home() {
     () => [...logs].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt))[0],
     [logs],
   );
+  // 삭제된 프로젝트의 기록도 이름은 보여야 해서 allProjects 로 만든다
+  const projectNameById = useMemo(
+    () => new Map(allProjects.map(p => [p.id!, p.name])),
+    [allProjects],
+  );
 
   return (
     <div className="space-y-5">
@@ -122,24 +128,26 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* 최근 기록 한 편만 — 나머지는 다이어리에서 */}
+      {/* 최근 기록 한 편만 — 나머지는 다이어리에서.
+          카드는 다이어리와 같은 것을 쓴다. 어느 프로젝트 기록인지 여기서도 보여야 한다. */}
       <section className="space-y-2">
         <div className="flex items-center justify-between px-0.5">
-          <h2 className="section-title">최근 기록</h2>
+          <h2 className="section-title">다이어리</h2>
           <Link to="/diary" className="flex items-center gap-0.5 text-[11.5px] text-muted-foreground">
-            다이어리 <ArrowRight className="h-3 w-3" />
+            상세보기 <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
         {latestLog ? (
-          <Link to={`/diary/${latestLog.id}/edit`} className="card-soft block p-3.5">
-            <div className="flex items-center gap-2">
-              <span className="text-[10.5px] font-semibold text-primary">
-                {formatLogDate(latestLog.date)}
-              </span>
-              {latestLog.mood && <span className="text-[13px]">{latestLog.mood}</span>}
-            </div>
-            <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-ink">{latestLog.text}</p>
-          </Link>
+          <div className="space-y-1.5">
+            <h3 className="px-0.5 text-[12px] font-bold tabular-nums text-foreground">
+              {formatLogDateFull(latestLog.date)}
+            </h3>
+            <LogCard
+              log={latestLog}
+              projectName={latestLog.projectId ? projectNameById.get(latestLog.projectId) : undefined}
+              showProject
+            />
+          </div>
         ) : (
           <Link
             to="/diary/new"

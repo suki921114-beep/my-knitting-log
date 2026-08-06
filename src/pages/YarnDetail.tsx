@@ -73,16 +73,16 @@ export default function YarnDetail() {
           </div>
 
           {(yarn.fiber || yarn.weight || yarn.shop || yarn.link) && (
-            <div className="space-y-0.5 rounded-xl bg-card/80 px-3.5 py-3 text-[12.5px] sm:max-w-[260px]">
-              {yarn.fiber && <div className="truncate"><span className="text-muted-foreground">성분 </span>{yarn.fiber}</div>}
-              {yarn.weight && <div className="truncate"><span className="text-muted-foreground">굵기 </span>{yarn.weight}</div>}
-              {yarn.shop && <div className="truncate"><span className="text-muted-foreground">구매처 </span>{yarn.shop}</div>}
+            <div className="space-y-0.5 text-[12.5px] text-primary/85 sm:max-w-[260px] sm:text-right">
+              {yarn.fiber && <div className="truncate"><span className="text-primary/55">성분 </span>{yarn.fiber}</div>}
+              {yarn.weight && <div className="truncate"><span className="text-primary/55">굵기 </span>{yarn.weight}</div>}
+              {yarn.shop && <div className="truncate"><span className="text-primary/55">구매처 </span>{yarn.shop}</div>}
               {yarn.link && (
                 <a
                   href={normalizeUrl(yarn.link)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-1 inline-flex max-w-full items-center gap-1 text-primary underline underline-offset-2"
+                  className="mt-1 inline-flex max-w-full items-center gap-1 font-semibold text-primary underline underline-offset-2"
                 >
                   <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">구매 링크 열기</span>

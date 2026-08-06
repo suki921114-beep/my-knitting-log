@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { KnitLog } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
-import Mascot from '@/components/Mascot';
 
 /**
  * 기록 한 편. 다이어리와 프로젝트 상세에서 같은 카드를 쓴다.
@@ -45,24 +44,18 @@ export default function LogCard({
           </div>
         </div>
 
-        {/* 사진이 없는 날도 카드 높이와 리듬이 흐트러지지 않게 문어가 자리를 지킨다 */}
-        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted">
-          {urls.length > 0 ? (
-            <>
-              <img src={urls[0]} alt="" className="h-full w-full object-cover" />
-              {urls.length > 1 && (
-                // 나머지는 눌러 들어가면 다 볼 수 있으니 장수만 알려준다
-                <span className="absolute bottom-0.5 right-0.5 rounded-full bg-black/55 px-1.5 text-[10px] font-bold leading-[15px] text-white">
-                  +{urls.length - 1}
-                </span>
-              )}
-            </>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-primary-soft/50 text-primary/45">
-              <Mascot size={44} mood="sleepy" />
-            </div>
-          )}
-        </div>
+        {/* 사진이 없으면 자리를 비운다 — 빈 칸을 뭔가로 채우면 오히려 눈에 걸린다 */}
+        {urls.length > 0 && (
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted">
+            <img src={urls[0]} alt="" className="h-full w-full object-cover" />
+            {urls.length > 1 && (
+              // 나머지는 눌러 들어가면 다 볼 수 있으니 장수만 알려준다
+              <span className="absolute bottom-0.5 right-0.5 rounded-full bg-black/55 px-1.5 text-[10px] font-bold leading-[15px] text-white">
+                +{urls.length - 1}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Link>
   );
