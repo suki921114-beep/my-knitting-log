@@ -9,9 +9,14 @@
 //     · 동일 origin GET asset   → StaleWhileRevalidate
 //     · 외부 (firestore 등)      → SW 우회 (Firestore SDK 가 자체 처리)
 //
-// CACHE 이름 끝의 버전을 올리면 다음 배포 시 옛 캐시가 자동 정리된다.
+// ⚠️ CACHE 이름을 안 올리면 옛 캐시가 영영 남는다.
+//    activate 는 이름이 다른 캐시만 지우는데, 이름이 늘 같으면 지울 게 없다.
+//    그러면 배포를 해도 쓰는 사람은 옛 화면을 계속 보게 된다.
+//
+//    src/lib/appVersion.ts 의 APP_VERSION 을 올릴 때 이 값도 같이 올릴 것.
+//    (빌드가 이 파일을 그대로 복사하므로 여기서 import 할 수 없다)
 
-const CACHE = 'knit-app-v1';
+const CACHE = 'knit-app-v1.2.0';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
