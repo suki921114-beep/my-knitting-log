@@ -9,11 +9,30 @@ function vibrate(ms = 10) {
   try { (navigator as any).vibrate?.(ms); } catch {}
 }
 
-export default function RowCounterSection({ projectId }: { projectId: number }) {
-  const counters = useLiveQuery(
+/**
+ * mode
+ *   edit — 수정 화면. 비어 있어도 안내와 추가 버튼을 보여준다.
+ *   view — 상세 화면. 카운터가 하나도 없으면 아예 감춘다.
+ *
+ * 단수 카운터가 필요 없는 도안도 많은데, 빈 안내가 늘 자리를 차지해서
+ * 아래 항목들이 밀린다는 의견이 있었다. 그래서 만들기는 수정 화면에서 하고
+ * 상세 화면에는 실제로 쓰는 것만 남긴다.
+ */
+export default function RowCounterSection({
+  projectId,
+  mode = 'edit',
+}: {
+  projectId: number;
+  mode?: 'view' | 'edit';
+}) {
+  const loaded = useLiveQuery(
     () => db.rowCounters.where('projectId').equals(projectId).filter(c => !c.isDeleted).sortBy('createdAt'),
     [projectId]
-  ) || [];
+  );
+  const counters = loaded || [];
+
+  // 아직 불러오는 중일 때도 감춘다 — 보였다 사라지면 화면이 덜컹거린다
+  if (mode === 'view' && counters.length === 0) return null;
 
   async function addCounter() {
     const t = now();

@@ -7,6 +7,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { ImageInput } from '@/components/ImageInput';
 import { toast } from '@/components/ui/sonner';
 import { Save, Trash2 } from 'lucide-react';
+import { gramsToMeters, formatMeters } from '@/lib/yarnCalc';
 
 export default function YarnForm() {
   const { id } = useParams();
@@ -18,7 +19,7 @@ export default function YarnForm() {
 
   const [f, setF] = useState({
     name: '', brand: '', colorName: '', colorCode: '', shop: '', link: '', fiber: '', weight: '',
-    needleSize: '', gauge: '', totalGrams: 0, note: '',
+    needleSize: '', gauge: '', totalGrams: 0, metersPer100g: 0, note: '',
   });
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
@@ -30,7 +31,8 @@ export default function YarnForm() {
         colorCode: existing.colorCode || '', shop: existing.shop || '', link: existing.link || '',
         fiber: existing.fiber || '',
         weight: existing.weight || '', needleSize: existing.needleSize || '', gauge: existing.gauge || '',
-        totalGrams: existing.totalGrams, note: existing.note || '',
+        totalGrams: existing.totalGrams, metersPer100g: existing.metersPer100g || 0,
+        note: existing.note || '',
       });
       setPhoto(existing.photoDataUrl);
       setHyd(true);
@@ -52,9 +54,11 @@ export default function YarnForm() {
     const t = now();
     
     // 공통 업데이트 필드
-    const payload = { 
-      ...f, 
-      photoDataUrl: photo, 
+    const payload = {
+      ...f,
+      // 안 적었으면 0 이 아니라 '없음'으로 둔다. 0m/100g 인 실은 없다.
+      metersPer100g: f.metersPer100g > 0 ? f.metersPer100g : undefined,
+      photoDataUrl: photo,
       updatedAt: t,
       isDeleted: false,
       deletedAt: null
@@ -109,7 +113,12 @@ export default function YarnForm() {
     });
   }
 
-  const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: k === 'totalGrams' ? Number(e.target.value) || 0 : e.target.value });
+  const numeric: (keyof typeof f)[] = ['totalGrams', 'metersPer100g'];
+  const u = (k: keyof typeof f) => (e: any) =>
+    setF({ ...f, [k]: numeric.includes(k) ? Number(e.target.value) || 0 : e.target.value });
+
+  // 적어둔 기준값이 있을 때만 총 길이를 보여준다
+  const totalMeters = gramsToMeters(f.totalGrams, f.metersPer100g);
 
   return (
     <div className="space-y-4">
@@ -154,9 +163,30 @@ export default function YarnForm() {
         ※ 라벨(볼밴드)에 적힌 권장 바늘 호수와 게이지를 적어두면 나중에 도안 매칭이 쉬워요.
       </p>
 
-      <Field label="총 보유량 (g)">
-        <input type="number" inputMode="decimal" className={inp} value={f.totalGrams} onChange={u('totalGrams')} />
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="총 보유량 (g)">
+          <input type="number" inputMode="decimal" className={inp} value={f.totalGrams} onChange={u('totalGrams')} />
+        </Field>
+        <Field label="100g당 길이 (m)">
+          <input
+            type="number"
+            inputMode="decimal"
+            className={inp}
+            value={f.metersPer100g || ''}
+            onChange={u('metersPer100g')}
+            placeholder="400"
+          />
+        </Field>
+      </div>
+      {totalMeters !== null ? (
+        <p className="-mt-2 rounded-xl bg-primary-soft/60 px-3 py-2.5 text-[12px] font-semibold text-primary">
+          총 길이 약 {formatMeters(totalMeters)}
+        </p>
+      ) : (
+        <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          ※ 100g당 길이를 적어두면 총 길이를 대신 계산해 드려요. 라벨이 50g / 200m 이면 400 을 적으시면 됩니다.
+        </p>
+      )}
       <Field label="메모"><textarea className={`${inp} min-h-[72px]`} value={f.note} onChange={u('note')} /></Field>
 
       <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">

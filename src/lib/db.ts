@@ -81,6 +81,12 @@ export interface Yarn extends SyncMetadata {
   /** 권장 게이지 (예: "22코 30단 / 10cm") */
   gauge?: string;
   totalGrams: number;
+  /**
+   * 100g 당 길이(m). 라벨에 적힌 값을 100g 기준으로 환산해 적는다.
+   * 콘사처럼 무게로만 파는 실도 이 값만 있으면 총 길이를 알 수 있다.
+   * 값이 없으면 길이 계산을 아예 보여주지 않는다 — 모르는 걸 0 으로 꾸미지 않는다.
+   */
+  metersPer100g?: number;
   note?: string;
   photoDataUrl?: string;
   createdAt: number;

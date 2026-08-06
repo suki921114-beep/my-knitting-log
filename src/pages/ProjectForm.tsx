@@ -9,6 +9,8 @@ import { syncLinks } from '@/lib/linkSync';
 import YarnPicker, { YarnLink } from '@/components/YarnPicker';
 import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
 import { MultiImageInput } from '@/components/ImageInput';
+import RowCounterSection from '@/components/RowCounterSection';
+import ProjectGaugeSection from '@/components/ProjectGaugeSection';
 import { Save, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
@@ -313,6 +315,20 @@ export default function ProjectForm() {
         <Field label="사이즈"><input className={inputCls} value={size} onChange={e => setSize(e.target.value)} placeholder="M / 90cm" /></Field>
         <Field label="게이지"><input className={inputCls} value={gauge} onChange={e => setGauge(e.target.value)} placeholder="22코 28단/10cm" /></Field>
       </div>
+
+      {/* 카운터와 게이지 계산은 여기서만 만든다.
+          상세 화면에는 실제로 쓰는 것만 남기려고 만들기를 이쪽으로 옮겼다.
+          새 프로젝트는 아직 id 가 없어 저장한 뒤에야 붙일 수 있다. */}
+      {projectId ? (
+        <>
+          <RowCounterSection projectId={projectId} />
+          <ProjectGaugeSection projectId={projectId} />
+        </>
+      ) : (
+        <p className="rounded-xl bg-secondary/50 px-3 py-3 text-[11.5px] leading-relaxed text-muted-foreground">
+          단수 카운터와 게이지 계산기는 저장한 뒤에 여기에서 추가할 수 있어요. 쓰지 않으면 프로젝트 화면에 나오지 않습니다.
+        </p>
+      )}
 
       <Field label="도안" as="div">
         <EntityPicker kind="pattern" links={patternLinks} onChange={setPatternLinks} />

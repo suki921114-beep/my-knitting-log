@@ -25,6 +25,28 @@ export function useAllYarnStats() {
   }, []);
 }
 
+/**
+ * 무게(g)를 길이(m)로 바꾼다.
+ *
+ * 콘사는 라벨에 총 길이가 안 적혀 있는 경우가 많아, 100g 당 길이만 알면
+ * 남은 무게에서 남은 길이를 바로 알 수 있다. 도안이 요구하는 실 길이와
+ * 맞춰볼 때 손으로 계산하지 않아도 되게 하려는 것.
+ *
+ * 기준값이 없거나 0 이하면 null — 계산할 수 없다는 뜻이고, 화면에서는 아예
+ * 감춘다. 0m 라고 적으면 실이 없다는 뜻으로 잘못 읽힌다.
+ */
+export function gramsToMeters(grams: number, metersPer100g?: number): number | null {
+  if (!metersPer100g || metersPer100g <= 0) return null;
+  if (!Number.isFinite(grams) || grams < 0) return null;
+  return (grams * metersPer100g) / 100;
+}
+
+/** 길이를 사람이 읽기 좋게 — 1000m 이 넘으면 km 로 접는다 */
+export function formatMeters(m: number): string {
+  if (m >= 1000) return `${(m / 1000).toFixed(m >= 10000 ? 1 : 2)}km`;
+  return `${Math.round(m)}m`;
+}
+
 export function statusLabel(s: string) {
   return ({ planned: '예정', in_progress: '진행중', done: '완성', on_hold: '보류' } as any)[s] || s;
 }

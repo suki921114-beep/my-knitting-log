@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { useYarnRemaining } from '@/lib/yarnCalc';
+import { useYarnRemaining, gramsToMeters, formatMeters } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, ExternalLink } from 'lucide-react';
 
@@ -36,6 +36,9 @@ export default function YarnDetail() {
   const used = stats?.used ?? 0;
   const remaining = stats?.remaining ?? yarn.totalGrams;
   const pct = total > 0 ? Math.max(0, Math.min(100, (remaining / total) * 100)) : 0;
+  // 100g당 길이를 적어둔 실만 길이로도 보여준다
+  const totalMeters = gramsToMeters(total, yarn.metersPer100g);
+  const remainingMeters = gramsToMeters(remaining, yarn.metersPer100g);
 
   return (
     <div className="space-y-5">
@@ -64,6 +67,12 @@ export default function YarnDetail() {
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-card/60">
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
+        {remainingMeters !== null && (
+          <div className="mt-3 flex items-baseline justify-between border-t border-primary/15 pt-2.5 text-[11.5px] text-primary/80">
+            <span>남은 길이 약 <strong className="text-[13px] font-bold text-primary">{formatMeters(remainingMeters)}</strong></span>
+            {totalMeters !== null && <span>총 {formatMeters(totalMeters)}</span>}
+          </div>
+        )}
       </div>
 
       {(yarn.fiber || yarn.weight || yarn.shop || yarn.link) && (

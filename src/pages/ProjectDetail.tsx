@@ -49,6 +49,9 @@ export default function ProjectDetail() {
   }
 
   const photos = project.photos || [];
+  const livePhotos = photos.filter((p: any) => !p.isDeleted);
+  // 맨 위 카드에 쓸 대표 사진 — 아직 내려받는 중이면 dataUrl 이 없을 수 있다
+  const cover = livePhotos.find((p: any) => p.dataUrl);
 
   return (
     <div className="space-y-5">
@@ -61,7 +64,8 @@ export default function ProjectDetail() {
           </Link>
         }
       />
-      {/* Hero — 상태 / 일자 / 사이즈 / 게이지를 한 카드로 묶음 */}
+      {/* Hero — 상태·일자 아래에 대표 사진과 사이즈·게이지를 나란히 둔다.
+          사진이 맨 위에 있어야 어떤 프로젝트인지 한눈에 들어온다는 의견 반영. */}
       <div className="card-soft overflow-hidden bg-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-4 py-3">
           <span className={`chip ${statusColor(project.status)}`}>{statusLabel(project.status)}</span>
@@ -72,32 +76,44 @@ export default function ProjectDetail() {
             <span className="text-[11.5px] text-muted-foreground">완료 {project.endDate}</span>
           )}
         </div>
-        {(project.size || project.gauge) && (
-          <dl className="grid grid-cols-2 gap-3 px-4 py-3 text-[12.5px]">
-            {project.size && (
-              <div className="min-w-0">
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">사이즈</dt>
-                <dd className="mt-0.5 truncate font-semibold text-foreground">{project.size}</dd>
-              </div>
+        {(cover || project.size || project.gauge) && (
+          <div className="flex gap-3.5 px-4 py-3.5">
+            {cover?.dataUrl && (
+              <button
+                type="button"
+                onClick={() => setLightbox(cover.dataUrl)}
+                className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl border bg-muted"
+              >
+                <img src={cover.dataUrl} alt="대표 사진" className="h-full w-full object-cover" />
+              </button>
             )}
-            {project.gauge && (
-              <div className="min-w-0">
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">게이지</dt>
-                <dd className="mt-0.5 truncate font-semibold text-foreground">{project.gauge}</dd>
-              </div>
-            )}
-          </dl>
+            <dl className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 text-[12.5px]">
+              {project.size && (
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">사이즈</dt>
+                  <dd className="mt-0.5 truncate font-semibold text-foreground">{project.size}</dd>
+                </div>
+              )}
+              {project.gauge && (
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">게이지</dt>
+                  <dd className="mt-0.5 truncate font-semibold text-foreground">{project.gauge}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
         )}
       </div>
 
-      <RowCounterSection projectId={pid} />
+      {/* 아래 항목들은 내용이 있을 때만 나온다.
+          빈 안내가 자리를 차지해 정작 필요한 것이 밀린다는 의견을 반영했다.
+          추가는 전부 수정 화면에서 한다. */}
+      <RowCounterSection projectId={pid} mode="view" />
 
-      <ProjectGaugeSection projectId={pid} />
+      <ProjectGaugeSection projectId={pid} mode="view" />
 
-      <Section title="도안">
-        {patternLinks.length === 0 ? (
-          <Empty text="아직 연결된 도안이 없어요" />
-        ) : (
+      {patternLinks.length > 0 && (
+        <Section title="도안">
           <ul className="space-y-2">
             {patternLinks.map(l => {
               const p = patternMap.get(l.patternId);
@@ -127,13 +143,11 @@ export default function ProjectDetail() {
               );
             })}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
-      <Section title="사용한 실">
-        {yarnLinks.length === 0 ? (
-          <Empty text="아직 연결된 실이 없어요" />
-        ) : (
+      {yarnLinks.length > 0 && (
+        <Section title="사용한 실">
           <ul className="space-y-2">
             {yarnLinks.map(l => {
               const y = yarnMap.get(l.yarnId);
@@ -162,13 +176,11 @@ export default function ProjectDetail() {
               );
             })}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
-      <Section title="바늘">
-        {needleLinks.length === 0 ? (
-          <Empty text="아직 연결된 바늘이 없어요" />
-        ) : (
+      {needleLinks.length > 0 && (
+        <Section title="바늘">
           <ul className="space-y-2">
             {needleLinks.map(l => {
               const n = needleMap.get(l.needleId);
@@ -195,13 +207,11 @@ export default function ProjectDetail() {
               );
             })}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
-      <Section title="부자재">
-        {notionLinks.length === 0 ? (
-          <Empty text="아직 연결된 부자재가 없어요" />
-        ) : (
+      {notionLinks.length > 0 && (
+        <Section title="부자재">
           <ul className="space-y-2">
             {notionLinks.map(l => {
               const n = notionMap.get(l.notionId);
@@ -230,14 +240,13 @@ export default function ProjectDetail() {
               );
             })}
           </ul>
-        )}
-      </Section>
+        </Section>
+      )}
 
-      {photos.filter((p: any) => !p.isDeleted).length > 0 && (
+      {livePhotos.length > 0 && (
         <Section title="사진">
           <div className="grid grid-cols-3 gap-2">
-            {photos
-              .filter((p: any) => !p.isDeleted)
+            {livePhotos
               .map((p: any, i: number) => (
                 <button
                   key={p.cloudId || i}
@@ -325,14 +334,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="section-title">{title}</h2>
       {children}
     </section>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <p className="rounded-2xl bg-secondary/40 px-3 py-5 text-center text-[12px] text-muted-foreground">
-      {text}
-    </p>
   );
 }
 

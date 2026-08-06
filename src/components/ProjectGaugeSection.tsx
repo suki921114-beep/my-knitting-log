@@ -5,7 +5,17 @@ import { Plus, Trash2, ChevronDown, Save, Target } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { useConfirm } from '@/hooks/useConfirm';
 
-interface Props { projectId: number }
+interface Props {
+  projectId: number;
+  /**
+   * edit — 수정 화면. 비어 있어도 안내와 추가 버튼을 보여준다.
+   * view — 상세 화면. 저장된 계산이 없으면 아예 감춘다.
+   *
+   * 게이지 계산이 필요 없는 도안도 많은데 빈 안내가 늘 자리를 차지한다는
+   * 의견이 있었다. 만들기는 수정 화면에서, 상세 화면에는 쓰는 것만 남긴다.
+   */
+  mode?: 'view' | 'edit';
+}
 
 const blank = (projectId: number): ProjectGauge => ({
   projectId,
@@ -25,11 +35,12 @@ const blank = (projectId: number): ProjectGauge => ({
   updatedAt: 0,
 });
 
-export default function ProjectGaugeSection({ projectId }: Props) {
-  const items = useLiveQuery(
+export default function ProjectGaugeSection({ projectId, mode = 'edit' }: Props) {
+  const loaded = useLiveQuery(
     () => db.projectGauges.where('projectId').equals(projectId).filter(g => !g.isDeleted).sortBy('createdAt'),
     [projectId]
-  ) || [];
+  );
+  const items = loaded || [];
 
   const [openId, setOpenId] = useState<number | null>(null);
 
@@ -44,6 +55,9 @@ export default function ProjectGaugeSection({ projectId }: Props) {
     });
     setOpenId(id);
   }
+
+  // 아직 불러오는 중일 때도 감춘다 — 보였다 사라지면 화면이 덜컹거린다
+  if (mode === 'view' && items.length === 0) return null;
 
   return (
     <section className="space-y-2.5">
