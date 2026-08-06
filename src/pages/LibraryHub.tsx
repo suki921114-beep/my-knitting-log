@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import PageHeader from '@/components/PageHeader';
 import { db } from '@/lib/db';
 import { useAllYarnStats } from '@/lib/yarnCalc';
-import { Layers, Scroll, Ruler, Sparkles, ChevronRight, Calculator } from 'lucide-react';
+import { Scroll, ChevronRight, Calculator } from 'lucide-react';
+import { YarnBallIcon, NeedlesIcon, ButtonIcon } from '@/components/CraftIcons';
 
 export default function LibraryHub() {
   const counts = useLiveQuery(async () => ({
@@ -21,7 +22,7 @@ export default function LibraryHub() {
       to: '/library/yarns',
       label: '실',
       summary: `${counts.yarns}개${lowYarn > 0 ? ` · 부족 ${lowYarn}` : ''}`,
-      icon: Layers,
+      icon: YarnBallIcon,
       accent: 'text-primary bg-primary-soft',
     },
     {
@@ -35,14 +36,14 @@ export default function LibraryHub() {
       to: '/library/needles',
       label: '바늘',
       summary: `${counts.needles}개`,
-      icon: Ruler,
+      icon: NeedlesIcon,
       accent: 'text-primary bg-primary-soft',
     },
     {
       to: '/library/notions',
       label: '부자재',
       summary: `${counts.notions}개`,
-      icon: Sparkles,
+      icon: ButtonIcon,
       accent: 'text-accent-foreground bg-accent-soft',
     },
   ];

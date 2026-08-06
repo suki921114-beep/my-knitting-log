@@ -4,13 +4,18 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
 import { Download, X, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 // ----------------------------------------------------------------------------
 // 사진 백업 리마인더
 // ----------------------------------------------------------------------------
-// 사진은 클라우드에도 올라가지만 1GB 상한이 있다. JSON 내보내기는 상한이 없다.
-// 앱 삭제 / 브라우저 저장소 정리 / 기기 교체 시 그대로 사라진다.
-// 사진이 쌓였는데 오래 내보내기를 안 했으면 홈에서 한 번 알려 준다.
+// 앱 삭제 / 브라우저 저장소 정리 / 기기 교체 시 이 기기의 사진은 그대로 사라진다.
+// 사진이 쌓였는데 오래 파일로 내보내지 않았으면 홈에서 한 번 알려 준다.
+//
+// ⚠️ 로그인 여부에 따라 사정이 다르다.
+//    로그인했으면 사진은 이미 클라우드에 올라가 있다. 그런데도 "파일로 내보내야
+//    사진을 보관할 수 있다"고 말하면 거짓말이 된다. 이 경우에는 용량 상한(1GB)
+//    때문에 한 벌 더 받아두면 좋다는 쪽으로만 권한다.
 
 /** 마지막 JSON 내보내기 시각 (SettingsBackup 의 handleExport 가 기록) */
 const LAST_BACKUP_KEY = 'lastBackupAt';
@@ -34,6 +39,8 @@ function daysSince(iso: string | null): number | null {
 }
 
 export default function BackupReminder() {
+  const { user } = useAuth();
+  const signedIn = !!user;
   const [dismissed, setDismissed] = useState(false);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
   const [snoozedAt, setSnoozedAt] = useState<string | null>(null);
@@ -84,20 +91,22 @@ export default function BackupReminder() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-200">
-백업한 지 오래됐어요 · 사진 {photoCount}장
+            {signedIn ? '백업 파일도 받아두시겠어요?' : '이 기기에만 저장돼 있어요'} · 사진 {photoCount}장
           </p>
           <p className="mt-1 text-[11.5px] leading-relaxed text-amber-800/90 dark:text-amber-300/80">
             {neverBackedUp
               ? '아직 백업 파일을 저장한 적이 없어요.'
-              : `마지막 백업이 ${backupDays}일 전이에요.`}{' '}
-JSON 파일로 내보내면 사진까지 통째로, 용량 제한 없이 보관할 수 있어요.
+              : `마지막으로 파일을 받은 지 ${backupDays}일 됐어요.`}{' '}
+            {signedIn
+              ? '사진은 클라우드에 올라가 있지만 무료 용량은 1GB예요. 파일로 한 벌 더 받아두면 용량과 상관없이 남습니다.'
+              : '로그인하지 않으면 사진은 이 기기에만 남아요. 파일로 내보내면 사진까지 통째로 보관할 수 있어요.'}
           </p>
           <Link
             to="/settings/backup"
             className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-amber-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-amber-700"
           >
             <Download className="h-3.5 w-3.5" />
-            지금 백업 파일 저장
+            백업 파일 저장
           </Link>
         </div>
       </div>
