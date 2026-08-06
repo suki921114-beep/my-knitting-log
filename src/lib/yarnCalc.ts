@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
+import type { Yarn, YarnRecommendation } from './db';
 
 export function useYarnRemaining(yarnId?: number) {
   return useLiveQuery(async () => {
@@ -41,10 +42,34 @@ export function gramsToMeters(grams: number, metersPer100g?: number): number | n
   return (grams * metersPer100g) / 100;
 }
 
-/** 길이를 사람이 읽기 좋게 — 1000m 이 넘으면 km 로 접는다 */
+/**
+ * 합수별 권장값을 꺼낸다.
+ *
+ * 예전에는 권장 바늘·게이지가 한 줄뿐이었다. 그때 적어둔 값은 1합 기준으로
+ * 보고 첫 줄에 놓는다. 데이터를 통째로 옮기는 대신 읽을 때 맞춰주는 쪽을
+ * 골랐다 — 기기마다 옮기는 시점이 어긋나면 클라우드에서 부딪힌다.
+ *
+ * 합수 오름차순으로 정렬해서 돌려준다.
+ */
+export function yarnRecommendations(yarn: Pick<Yarn, 'recommendations' | 'needleSize' | 'gauge'>): YarnRecommendation[] {
+  if (yarn.recommendations?.length) {
+    return [...yarn.recommendations].sort((a, b) => a.strands - b.strands);
+  }
+  if (yarn.needleSize || yarn.gauge) {
+    return [{ strands: 1, needleSize: yarn.needleSize, gauge: yarn.gauge }];
+  }
+  return [];
+}
+
+/**
+ * 길이 표기 — 언제나 미터로.
+ *
+ * km 로 접으면 목록에서 어떤 실은 m, 어떤 실은 km 로 나와 한눈에 비교가 안 된다.
+ * 실은 도안이 요구하는 미터수와 견주는 값이라 단위가 흔들리면 안 된다.
+ * 대신 자릿수가 길어지므로 천 단위로 끊어 준다.
+ */
 export function formatMeters(m: number): string {
-  if (m >= 1000) return `${(m / 1000).toFixed(m >= 10000 ? 1 : 2)}km`;
-  return `${Math.round(m)}m`;
+  return `${Math.round(m).toLocaleString('ko-KR')}m`;
 }
 
 export function statusLabel(s: string) {

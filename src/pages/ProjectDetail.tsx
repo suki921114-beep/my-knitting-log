@@ -105,164 +105,11 @@ export default function ProjectDetail() {
         )}
       </div>
 
-      {/* 아래 항목들은 내용이 있을 때만 나온다.
-          빈 안내가 자리를 차지해 정작 필요한 것이 밀린다는 의견을 반영했다.
-          추가는 전부 수정 화면에서 한다. */}
-      <RowCounterSection projectId={pid} mode="view" />
-
-      <ProjectGaugeSection projectId={pid} mode="view" />
-
-      {patternLinks.length > 0 && (
-        <Section title="도안">
-          <ul className="space-y-2">
-            {patternLinks.map(l => {
-              const p = patternMap.get(l.patternId);
-              const deleted = !!p?.isDeleted;
-              return (
-                <li key={l.id}>
-                  <MaybeLink
-                    to={`/library/patterns/${l.patternId}/edit`}
-                    isDeleted={deleted}
-                    className="card-soft flex items-center gap-3 p-3"
-                  >
-                    <Thumb src={p?.imageDataUrl} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <div className={`truncate text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                          {p?.name || '도안'}
-                        </div>
-                        {deleted && <DeletedBadge label="도안" />}
-                      </div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {[p?.designer, p?.difficulty].filter(Boolean).join(' · ')}
-                      </div>
-                      {l.note && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.note}</div>}
-                    </div>
-                  </MaybeLink>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-      )}
-
-      {yarnLinks.length > 0 && (
-        <Section title="사용한 실">
-          <ul className="space-y-2">
-            {yarnLinks.map(l => {
-              const y = yarnMap.get(l.yarnId);
-              const deleted = !!y?.isDeleted;
-              return (
-                <li key={l.id}>
-                  <MaybeLink
-                    to={`/library/yarns/${l.yarnId}`}
-                    isDeleted={deleted}
-                    className="card-soft flex items-center gap-3 p-3"
-                  >
-                    <Thumb src={y?.photoDataUrl} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <div className={`truncate text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                          {y?.name || '실'}
-                        </div>
-                        {deleted && <DeletedBadge label="실" />}
-                      </div>
-                      <div className="truncate text-[11px] text-muted-foreground">{y?.brand} {y?.colorName && `· ${y.colorName}`}</div>
-                      {l.colorNote && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.colorNote}</div>}
-                    </div>
-                    <div className={`text-sm font-semibold ${deleted ? 'text-muted-foreground' : 'text-primary'}`}>{l.usedGrams}g</div>
-                  </MaybeLink>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-      )}
-
-      {needleLinks.length > 0 && (
-        <Section title="바늘">
-          <ul className="space-y-2">
-            {needleLinks.map(l => {
-              const n = needleMap.get(l.needleId);
-              const deleted = !!n?.isDeleted;
-              return (
-                <li key={l.id}>
-                  <MaybeLink
-                    to={`/library/needles/${l.needleId}/edit`}
-                    isDeleted={deleted}
-                    className="card-soft block p-3"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <div className={`text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                        {n?.type} {n?.sizeMm && `· ${n.sizeMm}`}
-                      </div>
-                      {deleted && <DeletedBadge label="바늘" />}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {[n?.brand, n?.material, n?.length].filter(Boolean).join(' · ')}
-                    </div>
-                    {l.note && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.note}</div>}
-                  </MaybeLink>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-      )}
-
-      {notionLinks.length > 0 && (
-        <Section title="부자재">
-          <ul className="space-y-2">
-            {notionLinks.map(l => {
-              const n = notionMap.get(l.notionId);
-              const deleted = !!n?.isDeleted;
-              return (
-                <li key={l.id}>
-                  <MaybeLink
-                    to={`/library/notions/${l.notionId}/edit`}
-                    isDeleted={deleted}
-                    className="card-soft flex items-center gap-3 p-3"
-                  >
-                    <Thumb src={n?.photoDataUrl} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <div className={`truncate text-sm font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                          {n?.name}
-                        </div>
-                        {deleted && <DeletedBadge label="부자재" />}
-                      </div>
-                      <div className="truncate text-[11px] text-muted-foreground">{[n?.kind, n?.shop].filter(Boolean).join(' · ')}</div>
-                      {l.note && <div className="mt-0.5 text-xs text-muted-foreground">메모: {l.note}</div>}
-                    </div>
-                    {typeof l.quantity === 'number' && <div className={`text-sm font-semibold ${deleted ? 'text-muted-foreground' : 'text-primary'}`}>{l.quantity}개</div>}
-                  </MaybeLink>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-      )}
-
-      {livePhotos.length > 0 && (
-        <Section title="사진">
-          <div className="grid grid-cols-3 gap-2">
-            {livePhotos
-              .map((p: any, i: number) => (
-                <button
-                  key={p.cloudId || i}
-                  onClick={() => p.dataUrl && setLightbox(p.dataUrl)}
-                  disabled={!p.dataUrl}
-                  className="aspect-square overflow-hidden rounded-xl border bg-muted disabled:cursor-default"
-                >
-                  {p.dataUrl ? (
-                    <img src={p.dataUrl} alt={`사진 ${i + 1}`} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                      <ImageIcon className="h-5 w-5" />
-                    </div>
-                  )}
-                </button>
-              ))}
+      {/* 완성 소감은 다 만든 뒤에 쓰는 글이라 완성일 때만 내놓는다 */}
+      {project.status === 'done' && project.finishedNote && (
+        <Section title="완성 소감">
+          <div className="card-soft whitespace-pre-wrap rounded-r-2xl border-l-4 border-accent/40 bg-accent-soft/30 px-4 py-3.5 text-[13px] leading-relaxed text-ink">
+            {project.finishedNote}
           </div>
         </Section>
       )}
@@ -294,13 +141,121 @@ export default function ProjectDetail() {
           </div>
         )}
       </Section>
-      {project.finishedNote && (
-        <Section title="완성 소감">
-          <div className="card-soft whitespace-pre-wrap rounded-r-2xl border-l-4 border-accent/40 bg-accent-soft/30 px-4 py-3.5 text-[13px] leading-relaxed text-ink">
-            {project.finishedNote}
-          </div>
-        </Section>
-      )}
+
+      {/* 정해두고 잘 안 바뀌는 것들 — 한 줄에 둘씩 눌러 담는다.
+          내용이 없는 칸은 아예 안 나오고, 추가는 수정 화면에서 한다. */}
+      <div className="grid grid-cols-2 items-start gap-x-3 gap-y-4">
+        {patternLinks.length > 0 && (
+          <MiniSection title="도안">
+            {patternLinks.map(l => {
+              const p = patternMap.get(l.patternId);
+              const deleted = !!p?.isDeleted;
+              return (
+                <MaybeLink
+                  key={l.id}
+                  to={`/library/patterns/${l.patternId}/edit`}
+                  isDeleted={deleted}
+                  className="card-soft flex items-center gap-2 p-2"
+                >
+                  <Thumb src={p?.imageDataUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                      {p?.name || '도안'}
+                    </div>
+                    <div className="truncate text-[10.5px] text-muted-foreground">
+                      {deleted ? '삭제됨' : [p?.designer, p?.difficulty].filter(Boolean).join(' · ') || '—'}
+                    </div>
+                  </div>
+                </MaybeLink>
+              );
+            })}
+          </MiniSection>
+        )}
+
+        {/* 바늘은 사진이 없어 줄글로 넣는다 — 여러 개여도 답답하지 않다 */}
+        {needleLinks.length > 0 && (
+          <MiniSection title="바늘">
+            {needleLinks.map(l => {
+              const n = needleMap.get(l.needleId);
+              const deleted = !!n?.isDeleted;
+              return (
+                <MaybeLink
+                  key={l.id}
+                  to={`/library/needles/${l.needleId}/edit`}
+                  isDeleted={deleted}
+                  className="card-soft block px-2.5 py-2"
+                >
+                  <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                    {n?.type} {n?.sizeMm && `· ${n.sizeMm}`}
+                  </div>
+                  <div className="truncate text-[10.5px] text-muted-foreground">
+                    {deleted ? '삭제됨' : [n?.brand, n?.material, n?.length].filter(Boolean).join(' · ') || '—'}
+                  </div>
+                </MaybeLink>
+              );
+            })}
+          </MiniSection>
+        )}
+
+        {yarnLinks.length > 0 && (
+          <MiniSection title="사용한 실">
+            {yarnLinks.map(l => {
+              const y = yarnMap.get(l.yarnId);
+              const deleted = !!y?.isDeleted;
+              return (
+                <MaybeLink
+                  key={l.id}
+                  to={`/library/yarns/${l.yarnId}`}
+                  isDeleted={deleted}
+                  className="card-soft flex items-center gap-2 p-2"
+                >
+                  <Thumb src={y?.photoDataUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                      {y?.name || '실'}
+                    </div>
+                    <div className="truncate text-[10.5px] text-muted-foreground">
+                      {[y?.colorName, `${l.usedGrams}g`].filter(Boolean).join(' · ')}
+                    </div>
+                  </div>
+                </MaybeLink>
+              );
+            })}
+          </MiniSection>
+        )}
+
+        {notionLinks.length > 0 && (
+          <MiniSection title="부자재">
+            {notionLinks.map(l => {
+              const n = notionMap.get(l.notionId);
+              const deleted = !!n?.isDeleted;
+              return (
+                <MaybeLink
+                  key={l.id}
+                  to={`/library/notions/${l.notionId}/edit`}
+                  isDeleted={deleted}
+                  className="card-soft flex items-center gap-2 p-2"
+                >
+                  <Thumb src={n?.photoDataUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                      {n?.name}
+                    </div>
+                    <div className="truncate text-[10.5px] text-muted-foreground">
+                      {[n?.kind, typeof l.quantity === 'number' ? `${l.quantity}개` : null].filter(Boolean).join(' · ') || '—'}
+                    </div>
+                  </div>
+                </MaybeLink>
+              );
+            })}
+          </MiniSection>
+        )}
+      </div>
+
+      {/* 뜨면서 쓰는 도구는 맨 아래. 안 쓰면 아예 안 나온다. */}
+      <RowCounterSection projectId={pid} mode="view" />
+
+      <ProjectGaugeSection projectId={pid} mode="view" />
 
       {lightbox && (
         <div
@@ -314,9 +269,19 @@ export default function ProjectDetail() {
   );
 }
 
+/** 한 줄에 둘씩 들어가는 좁은 칸 — 제목이 작고 사이가 촘촘하다 */
+function MiniSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="min-w-0 space-y-1.5">
+      <h2 className="section-title">{title}</h2>
+      <div className="space-y-1.5">{children}</div>
+    </section>
+  );
+}
+
 function Thumb({ src }: { src?: string }) {
   return (
-    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border bg-muted">
+    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted">
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
@@ -363,14 +328,6 @@ function MaybeLink({
     <Link to={to} className={className}>
       {children}
     </Link>
-  );
-}
-
-function DeletedBadge({ label }: { label: string }) {
-  return (
-    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
-      삭제된 {label}
-    </span>
   );
 }
 

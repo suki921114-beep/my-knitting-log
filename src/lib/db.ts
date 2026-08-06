@@ -65,6 +65,21 @@ export interface Pattern extends SyncMetadata {
   updatedAt: number;
 }
 
+/**
+ * 합수별 권장값.
+ *
+ * 같은 실이라도 1합으로 뜰 때와 2합으로 뜰 때 권장 바늘 호수와 게이지가
+ * 달라진다. 한 줄로는 담을 수 없어 합수마다 따로 적어둔다.
+ */
+export interface YarnRecommendation {
+  /** 몇 합으로 떴을 때인지 */
+  strands: number;
+  /** 권장 바늘 호수 (예: "4.0mm", "5호") */
+  needleSize?: string;
+  /** 권장 게이지 (예: "22코 30단 / 10cm") */
+  gauge?: string;
+}
+
 export interface Yarn extends SyncMetadata {
   id?: number;
   name: string;
@@ -76,10 +91,16 @@ export interface Yarn extends SyncMetadata {
   link?: string;
   fiber?: string;
   weight?: string;
-  /** 권장 바늘 호수 (예: "4.0mm", "5호") */
+  /**
+   * @deprecated 합수별로 나뉘기 전에 쓰던 한 줄짜리 값.
+   * 새로 저장할 때는 recommendations 로 옮기고 비운다.
+   * 화면에서는 yarnRecommendations() 를 거칠 것 — 직접 읽지 말 것.
+   */
   needleSize?: string;
-  /** 권장 게이지 (예: "22코 30단 / 10cm") */
+  /** @deprecated needleSize 와 같은 이유 */
   gauge?: string;
+  /** 합수별 권장 바늘·게이지 */
+  recommendations?: YarnRecommendation[];
   totalGrams: number;
   /**
    * 100g 당 길이(m). 라벨에 적힌 값을 100g 기준으로 환산해 적는다.
@@ -427,6 +448,67 @@ class KnitDB extends Dexie {
             isDeleted: false,
             deletedAt: null,
           });
+        }
+      } finally {
+        resumeDirtyTracking();
+        clearSyncDirty();
+      }
+    });
+
+    // v8: 프로젝트 사진을 대표 한 장으로 줄인다.
+    //
+    // 프로젝트에 사진을 여러 장 쌓으면 '언제 찍은 것인지'가 사라진다.
+    // 앞으로 사진은 뜨개 기록에 붙이고, 프로젝트에는 대표 한 장만 둔다.
+    //
+    // 이미 올려둔 사진을 지울 수는 없으니 두 번째 장부터는 기록으로 옮긴다.
+    // 기록 날짜는 프로젝트 시작일 — 없으면 만든 날.
+    //
+    // ⚠️ cloudId 를 프로젝트 cloudId 에서 만들어 낸다. 폰과 태블릿이 각자
+    //    이 마이그레이션을 돌려도 같은 id 가 나와야 클라우드에서 한 건으로
+    //    합쳐진다. 무작위로 만들면 기기 수만큼 기록이 늘어난다.
+    this.version(8).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+      logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
+    }).upgrade(async (tx) => {
+      pauseDirtyTracking();
+      try {
+        const projects = await tx.table('projects').toArray();
+        const logs = tx.table('logs');
+        for (const p of projects) {
+          const alive = ((p?.photos || []) as any[]).filter(ph => ph && !ph.isDeleted);
+          if (alive.length <= 1) continue;
+
+          const moved = alive.slice(1);
+          const t = p.createdAt || Date.now();
+          const date = p.startDate || new Date(t).toISOString().slice(0, 10);
+          // 기기마다 같은 값이 나오도록 프로젝트 cloudId 에서 파생시킨다
+          const cloudId = p.cloudId ? `${p.cloudId}-photos` : crypto.randomUUID();
+
+          await logs.add({
+            projectId: p.id,
+            date,
+            text: '프로젝트에 올려둔 사진이에요.',
+            photos: moved,
+            createdAt: t,
+            updatedAt: Date.now(),
+            cloudId,
+            isDeleted: false,
+            deletedAt: null,
+          });
+
+          // 프로젝트에는 첫 장만 남긴다
+          await tx.table('projects').put({ ...p, photos: [alive[0]] });
         }
       } finally {
         resumeDirtyTracking();

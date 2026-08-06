@@ -6,8 +6,8 @@ import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ImageInput } from '@/components/ImageInput';
 import { toast } from '@/components/ui/sonner';
-import { Save, Trash2 } from 'lucide-react';
-import { gramsToMeters, formatMeters } from '@/lib/yarnCalc';
+import { Plus, Save, Trash2 } from 'lucide-react';
+import { gramsToMeters, formatMeters, yarnRecommendations } from '@/lib/yarnCalc';
 
 export default function YarnForm() {
   const { id } = useParams();
@@ -19,8 +19,10 @@ export default function YarnForm() {
 
   const [f, setF] = useState({
     name: '', brand: '', colorName: '', colorCode: '', shop: '', link: '', fiber: '', weight: '',
-    needleSize: '', gauge: '', totalGrams: 0, metersPer100g: 0, note: '',
+    totalGrams: 0, metersPer100g: 0, note: '',
   });
+  // 합수별 권장 바늘·게이지. 화면에서는 문자열로 다루고 저장할 때 숫자로 바꾼다.
+  const [recs, setRecs] = useState<{ strands: string; needleSize: string; gauge: string }[]>([]);
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
 
@@ -30,14 +32,36 @@ export default function YarnForm() {
         name: existing.name, brand: existing.brand || '', colorName: existing.colorName || '',
         colorCode: existing.colorCode || '', shop: existing.shop || '', link: existing.link || '',
         fiber: existing.fiber || '',
-        weight: existing.weight || '', needleSize: existing.needleSize || '', gauge: existing.gauge || '',
+        weight: existing.weight || '',
         totalGrams: existing.totalGrams, metersPer100g: existing.metersPer100g || 0,
         note: existing.note || '',
       });
+      // 예전에 한 줄로 적어둔 값도 1합으로 올라온다
+      setRecs(
+        yarnRecommendations(existing).map(r => ({
+          strands: String(r.strands),
+          needleSize: r.needleSize || '',
+          gauge: r.gauge || '',
+        })),
+      );
       setPhoto(existing.photoDataUrl);
       setHyd(true);
     }
   }, [editing, existing, hyd]);
+
+  function addRec() {
+    // 다음 합수를 미리 채워준다 — 대개 1합 다음은 2합이다
+    const next = recs.reduce((max, r) => Math.max(max, Number(r.strands) || 0), 0) + 1;
+    setRecs([...recs, { strands: String(next), needleSize: '', gauge: '' }]);
+  }
+
+  function updateRec(i: number, patch: Partial<(typeof recs)[number]>) {
+    setRecs(recs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  function removeRec(i: number) {
+    setRecs(recs.filter((_, idx) => idx !== i));
+  }
 
   // 삭제된 항목의 수정 화면으로 (뒤로가기 등으로) 진입하면 목록으로 되돌린다
   useEffect(() => {
@@ -54,10 +78,24 @@ export default function YarnForm() {
     const t = now();
     
     // 공통 업데이트 필드
+    // 합수가 없거나 바늘·게이지를 둘 다 비워둔 줄은 버린다
+    const recommendations = recs
+      .map(r => ({
+        strands: Number(r.strands) || 0,
+        needleSize: r.needleSize.trim() || undefined,
+        gauge: r.gauge.trim() || undefined,
+      }))
+      .filter(r => r.strands > 0 && (r.needleSize || r.gauge))
+      .sort((a, b) => a.strands - b.strands);
+
     const payload = {
       ...f,
       // 안 적었으면 0 이 아니라 '없음'으로 둔다. 0m/100g 인 실은 없다.
       metersPer100g: f.metersPer100g > 0 ? f.metersPer100g : undefined,
+      recommendations: recommendations.length ? recommendations : undefined,
+      // 예전 한 줄짜리 값은 여기서 비운다. 두 곳에 남으면 어느 쪽이 맞는지 알 수 없다.
+      needleSize: undefined,
+      gauge: undefined,
       photoDataUrl: photo,
       updatedAt: t,
       isDeleted: false,
@@ -151,17 +189,56 @@ export default function YarnForm() {
         <Field label="성분"><input className={inp} value={f.fiber} onChange={u('fiber')} placeholder="울 100%" /></Field>
         <Field label="굵기"><input className={inp} value={f.weight} onChange={u('weight')} placeholder="fingering" /></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="권장 바늘 호수">
-          <input className={inp} value={f.needleSize} onChange={u('needleSize')} placeholder="4.0mm / 5호" />
-        </Field>
-        <Field label="권장 게이지">
-          <input className={inp} value={f.gauge} onChange={u('gauge')} placeholder="22코 30단 / 10cm" />
-        </Field>
+      <div className="space-y-2">
+        <span className="block text-xs font-medium text-muted-foreground">합수별 권장 바늘·게이지</span>
+        {recs.map((r, i) => (
+          <div key={i} className="card-soft space-y-2 p-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                className={`${inp} w-16 shrink-0 px-2 text-center`}
+                value={r.strands}
+                onChange={e => updateRec(i, { strands: e.target.value })}
+              />
+              <span className="shrink-0 text-[12.5px] font-semibold text-muted-foreground">합</span>
+              <button
+                type="button"
+                onClick={() => removeRec(i)}
+                aria-label={`${r.strands || ''}합 지우기`}
+                className="ml-auto rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                className={inp}
+                value={r.needleSize}
+                onChange={e => updateRec(i, { needleSize: e.target.value })}
+                placeholder="4.0mm / 5호"
+              />
+              <input
+                className={inp}
+                value={r.gauge}
+                onChange={e => updateRec(i, { gauge: e.target.value })}
+                placeholder="22코 30단 / 10cm"
+              />
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addRec}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border py-2.5 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/40 hover:text-primary"
+        >
+          <Plus className="h-4 w-4" /> 합수 추가
+        </button>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          ※ 같은 실이라도 합수에 따라 권장 바늘과 게이지가 달라져요. 1합, 2합을 따로 적어두면 도안 맞출 때 편합니다.
+        </p>
       </div>
-      <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
-        ※ 라벨(볼밴드)에 적힌 권장 바늘 호수와 게이지를 적어두면 나중에 도안 매칭이 쉬워요.
-      </p>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="총 보유량 (g)">

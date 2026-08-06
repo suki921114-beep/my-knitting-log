@@ -1,13 +1,32 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useAllYarnStats } from '@/lib/yarnCalc';
+import { useAllYarnStats, gramsToMeters, formatMeters } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
 import { Plus, Search, ArrowUpDown, Image as ImageIcon } from 'lucide-react';
 import { EmptyState } from '@/components/Mascot';
 
-type Sort = 'updated' | 'low' | 'high';
+type Sort = 'updated' | 'low' | 'high' | 'lowM' | 'highM';
+
+const SORT_LABEL: Record<Sort, string> = {
+  updated: '최근 순',
+  low: '재고 적은 순',
+  high: '재고 많은 순',
+  lowM: '길이 짧은 순',
+  highM: '길이 긴 순',
+};
+
+/**
+ * 길이순 정렬용 값.
+ *
+ * 100g당 길이를 안 적어둔 실은 길이를 알 수 없다. 0 으로 치면 "가장 짧은 실"로
+ * 올라와 버리니, 어느 방향으로 정렬하든 맨 뒤로 보낸다.
+ */
+function lengthKey(m: number | null, desc: boolean): number {
+  if (m === null) return desc ? -Infinity : Infinity;
+  return m;
+}
 
 export default function Yarns() {
   const stats = useAllYarnStats() || [];
@@ -30,6 +49,14 @@ export default function Yarns() {
     if (sort === 'updated') arr = arr.sort((a, b) => b.yarn.updatedAt - a.yarn.updatedAt);
     if (sort === 'low') arr = arr.sort((a, b) => a.remaining - b.remaining);
     if (sort === 'high') arr = arr.sort((a, b) => b.remaining - a.remaining);
+    if (sort === 'lowM' || sort === 'highM') {
+      const desc = sort === 'highM';
+      arr = arr.sort((a, b) => {
+        const am = lengthKey(gramsToMeters(a.remaining, a.yarn.metersPer100g), desc);
+        const bm = lengthKey(gramsToMeters(b.remaining, b.yarn.metersPer100g), desc);
+        return desc ? bm - am : am - bm;
+      });
+    }
     return arr;
   }, [stats, q, sort, brand]);
 
@@ -55,11 +82,20 @@ export default function Yarns() {
           <option value="all">전체 브랜드</option>
           {brands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
-        <button onClick={() => setSort(sort === 'low' ? 'high' : sort === 'high' ? 'updated' : 'low')}
-          className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
-          <ArrowUpDown className="h-3 w-3" />
-          {sort === 'updated' ? '최근 순' : sort === 'low' ? '재고 적은 순' : '재고 많은 순'}
-        </button>
+        {/* 정렬 기준이 다섯 가지가 되어 눌러 넘기는 방식으로는 원하는 걸 찾기 어렵다 */}
+        <div className="relative inline-flex items-center">
+          <ArrowUpDown className="pointer-events-none absolute left-3 h-3 w-3 text-foreground" />
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value as Sort)}
+            aria-label="정렬 기준"
+            className="appearance-none rounded-full border border-border bg-card py-1.5 pl-7 pr-3 text-xs font-semibold text-foreground"
+          >
+            {(Object.keys(SORT_LABEL) as Sort[]).map(k => (
+              <option key={k} value={k}>{SORT_LABEL[k]}</option>
+            ))}
+          </select>
+        </div>
         <div className="ml-auto"><ViewToggle value={view} onChange={setView} /></div>
       </div>
 
@@ -83,8 +119,9 @@ export default function Yarns() {
                           {[s.yarn.brand, s.yarn.colorName, s.yarn.weight].filter(Boolean).join(' · ')}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="shrink-0 text-right">
                         <div className="text-[14px] font-bold text-primary">{s.remaining}<span className="ml-0.5 text-[10.5px] font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
+                        <LengthLine remaining={s.remaining} total={s.yarn.totalGrams} per100g={s.yarn.metersPer100g} />
                       </div>
                     </div>
                     <div className="mt-2 h-1 overflow-hidden rounded-full bg-secondary">
@@ -117,6 +154,7 @@ export default function Yarns() {
                       <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                     </div>
                     <div className="text-[11px] font-bold text-primary tabular-nums">{s.remaining}<span className="font-normal text-muted-foreground">/{s.yarn.totalGrams}g</span></div>
+                    <LengthLine remaining={s.remaining} total={s.yarn.totalGrams} per100g={s.yarn.metersPer100g} />
                   </div>
                 </Link>
               </li>
@@ -124,6 +162,21 @@ export default function Yarns() {
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * 무게 아래에 길이를 한 줄 덧붙인다.
+ * 100g당 길이를 안 적어둔 실은 알 수 없으니 아예 내보내지 않는다.
+ */
+function LengthLine({ remaining, total, per100g }: { remaining: number; total: number; per100g?: number }) {
+  const rm = gramsToMeters(remaining, per100g);
+  const tm = gramsToMeters(total, per100g);
+  if (rm === null || tm === null) return null;
+  return (
+    <div className="text-[10.5px] font-medium tabular-nums text-muted-foreground">
+      {formatMeters(rm)}<span className="opacity-70">/{formatMeters(tm)}</span>
     </div>
   );
 }

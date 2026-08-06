@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { useYarnRemaining, gramsToMeters, formatMeters } from '@/lib/yarnCalc';
+import { useYarnRemaining, gramsToMeters, formatMeters, yarnRecommendations } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, ExternalLink } from 'lucide-react';
 
@@ -39,6 +39,7 @@ export default function YarnDetail() {
   // 100g당 길이를 적어둔 실만 길이로도 보여준다
   const totalMeters = gramsToMeters(total, yarn.metersPer100g);
   const remainingMeters = gramsToMeters(remaining, yarn.metersPer100g);
+  const recs = yarnRecommendations(yarn);
 
   return (
     <div className="space-y-5">
@@ -53,26 +54,31 @@ export default function YarnDetail() {
         }
       />
 
+      {/* 무게와 길이는 같은 것을 두 가지 단위로 말하는 것이라 붙여 둔다.
+          떨어뜨려 놓으면 눈이 위아래를 오가야 해서 읽기 어렵다. */}
       <div className="card-soft bg-primary-soft p-5">
-        <div className="flex items-baseline justify-between">
-          <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
             <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary/80">잔여량</div>
-            <div className="mt-1 text-[32px] font-extrabold leading-none tracking-tight text-primary">{remaining}<span className="ml-1 text-base font-medium text-primary/70">g</span></div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+              <span className="text-[32px] font-extrabold leading-none tracking-tight text-primary">
+                {remaining}<span className="ml-1 text-base font-medium text-primary/70">g</span>
+              </span>
+              {remainingMeters !== null && (
+                <span className="text-[15px] font-bold leading-none text-primary/75">
+                  약 {formatMeters(remainingMeters)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="text-right text-[11.5px] text-primary/80">
-            <div>총 {total}g</div>
+          <div className="shrink-0 text-right text-[11.5px] text-primary/80">
+            <div>총 {total}g{totalMeters !== null && ` · ${formatMeters(totalMeters)}`}</div>
             <div>사용 {used}g</div>
           </div>
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-card/60">
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
-        {remainingMeters !== null && (
-          <div className="mt-3 flex items-baseline justify-between border-t border-primary/15 pt-2.5 text-[11.5px] text-primary/80">
-            <span>남은 길이 약 <strong className="text-[13px] font-bold text-primary">{formatMeters(remainingMeters)}</strong></span>
-            {totalMeters !== null && <span>총 {formatMeters(totalMeters)}</span>}
-          </div>
-        )}
       </div>
 
       {(yarn.fiber || yarn.weight || yarn.shop || yarn.link) && (
@@ -94,18 +100,27 @@ export default function YarnDetail() {
         </div>
       )}
 
-      {(yarn.needleSize || yarn.gauge) && (
+      {recs.length > 0 && (
         <section className="space-y-2">
           <h2 className="section-title">권장 사양</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="card-soft p-3.5">
-              <div className="text-[11px] font-medium text-muted-foreground">권장 바늘 호수</div>
-              <div className="mt-1 text-sm font-semibold text-ink">{yarn.needleSize || '—'}</div>
-            </div>
-            <div className="card-soft p-3.5">
-              <div className="text-[11px] font-medium text-muted-foreground">권장 게이지</div>
-              <div className="mt-1 text-sm font-semibold text-ink">{yarn.gauge || '—'}</div>
-            </div>
+          <div className="space-y-2">
+            {recs.map(r => (
+              <div key={r.strands} className="card-soft flex items-center gap-3 p-3.5">
+                <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-[11.5px] font-bold text-primary">
+                  {r.strands}합
+                </span>
+                <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10.5px] font-medium text-muted-foreground">바늘</div>
+                    <div className="truncate text-[13px] font-semibold text-ink">{r.needleSize || '—'}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10.5px] font-medium text-muted-foreground">게이지</div>
+                    <div className="truncate text-[13px] font-semibold text-ink">{r.gauge || '—'}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

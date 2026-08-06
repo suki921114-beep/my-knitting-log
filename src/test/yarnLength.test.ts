@@ -36,18 +36,15 @@ describe('gramsToMeters', () => {
 });
 
 describe('formatMeters', () => {
-  it('1000m 미만은 m 로, 소수점은 버린다', () => {
+  it('소수점은 버리고 미터로 적는다', () => {
     expect(formatMeters(200)).toBe('200m');
     expect(formatMeters(333.4)).toBe('333m');
     expect(formatMeters(999)).toBe('999m');
   });
 
-  it('1000m 이상은 km 로 접는다', () => {
-    expect(formatMeters(1000)).toBe('1.00km');
-    expect(formatMeters(2500)).toBe('2.50km');
-  });
-
-  it('10km 이상은 소수점 한 자리까지만', () => {
-    expect(formatMeters(12000)).toBe('12.0km');
+  it('아무리 길어도 km 로 접지 않는다 — 단위가 섞이면 비교가 안 된다', () => {
+    expect(formatMeters(1000)).toBe('1,000m');
+    expect(formatMeters(2500)).toBe('2,500m');
+    expect(formatMeters(12000)).toBe('12,000m');
   });
 });

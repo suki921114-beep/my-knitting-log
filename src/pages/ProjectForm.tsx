@@ -8,7 +8,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { syncLinks } from '@/lib/linkSync';
 import YarnPicker, { YarnLink } from '@/components/YarnPicker';
 import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
-import { MultiImageInput } from '@/components/ImageInput';
+import { ImageInput } from '@/components/ImageInput';
 import RowCounterSection from '@/components/RowCounterSection';
 import ProjectGaugeSection from '@/components/ProjectGaugeSection';
 import { Save, Trash2 } from 'lucide-react';
@@ -87,7 +87,7 @@ export default function ProjectForm() {
   const [hydrated, setHydrated] = useState(false);
   const [linksHydrated, setLinksHydrated] = useState(false);
 
-  // MultiImageInput 은 string[] 을 받으므로 photos 객체 배열에서 dataUrl 만 추출
+  // 사진 입력은 dataUrl 문자열만 다루므로 photos 객체 배열에서 뽑아 둔다
   const photoUrls = useMemo(
     () => photos.filter((p) => !p.isDeleted && p.dataUrl).map((p) => p.dataUrl!),
     [photos],
@@ -351,20 +351,29 @@ export default function ProjectForm() {
         <EntityPicker kind="notion" links={notionLinks} onChange={setNotionLinks} />
       </Field>
 
-      <Field label="사진" as="div">
-        <MultiImageInput
-          values={photoUrls}
-          onChange={(urls) => setPhotos(reconcilePhotos(photos, urls))}
+      {/* 프로젝트에는 대표 한 장만. 과정 사진은 뜨개 기록에 날짜와 함께 붙인다 —
+          그래야 나중에 언제 어디까지 떴는지 되짚을 수 있다. */}
+      <Field label="대표 사진" as="div">
+        <ImageInput
+          value={photoUrls[0]}
+          onChange={(url) => setPhotos(reconcilePhotos(photos, url ? [url] : []))}
+          aspect="square"
         />
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          ※ 과정 사진은 <strong>뜨개 기록</strong>에 남겨주세요. 날짜별로 모여서 완성한 뒤 한눈에 돌아볼 수 있어요.
+          <br />
           ※ 사진은 클라우드에 <strong>1GB까지</strong> 함께 백업돼요. 남은 용량은 설정 → 백업에서 볼 수 있어요.
         </p>
       </Field>
 
 
-      <Field label="완성 소감">
-        <textarea className={`${inputCls} min-h-[64px] resize-y`} value={finishedNote} onChange={e => setFinishedNote(e.target.value)} placeholder="다 만들고 나면 적어보세요." />
-      </Field>
+      {/* 완성 소감은 다 만든 뒤에 쓰는 글이다.
+          진행중인데 칸이 비어 있으면 뭘 적어야 하나 싶어 자리만 차지한다. */}
+      {status === 'done' && (
+        <Field label="완성 소감">
+          <textarea className={`${inputCls} min-h-[64px] resize-y`} value={finishedNote} onChange={e => setFinishedNote(e.target.value)} placeholder="다 만들고 나서 어땠는지 적어보세요." />
+        </Field>
+      )}
 
 
       <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur">
