@@ -10,6 +10,19 @@ export function todayStr(d: Date = new Date()): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+/**
+ * '2026-08-06 (목)' — 날짜 한 줄짜리 표기.
+ *
+ * 예전에는 '오늘' 같은 말과 원래 날짜를 나란히 뒀는데, 같은 날짜가 두 번
+ * 적힌 것처럼 읽혀 지저분했다. 한 줄로 합치고 요일만 덧붙인다.
+ */
+export function formatLogDateFull(date: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return date;
+  const weekday = d.toLocaleDateString('ko-KR', { weekday: 'short' });
+  return `${date} (${weekday})`;
+}
+
 /** '8월 4일 (월)' 처럼 사람이 읽는 날짜 */
 export function formatLogDate(date: string): string {
   const d = new Date(`${date}T00:00:00`);

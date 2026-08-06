@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { KnitLog } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
+import Mascot from '@/components/Mascot';
 
 /**
  * 기록 한 편. 다이어리와 프로젝트 상세에서 같은 카드를 쓴다.
@@ -18,28 +19,11 @@ export default function LogCard({
   const urls = photoUrls(log.photos);
 
   return (
-    // 사진 · 기분 · 글을 한 줄에 나란히 둔다.
-    // 사진이 아래로 내려가 있으면 목록에서 그날이 어땠는지 한눈에 안 들어온다.
+    // 프로젝트명 · 기분 · 글 · 사진 순으로 한 줄에 늘어놓는다.
+    // 사진은 맨 오른쪽 — 왼쪽 끝을 글이 차지해야 목록을 훑을 때 눈이 편하다.
     <Link to={`/diary/${log.id}/edit`} className="card-soft block p-3.5 transition active:scale-[0.995]">
       <div className="flex items-start gap-3">
-        {urls.length > 0 && (
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-            <img src={urls[0]} alt="" className="h-full w-full object-cover" />
-            {urls.length > 1 && (
-              // 나머지는 눌러 들어가면 다 볼 수 있으니 장수만 알려준다
-              <span className="absolute bottom-0.5 right-0.5 rounded-full bg-black/55 px-1.5 text-[10px] font-bold leading-[15px] text-white">
-                +{urls.length - 1}
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="flex items-start gap-2">
-            {log.mood && <span className="text-[16px] leading-none">{log.mood}</span>}
-            <p className="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{log.text}</p>
-          </div>
-
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           {((showProject && projectName) || log.rows != null) && (
             <div className="flex flex-wrap items-center gap-1.5">
               {showProject && projectName && (
@@ -52,6 +36,30 @@ export default function LogCard({
                   {log.rows}단
                 </span>
               )}
+            </div>
+          )}
+
+          <div className="flex items-start gap-2">
+            {log.mood && <span className="text-[16px] leading-none">{log.mood}</span>}
+            <p className="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{log.text}</p>
+          </div>
+        </div>
+
+        {/* 사진이 없는 날도 카드 높이와 리듬이 흐트러지지 않게 문어가 자리를 지킨다 */}
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted">
+          {urls.length > 0 ? (
+            <>
+              <img src={urls[0]} alt="" className="h-full w-full object-cover" />
+              {urls.length > 1 && (
+                // 나머지는 눌러 들어가면 다 볼 수 있으니 장수만 알려준다
+                <span className="absolute bottom-0.5 right-0.5 rounded-full bg-black/55 px-1.5 text-[10px] font-bold leading-[15px] text-white">
+                  +{urls.length - 1}
+                </span>
+              )}
+            </>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-primary-soft/50 text-primary/45">
+              <Mascot size={44} mood="sleepy" />
             </div>
           )}
         </div>

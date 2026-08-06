@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { groupByDate, formatLogDate, todayStr } from '@/lib/logs';
+import { groupByDate, formatLogDate, formatLogDateFull, todayStr } from '@/lib/logs';
 import LogCard from '@/components/LogCard';
 import LogCalendar from '@/components/LogCalendar';
 import { EmptyState } from '@/components/Mascot';
@@ -129,11 +129,8 @@ export default function Diary() {
 
           {selectedDate ? (
             <section className="space-y-2">
-              <h2 className="flex items-baseline gap-2 px-0.5">
-                <span className="text-[13px] font-bold text-foreground">
-                  {formatLogDate(selectedDate)}
-                </span>
-                <span className="text-[10.5px] tabular-nums text-muted-foreground">{selectedDate}</span>
+              <h2 className="px-0.5 text-[13px] font-bold tabular-nums text-foreground">
+                {formatLogDateFull(selectedDate)}
               </h2>
               {selectedLogs.length === 0 ? (
                 <Link
@@ -164,9 +161,8 @@ export default function Diary() {
               </p>
               {groups.map(g => (
                 <section key={g.date} className="space-y-2">
-                  <h2 className="flex items-baseline gap-2 px-0.5">
-                    <span className="text-[13px] font-bold text-foreground">{formatLogDate(g.date)}</span>
-                    <span className="text-[10.5px] tabular-nums text-muted-foreground">{g.date}</span>
+                  <h2 className="px-0.5 text-[13px] font-bold tabular-nums text-foreground">
+                    {formatLogDateFull(g.date)}
                   </h2>
                   <div className="space-y-2">
                     {g.items.map(l => (
@@ -191,9 +187,8 @@ export default function Diary() {
         <div className="space-y-5">
           {groups.map(g => (
             <section key={g.date} className="space-y-2">
-              <h2 className="flex items-baseline gap-2 px-0.5">
-                <span className="text-[13px] font-bold text-foreground">{formatLogDate(g.date)}</span>
-                <span className="text-[10.5px] tabular-nums text-muted-foreground">{g.date}</span>
+              <h2 className="px-0.5 text-[13px] font-bold tabular-nums text-foreground">
+                {formatLogDateFull(g.date)}
               </h2>
               <div className="space-y-2">
                 {g.items.map(l => (
