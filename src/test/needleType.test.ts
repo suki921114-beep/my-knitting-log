@@ -91,13 +91,13 @@ describe('writeNeedle', () => {
 });
 
 describe('describeNeedle', () => {
-  it('갈래를 가운뎃점으로 잇는다', () => {
-    expect(describeNeedle({ type: '대바늘', subType: '조립식', tipLength: '숏팁' })).toBe('대바늘 · 조립식 · 숏팁');
+  it('갈래를 세로줄로 잇는다', () => {
+    expect(describeNeedle({ type: '대바늘', subType: '조립식', tipLength: '숏팁' })).toBe('대바늘 | 조립식 | 숏팁');
   });
 
   it('없는 갈래는 빼고 잇는다', () => {
     expect(describeNeedle({ type: '대바늘' })).toBe('대바늘');
-    expect(describeNeedle({ type: '대바늘', subType: '줄바늘' })).toBe('대바늘 · 줄바늘');
+    expect(describeNeedle({ type: '대바늘', subType: '줄바늘' })).toBe('대바늘 | 줄바늘');
   });
 
   it('기타는 적어둔 말을 보여준다', () => {

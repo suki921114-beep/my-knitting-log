@@ -10,6 +10,7 @@ import {
   NEEDLE_SUBTYPES,
   NEEDLE_TIPS,
   describeNeedle,
+  needleParts,
   needleKindOf,
   readNeedle,
   type NeedleKind,
@@ -79,7 +80,7 @@ export default function Needles() {
     }
     return [...m.values()]
       .map(list => ({
-        head: describeNeedle(list[0]),
+        head: needleParts(list[0]),
         sub: [list[0].brand, list[0].material, list[0].length].filter(Boolean).join(' · '),
         // 호수는 숫자 순으로 — 2.0 다음에 2.25 가 와야 눈이 편하다
         items: [...list].sort((a, b) => sizeValue(a.sizeMm) - sizeValue(b.sizeMm)),
@@ -87,7 +88,7 @@ export default function Needles() {
       .sort((a, b) => {
         const ka = KIND_ORDER.get(needleKindOf(a.items[0])) ?? 99;
         const kb = KIND_ORDER.get(needleKindOf(b.items[0])) ?? 99;
-        return ka !== kb ? ka - kb : a.head.localeCompare(b.head, 'ko');
+        return ka !== kb ? ka - kb : a.head.join().localeCompare(b.head.join(), 'ko');
       });
   }, [filtered]);
 
@@ -163,9 +164,17 @@ export default function Needles() {
       ) : (
         <div className="space-y-3">
           {groups.map(g => (
-            <section key={g.head + g.sub} className="card-soft p-3.5">
+            <section key={g.head.join('|') + g.sub} className="card-soft p-3.5">
               <div className="mb-2.5">
-                <div className="text-[13.5px] font-bold text-foreground">{g.head}</div>
+                {/* 사이 기호를 흐리게 둬야 갈래가 끊기는 자리가 눈에 들어온다 */}
+                <div className="flex flex-wrap items-baseline gap-x-1.5 text-[13.5px] font-bold text-foreground">
+                  {g.head.map((part, i) => (
+                    <span key={part} className="flex items-baseline gap-1.5">
+                      {i > 0 && <span className="font-normal text-muted-foreground/50">|</span>}
+                      {part}
+                    </span>
+                  ))}
+                </div>
                 {g.sub && <div className="mt-0.5 text-[11.5px] text-muted-foreground">{g.sub}</div>}
               </div>
               <div className="flex flex-wrap gap-1.5">

@@ -81,11 +81,24 @@ export function writeNeedle(shape: NeedleShape): Required<Pick<StoredNeedle, 'ty
   return { type: '대바늘', subType: shape.subType, tipLength: shape.tip };
 }
 
-/** '대바늘 · 조립식 · 숏팁' 처럼 한 줄로 */
-export function describeNeedle(n: StoredNeedle): string {
+/**
+ * 갈래를 앞에서부터 늘어놓는다 — ['대바늘', '조립식', '숏팁']
+ * 화면에서 사이 기호에 다른 색을 주려면 이 조각들이 필요하다.
+ */
+export function needleParts(n: StoredNeedle): string[] {
   const s = readNeedle(n);
   const head = s.kind === '기타' ? s.custom || '기타' : s.kind;
-  return [head, s.subType, s.tip].filter(Boolean).join(' · ');
+  return [head, s.subType, s.tip].filter((v): v is string => !!v);
+}
+
+/**
+ * '대바늘 | 조립식 | 숏팁' 처럼 한 줄로.
+ *
+ * 가운뎃점(·)을 쓰다가 세로줄(|)로 바꿨다. 점은 글자 사이에 파묻혀서
+ * 어디서 갈래가 끊기는지 눈에 안 들어온다.
+ */
+export function describeNeedle(n: StoredNeedle): string {
+  return needleParts(n).join(' | ');
 }
 
 /** 목록에서 갈래별로 묶을 때 쓰는 값 */
