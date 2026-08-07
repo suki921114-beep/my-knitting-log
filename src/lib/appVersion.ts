@@ -9,7 +9,7 @@
 //   2) build.gradle 의 versionCode 를 +1 한다 (되돌릴 수 없음)
 //   3) public/sw.js 의 CACHE 이름도 같은 버전으로 올린다
 //      — 안 올리면 웹에서 옛 화면이 계속 나온다
-export const APP_VERSION = '1.4.2';
+export const APP_VERSION = '1.5.0';
 
 /** 버그 신고에 함께 보낼 환경 정보 */
 export function collectEnvInfo() {

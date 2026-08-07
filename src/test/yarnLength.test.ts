@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gramsToMeters, formatMeters } from '@/lib/yarnCalc';
+import { gramsToMeters, formatMeters, remainingGrams, isUsedUp } from '@/lib/yarnCalc';
 
 // ----------------------------------------------------------------------------
 // 실 길이 환산 — 콘사처럼 무게로만 파는 실의 총 길이를 대신 계산해 준다
@@ -46,5 +46,41 @@ describe('formatMeters', () => {
     expect(formatMeters(1000)).toBe('1,000m');
     expect(formatMeters(2500)).toBe('2,500m');
     expect(formatMeters(12000)).toBe('12,000m');
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 다 쓴 실
+// ----------------------------------------------------------------------------
+// 잔량은 총량에서 사용량을 빼서 나오지만 실제로는 딱 떨어지지 않는다.
+// 자투리를 버렸거나 g 을 대충 적었을 때, 사람이 끝났다고 말하면 끝난 것이다.
+
+describe('remainingGrams', () => {
+  it('보통은 총량에서 쓴 만큼 뺀다', () => {
+    expect(remainingGrams({ totalGrams: 300 }, 100)).toBe(200);
+  });
+
+  it("'다 썼어요' 를 켜면 계산과 상관없이 0", () => {
+    expect(remainingGrams({ totalGrams: 300, usedUp: true }, 100)).toBe(0);
+  });
+
+  it('많이 썼다고 적으면 음수가 나올 수도 있다 — 숫자를 꾸미지 않는다', () => {
+    // 사용량을 잘못 적었다는 신호다. 0 으로 감추면 사용자가 알아채지 못한다.
+    expect(remainingGrams({ totalGrams: 100 }, 150)).toBe(-50);
+  });
+});
+
+describe('isUsedUp', () => {
+  it('직접 표시했으면 다 쓴 실', () => {
+    expect(isUsedUp({ usedUp: true }, 200)).toBe(true);
+  });
+
+  it('남은 양이 없어도 다 쓴 실', () => {
+    expect(isUsedUp({}, 0)).toBe(true);
+    expect(isUsedUp({}, -10)).toBe(true);
+  });
+
+  it('남아 있으면 아직 쓸 수 있는 실', () => {
+    expect(isUsedUp({}, 50)).toBe(false);
   });
 });
