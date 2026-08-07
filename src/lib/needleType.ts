@@ -1,0 +1,94 @@
+// ----------------------------------------------------------------------------
+// 바늘 종류
+// ----------------------------------------------------------------------------
+// 예전에는 종류를 그냥 글로 적게 했다. 그러다 보니 '대바늘'과 '대 바늘' 이
+// 다른 종류로 갈라지고, 오타 하나에 묶여야 할 것이 흩어졌다.
+// 그래서 큰 갈래는 고르게 하고, 대바늘만 세부 갈래를 둔다.
+//
+//   대바늘 ─ 줄바늘 / 조립식 ─ 숏팁 / 롱팁
+//   코바늘
+//   장갑바늘
+//   기타 ─ 직접 적기
+//
+// ⚠️ 옛 데이터에는 '줄바늘' 이 큰 갈래로 저장돼 있다.
+//    읽을 때 대바늘 + 줄바늘로 풀어 준다. 기존 기록을 건드리지 않고도
+//    새 화면에서 제자리를 찾게 하려는 것 — 다음에 저장하면 정식으로 바뀐다.
+
+export const NEEDLE_KINDS = ['대바늘', '코바늘', '장갑바늘', '기타'] as const;
+export type NeedleKind = (typeof NEEDLE_KINDS)[number];
+
+export const NEEDLE_SUBTYPES = ['줄바늘', '조립식'] as const;
+export type NeedleSubType = (typeof NEEDLE_SUBTYPES)[number];
+
+export const NEEDLE_TIPS = ['숏팁', '롱팁'] as const;
+export type NeedleTip = (typeof NEEDLE_TIPS)[number];
+
+/** 세부 갈래가 있는 종류는 대바늘뿐이다 */
+export function hasSubType(kind: NeedleKind): boolean {
+  return kind === '대바늘';
+}
+
+export interface NeedleShape {
+  kind: NeedleKind;
+  /** kind 가 '기타' 일 때 사용자가 직접 적은 말 */
+  custom?: string;
+  subType?: NeedleSubType;
+  tip?: NeedleTip;
+}
+
+interface StoredNeedle {
+  type?: string;
+  subType?: string;
+  tipLength?: string;
+}
+
+function asSubType(v?: string): NeedleSubType | undefined {
+  return (NEEDLE_SUBTYPES as readonly string[]).includes(v ?? '') ? (v as NeedleSubType) : undefined;
+}
+
+function asTip(v?: string): NeedleTip | undefined {
+  return (NEEDLE_TIPS as readonly string[]).includes(v ?? '') ? (v as NeedleTip) : undefined;
+}
+
+/** 저장된 값을 화면에서 쓰는 모양으로 푼다 */
+export function readNeedle(n: StoredNeedle): NeedleShape {
+  const type = (n.type ?? '').trim();
+  const subType = asSubType(n.subType);
+  const tip = asTip(n.tipLength);
+
+  // 옛 데이터 — '줄바늘' 이 큰 갈래로 저장돼 있던 시절
+  if (type === '줄바늘') {
+    return { kind: '대바늘', subType: subType ?? '줄바늘', tip };
+  }
+  if (type === '대바늘') return { kind: '대바늘', subType, tip };
+  if (type === '코바늘') return { kind: '코바늘' };
+  if (type === '장갑바늘') return { kind: '장갑바늘' };
+
+  // 그 밖에는 전부 기타. 적어둔 말은 버리지 않는다.
+  return { kind: '기타', custom: type || undefined };
+}
+
+/** 화면 모양을 저장할 값으로 되돌린다 */
+export function writeNeedle(shape: NeedleShape): Required<Pick<StoredNeedle, 'type'>> & StoredNeedle {
+  if (shape.kind === '기타') {
+    return { type: shape.custom?.trim() || '기타', subType: undefined, tipLength: undefined };
+  }
+  if (shape.kind !== '대바늘') {
+    // 세부 갈래가 없는 종류는 남은 값을 지운다. 안 지우면 대바늘에서 옮겨온
+    // '숏팁' 같은 값이 코바늘에 남아 화면에 엉뚱하게 나온다.
+    return { type: shape.kind, subType: undefined, tipLength: undefined };
+  }
+  return { type: '대바늘', subType: shape.subType, tipLength: shape.tip };
+}
+
+/** '대바늘 · 조립식 · 숏팁' 처럼 한 줄로 */
+export function describeNeedle(n: StoredNeedle): string {
+  const s = readNeedle(n);
+  const head = s.kind === '기타' ? s.custom || '기타' : s.kind;
+  return [head, s.subType, s.tip].filter(Boolean).join(' · ');
+}
+
+/** 목록에서 갈래별로 묶을 때 쓰는 값 */
+export function needleKindOf(n: StoredNeedle): NeedleKind {
+  return readNeedle(n).kind;
+}

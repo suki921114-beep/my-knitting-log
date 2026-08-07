@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, Pattern, Needle, Notion } from '@/lib/db';
+import NeedleTypePicker from '@/components/NeedleTypePicker';
+import { describeNeedle, writeNeedle, type NeedleShape } from '@/lib/needleType';
 import { Plus, X, Search, Check } from 'lucide-react';
 
 export type EntityKind = 'pattern' | 'needle' | 'notion';
@@ -98,7 +100,7 @@ export default function EntityPicker<T extends BaseLink>({ kind, links, onChange
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-ink">
                   {kind === 'pattern' && (it?.name || '도안')}
-                  {kind === 'needle' && `${it?.type || '바늘'}${it?.sizeMm ? ` · ${it.sizeMm}` : ''}`}
+                  {kind === 'needle' && `${describeNeedle(it || {})}${it?.sizeMm ? ` · ${it.sizeMm}` : ''}`}
                   {kind === 'notion' && (it?.name || '부자재')}
                 </div>
                 <div className="truncate text-[11px] text-muted-foreground">
@@ -261,7 +263,7 @@ function PickerModal({
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-ink">
                       {kind === 'pattern' && it.name}
-                      {kind === 'needle' && `${it.type}${it.sizeMm ? ` · ${it.sizeMm}` : ''}`}
+                      {kind === 'needle' && `${describeNeedle(it)}${it.sizeMm ? ` · ${it.sizeMm}` : ''}`}
                       {kind === 'notion' && it.name}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
@@ -306,6 +308,9 @@ function QuickAdd({
 }) {
   const meta = META[kind];
   const [name, setName] = useState(initial);
+  // 바늘은 이름을 글로 받지 않고 종류를 고르게 한다.
+  // 라이브러리와 같은 고르개를 써야 오타로 갈라지지 않는다.
+  const [needleShape, setNeedleShape] = useState<NeedleShape>({ kind: '대바늘' });
   const [extra1, setExtra1] = useState(''); // pattern: designer | needle: sizeMm | notion: kind
   const [extra2, setExtra2] = useState(''); // pattern: link    | needle: brand  | notion: quantity
   const [note, setNote] = useState('');
@@ -343,7 +348,7 @@ function QuickAdd({
         } as Pattern)) as number;
       } else if (kind === 'needle') {
         id = (await db.needles.add({
-          type: name.trim() || '대바늘',
+          ...writeNeedle(needleShape),
           sizeMm: extra1.trim() || undefined,
           brand: extra2.trim() || undefined,
           note: note.trim() || undefined,
@@ -395,7 +400,7 @@ function QuickAdd({
                 className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 hover:bg-card"
               >
                 <span className="text-sm text-ink">
-                  {kind === 'needle' ? `${s.type}${s.sizeMm ? ` · ${s.sizeMm}` : ''}` : s.name}
+                  {kind === 'needle' ? `${describeNeedle(s)}${s.sizeMm ? ` · ${s.sizeMm}` : ''}` : s.name}
                 </span>
                 <Check className="h-3.5 w-3.5 text-primary" />
               </button>
@@ -405,7 +410,11 @@ function QuickAdd({
       )}
 
       <div className="space-y-2.5">
-        <input autoFocus className={qaInput} value={name} onChange={e => setName(e.target.value)} placeholder={ph.name} />
+        {kind === 'needle' ? (
+          <NeedleTypePicker value={needleShape} onChange={setNeedleShape} compact />
+        ) : (
+          <input autoFocus className={qaInput} value={name} onChange={e => setName(e.target.value)} placeholder={ph.name} />
+        )}
         <div className="grid grid-cols-2 gap-2">
           <input className={qaInput} value={extra1} onChange={e => setExtra1(e.target.value)} placeholder={ph.e1} />
           <input

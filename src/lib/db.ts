@@ -116,7 +116,15 @@ export interface Yarn extends SyncMetadata {
 
 export interface Needle extends SyncMetadata {
   id?: number;
+  /**
+   * 큰 갈래 — '대바늘' | '코바늘' | '장갑바늘' 또는 직접 적은 말(기타).
+   * 읽고 쓸 때는 src/lib/needleType.ts 의 readNeedle / writeNeedle 을 거칠 것.
+   */
   type: string;
+  /** 대바늘의 세부 갈래 — '줄바늘' | '조립식' */
+  subType?: string;
+  /** 대바늘 팁 길이 — '숏팁' | '롱팁' */
+  tipLength?: string;
   sizeMm?: string;
   brand?: string;
   material?: string;

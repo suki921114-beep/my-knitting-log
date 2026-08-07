@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
+import { describeNeedle } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, Image as ImageIcon, PenLine } from 'lucide-react';
 import { useState } from 'react';
@@ -222,7 +223,7 @@ export default function ProjectDetail() {
                   className="card-soft block px-2.5 py-2"
                 >
                   <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                    {n?.type} {n?.sizeMm && `· ${n.sizeMm}`}
+                    {describeNeedle(n || {})}{n?.sizeMm && ` · ${n.sizeMm}`}
                   </div>
                   <div className="truncate text-[10.5px] text-muted-foreground">
                     {deleted ? '삭제됨' : [n?.brand, n?.material, n?.length].filter(Boolean).join(' · ') || '—'}
