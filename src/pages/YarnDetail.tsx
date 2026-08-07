@@ -4,7 +4,8 @@ import { db } from '@/lib/db';
 import { useYarnRemaining, gramsToMeters, formatMeters, yarnRecommendations } from '@/lib/yarnCalc';
 import { formatNeedleSize } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
-import { Pencil, ExternalLink, Scale, Ruler } from 'lucide-react';
+import { Pencil, ExternalLink, Scale, Ruler, CheckCircle2, RotateCcw } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 /** 스킴이 없으면 https:// 를 붙여 준다 (예: "shop.com/x" → "https://shop.com/x") */
 function normalizeUrl(raw: string): string {
@@ -41,6 +42,13 @@ export default function YarnDetail() {
   const totalMeters = gramsToMeters(total, yarn.metersPer100g);
   const remainingMeters = gramsToMeters(remaining, yarn.metersPer100g);
   const recs = yarnRecommendations(yarn);
+
+  async function toggleUsedUp() {
+    if (!yarn) return;
+    const next = !yarn.usedUp;
+    await db.yarns.update(yid, { usedUp: next, updatedAt: Date.now() } as any);
+    toast.success(next ? '다 쓴 실로 표시했어요' : '아직 남은 실로 되돌렸어요');
+  }
 
   return (
     <div className="space-y-5">
@@ -97,17 +105,33 @@ export default function YarnDetail() {
           <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
 
-        <div className="mt-2 flex flex-col items-end gap-0.5 text-[11.5px] font-medium tabular-nums text-primary/80">
-          <div className="flex items-center gap-1.5">
-            <Scale className="h-3.5 w-3.5 shrink-0" aria-label="무게" />
-            <span>{remaining}g<span className="mx-1 opacity-50">|</span>{total}g</span>
-          </div>
-          {remainingMeters !== null && totalMeters !== null && (
+        {/* 잔량은 계산으로 나오지만 실제로는 딱 떨어지지 않는다.
+            자투리를 버렸거나 g 을 대충 적었을 때 사람이 끝났다고 말할 수 있게 한다. */}
+        <div className="mt-2.5 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={toggleUsedUp}
+            className="inline-flex items-center gap-1.5 rounded-full bg-card/70 px-3 py-1.5 text-[11.5px] font-semibold text-primary transition hover:bg-card"
+          >
+            {yarn.usedUp ? (
+              <><RotateCcw className="h-3.5 w-3.5" /> 아직 남았어요</>
+            ) : (
+              <><CheckCircle2 className="h-3.5 w-3.5" /> 다 썼어요</>
+            )}
+          </button>
+
+          <div className="flex flex-col items-end gap-0.5 text-[11.5px] font-medium tabular-nums text-primary/80">
             <div className="flex items-center gap-1.5">
-              <Ruler className="h-3.5 w-3.5 shrink-0" aria-label="길이" />
-              <span>{formatMeters(remainingMeters)}<span className="mx-1 opacity-50">|</span>{formatMeters(totalMeters)}</span>
+              <Scale className="h-3.5 w-3.5 shrink-0" aria-label="무게" />
+              <span>{remaining}g<span className="mx-1 opacity-50">|</span>{total}g</span>
             </div>
-          )}
+            {remainingMeters !== null && totalMeters !== null && (
+              <div className="flex items-center gap-1.5">
+                <Ruler className="h-3.5 w-3.5 shrink-0" aria-label="길이" />
+                <span>{formatMeters(remainingMeters)}<span className="mx-1 opacity-50">|</span>{formatMeters(totalMeters)}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

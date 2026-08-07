@@ -2,6 +2,17 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import type { Yarn, YarnRecommendation } from './db';
 
+/**
+ * 남은 양.
+ *
+ * '다 썼어요' 를 켜면 계산과 상관없이 0 이다. 사용량을 g 단위로 정확히 적는
+ * 사람은 드물고, 자투리는 그냥 버리기도 한다. 사람이 끝났다고 하면 끝난 것이다.
+ */
+export function remainingGrams(yarn: Pick<Yarn, 'totalGrams' | 'usedUp'>, used: number): number {
+  if (yarn.usedUp) return 0;
+  return yarn.totalGrams - used;
+}
+
 export function useYarnRemaining(yarnId?: number) {
   return useLiveQuery(async () => {
     if (!yarnId) return null;
@@ -9,7 +20,7 @@ export function useYarnRemaining(yarnId?: number) {
     if (!yarn || yarn.isDeleted) return null;
     const links = await db.projectYarns.where('yarnId').equals(yarnId).toArray();
     const used = links.reduce((s, l) => s + (l.usedGrams || 0), 0);
-    return { total: yarn.totalGrams, used, remaining: yarn.totalGrams - used };
+    return { total: yarn.totalGrams, used, remaining: remainingGrams(yarn, used) };
   }, [yarnId]);
 }
 
@@ -21,9 +32,18 @@ export function useAllYarnStats() {
     for (const l of links) usedByYarn.set(l.yarnId, (usedByYarn.get(l.yarnId) || 0) + (l.usedGrams || 0));
     return yarns.map(y => {
       const used = usedByYarn.get(y.id!) || 0;
-      return { yarn: y, used, remaining: y.totalGrams - used };
+      return { yarn: y, used, remaining: remainingGrams(y, used) };
     });
   }, []);
+}
+
+/**
+ * 다 쓴 실인지.
+ *
+ * 직접 '다 썼어요' 를 눌렀거나, 계산상 남은 양이 없거나. 둘 다 끝난 실이다.
+ */
+export function isUsedUp(yarn: Pick<Yarn, 'usedUp'>, remaining: number): boolean {
+  return !!yarn.usedUp || remaining <= 0;
 }
 
 /**

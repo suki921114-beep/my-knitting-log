@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, ProjectPhoto } from '@/lib/db';
+import { db, ProjectPhoto, type ProjectStatus } from '@/lib/db';
+import { statusLabel } from '@/lib/yarnCalc';
 import { saveLog, deleteLog, todayStr } from '@/lib/logs';
 import { photoUrls } from '@/lib/photo';
 import PageHeader from '@/components/PageHeader';
@@ -158,35 +159,28 @@ export default function LogForm() {
         </Field>
       </div>
 
-      <FieldDiv label="연결할 프로젝트">
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setProjectId(undefined)}
-            className={`rounded-full border px-3 py-1.5 text-xs transition ${
-              projectId === undefined
-                ? 'border-primary bg-primary/10 font-medium text-primary'
-                : 'border-border text-muted-foreground'
-            }`}
-          >
-            연결 안 함
-          </button>
-          {projects.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setProjectId(p.id)}
-              className={`max-w-[180px] truncate rounded-full border px-3 py-1.5 text-xs transition ${
-                projectId === p.id
-                  ? 'border-primary bg-primary/10 font-medium text-primary'
-                  : 'border-border text-muted-foreground'
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-      </FieldDiv>
+      {/* 프로젝트가 늘면 칩이 화면을 반쯤 덮는다. 목록에서 고르게 하고,
+          진행중인 것을 맨 위로 올려 대개는 바로 눈에 띄게 한다. */}
+      <Field label="연결할 프로젝트">
+        <select
+          className={inp}
+          value={projectId ?? ''}
+          onChange={e => setProjectId(e.target.value ? Number(e.target.value) : undefined)}
+        >
+          <option value="">연결 안 함</option>
+          {PROJECT_GROUPS.map(status => {
+            const list = projects.filter(p => p.status === status);
+            if (!list.length) return null;
+            return (
+              <optgroup key={status} label={statusLabel(status)}>
+                {list.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </optgroup>
+            );
+          })}
+        </select>
+      </Field>
 
       <FieldDiv label="사진">
         <MultiImageInput values={urls} onChange={next => setPhotos(reconcilePhotos(photos, next))} max={4} />
@@ -217,6 +211,9 @@ export default function LogForm() {
 }
 
 const inp = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';
+
+// 진행중인 프로젝트를 맨 앞에. 기록을 남기는 순간 대개 뜨고 있는 그것이다.
+const PROJECT_GROUPS: ProjectStatus[] = ['in_progress', 'planned', 'on_hold', 'done'];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

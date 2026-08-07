@@ -105,6 +105,14 @@ export interface Yarn extends SyncMetadata {
   /** 합수별 권장 바늘·게이지 */
   recommendations?: YarnRecommendation[];
   totalGrams: number;
+  /**
+   * 다 쓴 실.
+   *
+   * 잔량은 총량에서 사용량을 빼서 나오는데, 실제로는 딱 떨어지지 않는다.
+   * 프로젝트마다 g 을 정확히 안 적기도 하고, 자투리는 그냥 버리기도 한다.
+   * 그래서 "이건 끝났다" 고 사람이 직접 말할 수 있게 둔다. 켜지면 잔량은 0.
+   */
+  usedUp?: boolean;
   /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
   photoStoragePath?: string;
   /**

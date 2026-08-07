@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useAllYarnStats, gramsToMeters, formatMeters } from '@/lib/yarnCalc';
+import { useAllYarnStats, gramsToMeters, formatMeters, isUsedUp } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
-import { Plus, Search, ArrowUpDown, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, Check, Image as ImageIcon } from 'lucide-react';
 import { EmptyState } from '@/components/Mascot';
 
 type Sort = 'updated' | 'low' | 'high' | 'lowM' | 'highM';
+
+const HIDE_USED_UP_KEY = 'yarnsHideUsedUp';
 
 const SORT_LABEL: Record<Sort, string> = {
   updated: '최근 순',
@@ -34,6 +36,21 @@ export default function Yarns() {
   const [sort, setSort] = useState<Sort>('updated');
   const [brand, setBrand] = useState<string>('all');
   const [view, setView] = useViewMode('yarns', 'grid');
+  // 다 쓴 실은 대개 다시 볼 일이 없다. 기본으로 감추되 선택은 기억한다.
+  const [hideUsedUp, setHideUsedUp] = useState(
+    () => localStorage.getItem(HIDE_USED_UP_KEY) !== 'false',
+  );
+
+  function toggleHideUsedUp() {
+    const next = !hideUsedUp;
+    setHideUsedUp(next);
+    localStorage.setItem(HIDE_USED_UP_KEY, String(next));
+  }
+
+  const usedUpCount = useMemo(
+    () => stats.filter(s => isUsedUp(s.yarn, s.remaining)).length,
+    [stats],
+  );
 
   const brands = useMemo(
     () => Array.from(new Set(stats.map(s => s.yarn.brand).filter(Boolean))) as string[],
@@ -44,7 +61,8 @@ export default function Yarns() {
     const s = q.trim().toLowerCase();
     let arr = stats.filter(x =>
       (!s || [x.yarn.name, x.yarn.brand, x.yarn.colorName, x.yarn.fiber, x.yarn.weight].filter(Boolean).some(v => v!.toLowerCase().includes(s))) &&
-      (brand === 'all' || x.yarn.brand === brand)
+      (brand === 'all' || x.yarn.brand === brand) &&
+      (!hideUsedUp || !isUsedUp(x.yarn, x.remaining))
     );
     if (sort === 'updated') arr = arr.sort((a, b) => b.yarn.updatedAt - a.yarn.updatedAt);
     if (sort === 'low') arr = arr.sort((a, b) => a.remaining - b.remaining);
@@ -58,7 +76,7 @@ export default function Yarns() {
       });
     }
     return arr;
-  }, [stats, q, sort, brand]);
+  }, [stats, q, sort, brand, hideUsedUp]);
 
   return (
     <div>
@@ -96,6 +114,25 @@ export default function Yarns() {
             ))}
           </select>
         </div>
+        {usedUpCount > 0 && (
+          <button
+            type="button"
+            onClick={toggleHideUsedUp}
+            aria-pressed={hideUsedUp}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              hideUsedUp
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground'
+            }`}
+          >
+            <span className={`flex h-3 w-3 items-center justify-center rounded-[4px] border ${
+              hideUsedUp ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50'
+            }`}>
+              {hideUsedUp && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
+            </span>
+            다 쓴 실 {usedUpCount}개 숨기기
+          </button>
+        )}
         <div className="ml-auto"><ViewToggle value={view} onChange={setView} /></div>
       </div>
 
