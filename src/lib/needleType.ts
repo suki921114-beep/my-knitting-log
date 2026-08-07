@@ -92,3 +92,21 @@ export function describeNeedle(n: StoredNeedle): string {
 export function needleKindOf(n: StoredNeedle): NeedleKind {
   return readNeedle(n).kind;
 }
+
+/**
+ * 호수 칸에 적힌 글을 하나씩 끊는다.
+ *
+ * 조립식 세트는 팁이 열 쌍 넘게 들어 있는데, 한 줄로 뭉개면 "3.75mm 있었나?"
+ * 를 알 수 없다. 그렇다고 열 번 입력하게 하는 것도 못 할 짓이다.
+ * 그래서 '3.5, 3.75, 4' 처럼 적으면 각각 한 줄로 만들어 준다.
+ *
+ * 범위(3~8mm)로 받지 않는 이유 — 세트마다 들어 있는 호수가 제각각이다.
+ * 어떤 세트는 3.75가 있고 어떤 세트는 3.5 다음이 바로 4다.
+ * 범위로 적으면 없는 바늘을 있다고 적게 된다.
+ */
+export function splitSizes(raw: string): string[] {
+  return raw
+    .split(/[,、/\n]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}

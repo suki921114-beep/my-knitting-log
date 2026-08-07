@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readNeedle, writeNeedle, describeNeedle, needleKindOf } from '@/lib/needleType';
+import { readNeedle, writeNeedle, describeNeedle, needleKindOf, splitSizes } from '@/lib/needleType';
 
 // ----------------------------------------------------------------------------
 // 바늘 종류 — 골라 담기로 바꾸면서 옛 기록이 다치지 않는지
@@ -110,5 +110,32 @@ describe('needleKindOf', () => {
     // 목록에서 갈래별로 셀 때 옛것과 새것이 갈라지면 안 된다
     expect(needleKindOf({ type: '줄바늘' })).toBe('대바늘');
     expect(needleKindOf({ type: '대바늘', subType: '줄바늘' })).toBe('대바늘');
+  });
+});
+
+describe('splitSizes', () => {
+  it('쉼표로 끊는다', () => {
+    expect(splitSizes('3.5, 3.75, 4')).toEqual(['3.5', '3.75', '4']);
+  });
+
+  it('중간이 비는 세트도 그대로 적힌 대로만 만든다', () => {
+    // 범위로 받으면 3.75 를 없는데 있다고 적게 된다. 적은 것만 만든다.
+    expect(splitSizes('3.5, 4, 4.5, 5.5')).toEqual(['3.5', '4', '4.5', '5.5']);
+  });
+
+  it('빗금과 줄바꿈도 끊는다', () => {
+    expect(splitSizes('3.5 / 4\n4.5')).toEqual(['3.5', '4', '4.5']);
+  });
+
+  it('빈 칸과 중복 구분자는 흘려보낸다', () => {
+    expect(splitSizes('3.5,, 4 ,')).toEqual(['3.5', '4']);
+  });
+
+  it('하나만 적으면 하나만', () => {
+    expect(splitSizes('4.0mm')).toEqual(['4.0mm']);
+  });
+
+  it('아무것도 안 적으면 빈 목록', () => {
+    expect(splitSizes('   ')).toEqual([]);
   });
 });

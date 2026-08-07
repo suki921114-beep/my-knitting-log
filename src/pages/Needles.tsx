@@ -93,8 +93,15 @@ export default function Needles() {
                   <NeedlesIcon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold text-foreground">
-                    {describeNeedle(n)}{n.sizeMm && ` · ${n.sizeMm}`}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[14px] font-semibold text-foreground">
+                      {describeNeedle(n)}{n.sizeMm && ` · ${n.sizeMm}`}
+                    </span>
+                    {(n.quantity ?? 1) > 1 && (
+                      <span className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-primary">
+                        {n.quantity}개
+                      </span>
+                    )}
                   </div>
                   <div className="truncate text-[11.5px] text-muted-foreground">
                     {[n.brand, n.material, n.length].filter(Boolean).join(' · ') || '—'}

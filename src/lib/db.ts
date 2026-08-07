@@ -126,6 +126,11 @@ export interface Needle extends SyncMetadata {
   /** 대바늘 팁 길이 — '숏팁' | '롱팁' */
   tipLength?: string;
   sizeMm?: string;
+  /**
+   * 같은 바늘을 몇 개 가지고 있는지. 없거나 1이면 한 개.
+   * 하나는 쓰는 중이고 하나는 남았는지 알고 싶을 때 쓴다.
+   */
+  quantity?: number;
   brand?: string;
   material?: string;
   length?: string;
