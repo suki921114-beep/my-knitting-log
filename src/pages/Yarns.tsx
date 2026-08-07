@@ -130,7 +130,7 @@ export default function Yarns() {
             }`}>
               {hideUsedUp && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
             </span>
-            다 쓴 실 {usedUpCount}개 숨기기
+            다 쓴 실 숨기기
           </button>
         )}
         <div className="ml-auto"><ViewToggle value={view} onChange={setView} /></div>
