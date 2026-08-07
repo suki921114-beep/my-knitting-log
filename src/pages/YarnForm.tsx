@@ -19,7 +19,7 @@ export default function YarnForm() {
 
   const [f, setF] = useState({
     name: '', brand: '', colorName: '', colorCode: '', shop: '', link: '', fiber: '', weight: '',
-    totalGrams: 0, metersPer100g: 0, note: '',
+    totalGrams: '', metersPer100g: '', note: '',
   });
   // 합수별 권장 바늘·게이지. 화면에서는 문자열로 다루고 저장할 때 숫자로 바꾼다.
   const [recs, setRecs] = useState<{ strands: string; needleSize: string; gauge: string }[]>([]);
@@ -33,7 +33,8 @@ export default function YarnForm() {
         colorCode: existing.colorCode || '', shop: existing.shop || '', link: existing.link || '',
         fiber: existing.fiber || '',
         weight: existing.weight || '',
-        totalGrams: existing.totalGrams, metersPer100g: existing.metersPer100g || 0,
+        totalGrams: existing.totalGrams ? String(existing.totalGrams) : '',
+        metersPer100g: existing.metersPer100g ? String(existing.metersPer100g) : '',
         note: existing.note || '',
       });
       // 예전에 한 줄로 적어둔 값도 1합으로 올라온다
@@ -91,7 +92,8 @@ export default function YarnForm() {
     const payload = {
       ...f,
       // 안 적었으면 0 이 아니라 '없음'으로 둔다. 0m/100g 인 실은 없다.
-      metersPer100g: f.metersPer100g > 0 ? f.metersPer100g : undefined,
+      totalGrams: grams,
+      metersPer100g: per100g > 0 ? per100g : undefined,
       recommendations: recommendations.length ? recommendations : undefined,
       // 예전 한 줄짜리 값은 여기서 비운다. 두 곳에 남으면 어느 쪽이 맞는지 알 수 없다.
       needleSize: undefined,
@@ -151,12 +153,16 @@ export default function YarnForm() {
     });
   }
 
-  const numeric: (keyof typeof f)[] = ['totalGrams', 'metersPer100g'];
-  const u = (k: keyof typeof f) => (e: any) =>
-    setF({ ...f, [k]: numeric.includes(k) ? Number(e.target.value) || 0 : e.target.value });
+  // 숫자 칸도 글자 그대로 들고 있다가 저장할 때만 숫자로 바꾼다.
+  // 숫자로 들고 있으면 빈 칸을 표현할 수 없어 0 이 박혀 있게 되고,
+  // 그 0 을 지우기 전에 숫자를 치면 '0100' 같은 값이 된다.
+  const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
+
+  const grams = Number(f.totalGrams) || 0;
+  const per100g = Number(f.metersPer100g) || 0;
 
   // 적어둔 기준값이 있을 때만 총 길이를 보여준다
-  const totalMeters = gramsToMeters(f.totalGrams, f.metersPer100g);
+  const totalMeters = gramsToMeters(grams, per100g);
 
   return (
     <div className="space-y-4">
@@ -175,9 +181,12 @@ export default function YarnForm() {
         <Field label="컬러번호"><input className={inp} value={f.colorCode} onChange={u('colorCode')} /></Field>
       </div>
       <Field label="구매 링크">
+        {/* ⚠️ type="url" 을 쓰지 않는다.
+            브라우저가 URL 칸에서 한글 입력기를 꺼버리는데, 다음 칸으로 옮겨도
+            다시 켜주지 않는다. 그래서 바로 아래 성분 칸이 영문으로 시작한다.
+            inputMode 만으로도 폰에서는 주소용 자판이 뜬다. */}
         <input
           className={inp}
-          type="url"
           inputMode="url"
           value={f.link}
           onChange={u('link')}
@@ -242,14 +251,15 @@ export default function YarnForm() {
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="총 보유량 (g)">
-          <input type="number" inputMode="decimal" className={inp} value={f.totalGrams} onChange={u('totalGrams')} />
+          <input type="number" inputMode="decimal" min={0} className={inp} value={f.totalGrams} onChange={u('totalGrams')} placeholder="200" />
         </Field>
         <Field label="100g당 길이 (m)">
           <input
             type="number"
             inputMode="decimal"
             className={inp}
-            value={f.metersPer100g || ''}
+            min={0}
+            value={f.metersPer100g}
             onChange={u('metersPer100g')}
             placeholder="400"
           />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readNeedle, writeNeedle, describeNeedle, needleKindOf, splitSizes } from '@/lib/needleType';
+import { readNeedle, writeNeedle, describeNeedle, needleKindOf, splitSizes, formatNeedleSize } from '@/lib/needleType';
 
 // ----------------------------------------------------------------------------
 // 바늘 종류 — 골라 담기로 바꾸면서 옛 기록이 다치지 않는지
@@ -137,5 +137,28 @@ describe('splitSizes', () => {
 
   it('아무것도 안 적으면 빈 목록', () => {
     expect(splitSizes('   ')).toEqual([]);
+  });
+});
+
+describe('formatNeedleSize', () => {
+  it('숫자만 적었으면 mm 를 붙인다', () => {
+    expect(formatNeedleSize('3.5')).toBe('3.5mm');
+    expect(formatNeedleSize('4')).toBe('4mm');
+  });
+
+  it('단위를 이미 적었으면 건드리지 않는다', () => {
+    // 사람이 적어둔 말을 앱이 고쳐 쓰지 않는다
+    expect(formatNeedleSize('4.0mm')).toBe('4.0mm');
+    expect(formatNeedleSize('5호')).toBe('5호');
+    expect(formatNeedleSize('US 6')).toBe('US 6');
+  });
+
+  it('앞뒤 공백은 털어낸다', () => {
+    expect(formatNeedleSize('  3.75  ')).toBe('3.75mm');
+  });
+
+  it('비었으면 빈 값', () => {
+    expect(formatNeedleSize('')).toBe('');
+    expect(formatNeedleSize(undefined)).toBe('');
   });
 });

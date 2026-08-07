@@ -17,12 +17,12 @@ export default function NeedleForm() {
   const nav = useNavigate();
   const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (nid ? db.needles.get(nid) : undefined), [nid]);
-  const [f, setF] = useState({ sizeMm: '', brand: '', material: '', length: '', note: '', quantity: 1 });
+  const [f, setF] = useState({ sizeMm: '', brand: '', material: '', length: '', note: '', quantity: '' });
   const [shape, setShape] = useState<NeedleShape>({ kind: '대바늘' });
   const [hyd, setHyd] = useState(false);
   useEffect(() => {
     if (editing && existing && !hyd) {
-      setF({ sizeMm: existing.sizeMm || '', brand: existing.brand || '', material: existing.material || '', length: existing.length || '', note: existing.note || '', quantity: existing.quantity ?? 1 });
+      setF({ sizeMm: existing.sizeMm || '', brand: existing.brand || '', material: existing.material || '', length: existing.length || '', note: existing.note || '', quantity: existing.quantity && existing.quantity > 1 ? String(existing.quantity) : '' });
       setShape(readNeedle(existing));
       setHyd(true);
     }
@@ -40,7 +40,8 @@ export default function NeedleForm() {
 
     const payload = {
       ...f,
-      quantity: f.quantity > 1 ? f.quantity : undefined,
+      // 안 적었거나 1이면 굳이 저장하지 않는다 — 목록의 개수 배지는 2 이상일 때만 뜬다
+      quantity: Number(f.quantity) > 1 ? Number(f.quantity) : undefined,
       ...writeNeedle(shape),
       updatedAt: t,
       isDeleted: false,
@@ -137,7 +138,8 @@ export default function NeedleForm() {
           min={1}
           className={`${inp} w-24`}
           value={f.quantity}
-          onChange={e => setF({ ...f, quantity: Math.max(1, Number(e.target.value) || 1) })}
+          onChange={u('quantity')}
+          placeholder="1"
         />
       </Field>
       <Field label="메모"><textarea className={`${inp} min-h-[72px]`} value={f.note} onChange={u('note')} /></Field>

@@ -123,3 +123,16 @@ export function splitSizes(raw: string): string[] {
     .map(s => s.trim())
     .filter(Boolean);
 }
+
+/**
+ * 호수 표기 — 숫자만 적었으면 mm 를 붙여 준다.
+ *
+ * '3.5' 라고만 적어두면 나중에 볼 때 mm 인지 호(號)인지 알 수 없다.
+ * 다만 '5호' 나 '4.0mm' 처럼 단위를 이미 적었으면 그대로 둔다.
+ * 사람이 적어둔 말을 앱이 고쳐 쓰지는 않는다.
+ */
+export function formatNeedleSize(raw?: string): string {
+  const s = (raw ?? '').trim();
+  if (!s) return '';
+  return /^\d+(\.\d+)?$/.test(s) ? `${s}mm` : s;
+}

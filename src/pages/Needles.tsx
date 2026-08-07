@@ -10,6 +10,7 @@ import {
   NEEDLE_SUBTYPES,
   NEEDLE_TIPS,
   describeNeedle,
+  formatNeedleSize,
   needleParts,
   needleKindOf,
   readNeedle,
@@ -184,7 +185,7 @@ export default function Needles() {
                     to={`/library/needles/${n.id}/edit`}
                     className="inline-flex items-center gap-1 rounded-xl border border-border bg-secondary/40 px-2.5 py-1.5 text-[13px] font-semibold tabular-nums text-foreground transition hover:border-primary/50 hover:bg-primary-soft/50 hover:text-primary"
                   >
-                    {n.sizeMm || '호수 없음'}
+                    {formatNeedleSize(n.sizeMm) || '호수 없음'}
                     {(n.quantity ?? 1) > 1 && (
                       <span className="text-[10.5px] font-bold text-primary">×{n.quantity}</span>
                     )}

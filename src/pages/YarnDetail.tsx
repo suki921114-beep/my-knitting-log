@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useYarnRemaining, gramsToMeters, formatMeters, yarnRecommendations } from '@/lib/yarnCalc';
+import { formatNeedleSize } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, ExternalLink, Scale, Ruler } from 'lucide-react';
 
@@ -144,7 +145,7 @@ export default function YarnDetail() {
                 <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
                   <div className="min-w-0">
                     <div className="text-[10.5px] font-medium text-muted-foreground">바늘</div>
-                    <div className="truncate text-[13px] font-semibold text-ink">{r.needleSize || '—'}</div>
+                    <div className="truncate text-[13px] font-semibold text-ink">{formatNeedleSize(r.needleSize) || '—'}</div>
                   </div>
                   <div className="min-w-0">
                     <div className="text-[10.5px] font-medium text-muted-foreground">게이지</div>

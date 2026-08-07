@@ -379,9 +379,12 @@ function QuickAddYarn({
           <input className={qaInput} value={colorName} onChange={e => setColorName(e.target.value)} placeholder="컬러명" />
           <input className={qaInput} value={colorCode} onChange={e => setColorCode(e.target.value)} placeholder="컬러번호" />
         </div>
+        {/* ⚠️ type="url" 을 쓰지 않는다.
+            브라우저가 URL 칸에서 한글 입력기를 꺼버리는데, 다음 칸으로 옮겨도
+            다시 켜주지 않는다. 그래서 바로 아래 성분 칸이 영문으로 시작한다.
+            inputMode 만으로도 폰에서는 주소용 자판이 뜬다. */}
         <input
           className={qaInput}
-          type="url"
           inputMode="url"
           value={link}
           onChange={e => setLink(e.target.value)}
