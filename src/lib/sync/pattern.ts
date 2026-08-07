@@ -8,6 +8,9 @@ import { firestore } from '../firebase';
 import { db } from '@/lib/db';
 import type { Pattern } from '@/lib/db';
 import { sanitizeForFirestore, type FetchDiff, type SyncDiff } from './common';
+import { prepareCoverUpload, resolveCover, PATTERN_COVER } from './coverSync';
+import { readUsage, writeUsage } from '@/lib/cloudUsage';
+import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
 export async function calculatePatternSyncDiff(userId: string): Promise<SyncDiff<Pattern>> {
   const diff: SyncDiff<Pattern> = { toUpload: [], toDownload: [], unchanged: 0 };
@@ -88,6 +91,11 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
   let downloaded = 0;
   let failed = 0;
 
+  // 대표 이미지는 Storage 로 보내고 문서에는 위치만 적는다.
+  // 문서에 그림을 박으면 1MB 한도에 걸려 저장이 통째로 실패한다.
+  let usage: StorageUsage = diff.toUpload.length ? await readUsage(userId) : { ...EMPTY_USAGE };
+  let usageChanged = false;
+
   try {
     const batch = writeBatch(firestore);
     for (const local of diff.toUpload) {
@@ -111,8 +119,18 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
           await db.patterns.update(local.id, fixUpdates);
         }
 
+        const prepared = await prepareCoverUpload(userId, local, PATTERN_COVER, usage, 'PatternSync');
+        usage = prepared.usage;
+        usageChanged = usageChanged || prepared.usageChanged;
+        // Storage 위치를 기기에도 적어 둔다 — 안 적으면 다음 백업에 같은 사진을
+        // 또 올려 용량만 두 배로 먹는다.
+        if (prepared.localPatch && local.id) {
+          await db.patterns.update(local.id, prepared.localPatch as any);
+          Object.assign(local, prepared.localPatch);
+        }
+
         const docRef = doc(firestore, `users/${userId}/patterns`, local.cloudId!);
-        const uploadData = sanitizeForFirestore(local);
+        const uploadData = sanitizeForFirestore(prepared.payload);
 
         console.log(`[Sync Upload] 도안 대상: ${local.name || 'Unknown'}`);
         batch.set(docRef, uploadData);
@@ -131,19 +149,31 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
       uploaded = 0;
     }
 
+    if (usageChanged) {
+      try {
+        await writeUsage(userId, usage);
+      } catch (e) {
+        // 사용량 기록이 실패해도 사진은 이미 올라갔다. 다음 백업에서 다시 맞춰진다.
+        console.warn('[Sync] 사용량 기록 실패:', e);
+      }
+    }
+
     for (const remote of diff.toDownload) {
       try {
         const existing = await db.patterns.where('cloudId').equals(remote.cloudId!).first();
+        // 기기에 그림이 없으면 Storage 에서 받아온다.
+        // 예전에 문서 안에 글자로 박아 올린 사진도 그대로 읽어 준다.
+        const imageDataUrl = await resolveCover(existing?.imageDataUrl, remote, PATTERN_COVER, 'PatternSync');
         if (existing) {
           await db.patterns.update(existing.id!, {
             ...remote,
             id: existing.id,
-            imageDataUrl: existing.imageDataUrl,
+            imageDataUrl,
             fileDataUrl: existing.fileDataUrl
           });
         } else {
           const { id, ...dataToPut } = remote as any;
-          await db.patterns.add(dataToPut);
+          await db.patterns.add({ ...dataToPut, imageDataUrl });
         }
         downloaded++;
       } catch(e) {
@@ -167,7 +197,8 @@ export async function executePatternFetch(diff: FetchDiff<Pattern>) {
   for (const remote of diff.toAdd) {
     try {
       const { id, ...dataToPut } = remote as any;
-      await db.patterns.add(dataToPut);
+      const imageDataUrl = await resolveCover(undefined, remote, PATTERN_COVER, 'PatternFetch');
+      await db.patterns.add({ ...dataToPut, imageDataUrl });
       added++;
     } catch (e) {
       console.error(`[Fetch] Pattern 추가 실패: ${remote.name} (${remote.cloudId})`, e);
@@ -179,10 +210,11 @@ export async function executePatternFetch(diff: FetchDiff<Pattern>) {
     try {
       const existing = await db.patterns.where('cloudId').equals(remote.cloudId!).first();
       if (existing) {
+        const imageDataUrl = await resolveCover(existing.imageDataUrl, remote, PATTERN_COVER, 'PatternFetch');
         await db.patterns.update(existing.id!, {
           ...remote,
           id: existing.id,
-          imageDataUrl: existing.imageDataUrl,
+          imageDataUrl,
           fileDataUrl: existing.fileDataUrl
         });
         updated++;

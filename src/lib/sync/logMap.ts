@@ -7,8 +7,14 @@
 // 엉뚱한 프로젝트에 일기가 붙는다. 반드시 cloudId 를 거쳐야 한다.
 
 import type { KnitLog, ProjectPhoto } from '@/lib/db';
+import type { RemotePhoto } from './photoSync';
 
-/** 클라우드에 저장되는 형태 — 로컬 id / projectId / photos 는 담지 않는다 */
+/**
+ * 클라우드에 저장되는 형태 — 로컬 id 와 projectId 는 담지 않는다.
+ *
+ * 사진은 그림 자체가 아니라 '어디에 있는지' 만 담는다. 그림을 문서에 글자로
+ * 박으면 문서 1MB 한도를 넘겨 저장이 통째로 실패한다.
+ */
 export interface RemoteLog {
   cloudId: string;
   /** 연결된 프로젝트의 cloudId. 자유 기록이면 null */
@@ -17,13 +23,20 @@ export interface RemoteLog {
   text: string;
   rows?: number;
   mood?: string;
+  /** Storage 에 올라간 사진들. 예전 기록에는 없다. */
+  photos?: RemotePhoto[];
   createdAt: number;
   updatedAt: number;
   isDeleted: boolean;
   deletedAt: number | null;
 }
 
-export function toRemote(local: KnitLog, projectCloudIds: Map<number, string>): RemoteLog {
+export function toRemote(
+  local: KnitLog,
+  projectCloudIds: Map<number, string>,
+  /** 이미 Storage 에 올라간 사진 정보. 올리기 전 호출자가 채워 준다. */
+  photos?: RemotePhoto[],
+): RemoteLog {
   return {
     cloudId: local.cloudId!,
     projectCloudId:
@@ -32,6 +45,7 @@ export function toRemote(local: KnitLog, projectCloudIds: Map<number, string>): 
     text: local.text,
     rows: local.rows,
     mood: local.mood,
+    photos: photos?.length ? photos : undefined,
     createdAt: local.createdAt,
     updatedAt: local.updatedAt,
     isDeleted: local.isDeleted ?? false,
@@ -41,12 +55,14 @@ export function toRemote(local: KnitLog, projectCloudIds: Map<number, string>): 
 
 /**
  * 원격 기록을 로컬 저장 형태로 되돌린다.
- * @param existingPhotos 이미 기기에 있던 사진 — 클라우드는 사진을 보관하지 않으므로 그대로 살린다
+ *
+ * @param photos 받아온 사진 — 호출자가 Storage 에서 내려받아 넘겨준다.
+ *               넘기지 않으면 기기에 있던 사진을 그대로 둔다.
  */
 export function toLocal(
   remote: RemoteLog,
   projectIds: Map<string, number>,
-  existingPhotos?: ProjectPhoto[],
+  photos?: ProjectPhoto[],
 ): Omit<KnitLog, 'id'> {
   const projectId = remote.projectCloudId ? projectIds.get(remote.projectCloudId) : undefined;
   return {
@@ -58,7 +74,7 @@ export function toLocal(
     text: remote.text,
     rows: remote.rows,
     mood: remote.mood,
-    photos: existingPhotos && existingPhotos.length ? existingPhotos : undefined,
+    photos: photos && photos.length ? photos : undefined,
     createdAt: remote.createdAt,
     updatedAt: remote.updatedAt,
     isDeleted: remote.isDeleted ?? false,

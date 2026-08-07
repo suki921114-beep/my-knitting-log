@@ -10,7 +10,8 @@ export interface SyncMetadata {
 }
 
 /**
- * Project 사진 한 장 — Firebase Storage 동기화 + 로컬 dataUrl 캐시.
+ * 사진 한 장 — Firebase Storage 동기화 + 로컬 dataUrl 캐시.
+ * 프로젝트와 다이어리가 같은 모양을 쓴다.
  *
  * - cloudId: 사진 식별자 (Storage path 안에 들어가는 UUID)
  * - dataUrl: 로컬 캐시. Firestore/Storage payload 에는 절대 안 보냄.
@@ -58,6 +59,8 @@ export interface Pattern extends SyncMetadata {
   link?: string;
   fileDataUrl?: string;
   imageDataUrl?: string; // 대표 이미지
+  /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
+  imageStoragePath?: string;
   difficulty?: string;
   sizeInfo?: string;
   note?: string;
@@ -102,6 +105,8 @@ export interface Yarn extends SyncMetadata {
   /** 합수별 권장 바늘·게이지 */
   recommendations?: YarnRecommendation[];
   totalGrams: number;
+  /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
+  photoStoragePath?: string;
   /**
    * 100g 당 길이(m). 라벨에 적힌 값을 100g 기준으로 환산해 적는다.
    * 콘사처럼 무게로만 파는 실도 이 값만 있으면 총 길이를 알 수 있다.
@@ -147,6 +152,8 @@ export interface Notion extends SyncMetadata {
   shop?: string;
   note?: string;
   photoDataUrl?: string;
+  /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
+  photoStoragePath?: string;
   createdAt: number;
   updatedAt: number;
 }

@@ -1,9 +1,14 @@
 // ----------------------------------------------------------------------------
-// photoStorage — 프로젝트 사진을 Firebase Storage 와 주고받는 헬퍼
+// photoStorage — 사진을 Firebase Storage 와 주고받는 헬퍼
 // ----------------------------------------------------------------------------
 // 정책:
-//   - dataURL ↔ Storage 변환만 담당 (Firestore 메타는 sync/project.ts 가 처리)
-//   - Storage path: users/{uid}/projectPhotos/{projectCloudId}/{photoCloudId}.{ext}
+//   - dataURL ↔ Storage 변환만 담당 (문서에 뭘 적을지는 sync/photoSync.ts 가 정한다)
+//   - Storage path: users/{uid}/projectPhotos/{ownerCloudId}/{photoCloudId}.{ext}
+//
+// ⚠️ 경로의 `projectPhotos` 는 이제 프로젝트 전용이 아니다. 다이어리·실·도안·
+//    부자재 사진도 같은 경로를 쓴다. 이미 올라간 사진들이 여기 있어서 이름만
+//    그대로 두었다 — 바꾸려면 파일을 전부 옮겨야 하고 얻는 게 없다.
+//    storage.rules 도 이 경로 기준이니 함께 볼 것.
 //   - 업로드는 putString(dataUrl, 'data_url') 사용 (base64 추출 없이 바로)
 //   - 다운로드는 getDownloadURL → fetch → blob → dataUrl 로 캐시
 //   - Storage 보안 규칙: users/{uid} 본인 경로만 read/write (docs/firebase-storage-rules.md)
@@ -31,10 +36,10 @@ function guessContentType(path: string): string {
 
 export function buildPhotoStoragePath(
   uid: string,
-  projectCloudId: string,
+  ownerCloudId: string,
   photo: Pick<ProjectPhoto, 'cloudId' | 'contentType'>,
 ): string {
-  return `users/${uid}/projectPhotos/${projectCloudId}/${photo.cloudId}.${extToContentType(photo.contentType)}`;
+  return `users/${uid}/projectPhotos/${ownerCloudId}/${photo.cloudId}.${extToContentType(photo.contentType)}`;
 }
 
 /**
@@ -43,11 +48,11 @@ export function buildPhotoStoragePath(
  */
 export async function uploadPhotoDataUrl(
   uid: string,
-  projectCloudId: string,
+  ownerCloudId: string,
   photo: ProjectPhoto,
 ): Promise<string> {
   if (!photo.dataUrl) throw new Error('photo.dataUrl 비어있음 — 업로드 불가');
-  const path = buildPhotoStoragePath(uid, projectCloudId, photo);
+  const path = buildPhotoStoragePath(uid, ownerCloudId, photo);
   const r = storageRef(storage, path);
   // putString 의 'data_url' 모드는 'data:image/...;base64,...' 그대로 받음
   await uploadString(r, photo.dataUrl, 'data_url', {

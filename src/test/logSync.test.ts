@@ -79,9 +79,17 @@ describe('일기 동기화 — 사진', () => {
     deletedAt: null,
   };
 
-  it('사진은 클라우드로 올리지 않는다 (문서 크기 한도)', () => {
+  it('그림 자체는 문서에 담지 않는다 (문서 크기 한도)', () => {
+    // 사진은 Storage 에 올리고 문서에는 '어디에 있는지' 만 적는다.
+    // 그림을 글자로 바꿔 담으면 문서 1MB 한도를 넘겨 저장이 통째로 실패한다.
     const remote = toRemote(makeLog({ photos: [photo] }), new Map([[3, 'proj-abc']]));
-    expect(remote).not.toHaveProperty('photos');
+    expect(JSON.stringify(remote)).not.toContain('data:image');
+  });
+
+  it('아직 안 올라간 사진은 문서에 적지 않는다', () => {
+    // 호출자가 업로드 결과를 안 넘기면 적을 위치가 없다
+    const remote = toRemote(makeLog({ photos: [photo] }), new Map([[3, 'proj-abc']]));
+    expect(remote.photos).toBeUndefined();
   });
 
   it('받아올 때 기기에 있던 사진을 지우지 않는다', () => {

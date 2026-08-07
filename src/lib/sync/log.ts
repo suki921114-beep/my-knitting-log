@@ -9,9 +9,10 @@
 //    → 클라우드에는 projectCloudId 로 올리고, 내려받을 때 로컬 projectId 로 되돌린다.
 //    → 그래서 프로젝트 동기화를 먼저 끝낸 뒤에 호출해야 한다.
 //
-// 2) photos 는 base64 dataUrl 이라 Firestore 문서 1MB 한도를 쉽게 넘긴다.
-//    무료 백업은 사진을 포함하지 않는다는 안내와도 맞춰, 업로드에서 제외하고
-//    내려받을 때는 기기에 있던 사진을 그대로 보존한다.
+// 2) photos 는 그림 자체를 문서에 담을 수 없다.
+//    글자로 바꾸면 용량이 3분의 1쯤 불어나는데 문서 하나는 1MB 를 못 넘는다.
+//    그래서 그림은 Storage 에 올리고 문서에는 '어디에 있는지' 만 적는다.
+//    (예전에는 아예 안 올려서, 기기를 바꾸면 다이어리 사진이 사라졌다)
 
 import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { firestore } from '../firebase';
@@ -19,6 +20,9 @@ import { db } from '@/lib/db';
 import type { KnitLog } from '@/lib/db';
 import { sanitizeForFirestore, type FetchResult, type SyncResult } from './common';
 import { toLocal, toRemote, type RemoteLog } from './logMap';
+import { uploadPhotos, downloadPhotos } from './photoSync';
+import { readUsage, writeUsage } from '@/lib/cloudUsage';
+import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
 export * from './logMap';
 
@@ -99,6 +103,11 @@ export async function executeLogSync(userId: string, diff: LogSyncDiff): Promise
 
   const projectCloudIds = await projectCloudIdByLocalId();
 
+  // 사진은 문서를 쓰기 전에 Storage 로 올린다. 올린 뒤라야 '어디에 있는지'를
+  // 문서에 적을 수 있다.
+  let usage: StorageUsage = diff.toUpload.length ? await readUsage(userId) : { ...EMPTY_USAGE };
+  let usageChanged = false;
+
   const batch = writeBatch(firestore);
   for (const local of diff.toUpload) {
     try {
@@ -115,12 +124,32 @@ export async function executeLogSync(userId: string, diff: LogSyncDiff): Promise
         fixUpdates.updatedAt = local.updatedAt;
         needsLocalUpdate = true;
       }
+
+      const result = await uploadPhotos(
+        userId,
+        local.cloudId!,
+        local.photos ?? [],
+        usage,
+        'LogSync',
+      );
+      usage = result.usage;
+      usageChanged = usageChanged || result.usageChanged;
+      // storagePath 가 채워진 메타를 기기에도 남긴다 — 안 남기면 다음 백업에
+      // 같은 사진을 또 올려 용량만 두 배로 먹는다.
+      if (result.usageChanged) {
+        fixUpdates.photos = result.photos;
+        needsLocalUpdate = true;
+      }
+
       if (needsLocalUpdate && local.id) {
         await db.logs.update(local.id, fixUpdates);
       }
 
       const docRef = doc(firestore, `users/${userId}/logs`, local.cloudId!);
-      batch.set(docRef, sanitizeForFirestore(toRemote(local, projectCloudIds)));
+      batch.set(
+        docRef,
+        sanitizeForFirestore(toRemote(local, projectCloudIds, result.payloads)),
+      );
       uploaded++;
     } catch (e) {
       console.error(`[Sync] 일기 업로드 준비 실패 (${local.cloudId})`, e);
@@ -134,6 +163,15 @@ export async function executeLogSync(userId: string, diff: LogSyncDiff): Promise
     console.error('[Sync] Firestore Batch Commit 실패 (KnitLog):', batchError);
     failed += uploaded;
     uploaded = 0;
+  }
+
+  if (usageChanged) {
+    try {
+      await writeUsage(userId, usage);
+    } catch (e) {
+      // 사용량 기록이 실패해도 사진은 이미 올라갔다. 다음 백업에서 다시 맞춰진다.
+      console.warn('[Sync] 사용량 기록 실패 (KnitLog):', e);
+    }
   }
 
   const projectIds = await projectLocalIdByCloudId();
@@ -219,7 +257,15 @@ export async function executeLogFetch(diff: LogFetchDiff): Promise<FetchResult> 
 /** cloudId 로 로컬 레코드를 찾아 갱신하고, 없으면 추가한다 */
 async function upsertLocal(remote: RemoteLog, projectIds: Map<string, number>) {
   const existing = await db.logs.where('cloudId').equals(remote.cloudId).first();
-  const data = toLocal(remote, projectIds, existing?.photos);
+
+  // ⚠️ 사진 받아오기는 Dexie 트랜잭션 밖에서 해야 한다.
+  //    트랜잭션 안에서 네트워크를 기다리면 Dexie 가 트랜잭션을 끊어 버린다.
+  //    (프로젝트 동기화에서 같은 실수로 사진이 안 내려온 적이 있다)
+  const photos = remote.photos?.length
+    ? await downloadPhotos(remote.photos, existing?.photos, 'LogFetch')
+    : existing?.photos;
+
+  const data = toLocal(remote, projectIds, photos);
 
   if (existing?.id != null) {
     await db.logs.update(existing.id, data as any);

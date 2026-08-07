@@ -8,6 +8,9 @@ import { firestore } from '../firebase';
 import { db } from '@/lib/db';
 import type { Yarn } from '@/lib/db';
 import { sanitizeForFirestore, type FetchDiff, type SyncDiff } from './common';
+import { prepareCoverUpload, resolveCover, YARN_COVER } from './coverSync';
+import { readUsage, writeUsage } from '@/lib/cloudUsage';
+import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
 export async function calculateYarnSyncDiff(userId: string): Promise<SyncDiff<Yarn>> {
   const diff: SyncDiff<Yarn> = { toUpload: [], toDownload: [], unchanged: 0 };
@@ -95,8 +98,12 @@ export async function executeYarnSync(userId: string, diff: SyncDiff<Yarn>) {
   let downloaded = 0;
   let failed = 0;
 
+  // 대표 이미지는 Storage 로 보내고 문서에는 위치만 적는다.
+  // 문서에 그림을 박으면 1MB 한도에 걸려 저장이 통째로 실패한다.
+  let usage: StorageUsage = diff.toUpload.length ? await readUsage(userId) : { ...EMPTY_USAGE };
+  let usageChanged = false;
+
   try {
-    // 1. Firestore로 업로드 (이미지 필드 제외)
     const batch = writeBatch(firestore);
     for (const local of diff.toUpload) {
       try {
@@ -122,8 +129,18 @@ export async function executeYarnSync(userId: string, diff: SyncDiff<Yarn>) {
           await db.yarns.update(local.id, fixUpdates);
         }
 
+        const prepared = await prepareCoverUpload(userId, local, YARN_COVER, usage, 'YarnSync');
+        usage = prepared.usage;
+        usageChanged = usageChanged || prepared.usageChanged;
+        // Storage 위치를 기기에도 적어 둔다 — 안 적으면 다음 백업에 같은 사진을
+        // 또 올려 용량만 두 배로 먹는다.
+        if (prepared.localPatch && local.id) {
+          await db.yarns.update(local.id, prepared.localPatch as any);
+          Object.assign(local, prepared.localPatch);
+        }
+
         const docRef = doc(firestore, `users/${userId}/yarns`, local.cloudId!);
-        const uploadData = sanitizeForFirestore(local);
+        const uploadData = sanitizeForFirestore(prepared.payload);
 
         console.log(`[Sync Upload] 대상: ${local.name || 'Unknown'}`);
         console.log(`  - cloudId: ${local.cloudId}`);
@@ -147,21 +164,27 @@ export async function executeYarnSync(userId: string, diff: SyncDiff<Yarn>) {
       uploaded = 0;
     }
 
+    if (usageChanged) {
+      try {
+        await writeUsage(userId, usage);
+      } catch (e) {
+        // 사용량 기록이 실패해도 사진은 이미 올라갔다. 다음 백업에서 다시 맞춰진다.
+        console.warn('[Sync] 사용량 기록 실패:', e);
+      }
+    }
+
     // 2. 로컬(Dexie)로 다운로드 (기존 이미지/id 보존)
     for (const remote of diff.toDownload) {
       try {
         const existing = await db.yarns.where('cloudId').equals(remote.cloudId!).first();
+        // 기기에 그림이 없으면 Storage 에서 받아온다.
+        // 예전에 문서 안에 글자로 박아 올린 사진도 그대로 읽어 준다.
+        const photoDataUrl = await resolveCover(existing?.photoDataUrl, remote, YARN_COVER, 'YarnSync');
         if (existing) {
-          // 기존 항목 업데이트 (photoDataUrl과 로컬 id 유지)
-          await db.yarns.update(existing.id!, {
-            ...remote,
-            id: existing.id,
-            photoDataUrl: existing.photoDataUrl
-          });
+          await db.yarns.update(existing.id!, { ...remote, id: existing.id, photoDataUrl });
         } else {
-          // 새로 생성
           const { id, ...dataToPut } = remote as any;
-          await db.yarns.add(dataToPut);
+          await db.yarns.add({ ...dataToPut, photoDataUrl });
         }
         downloaded++;
       } catch(e) {
@@ -191,7 +214,8 @@ export async function executeYarnFetch(diff: FetchDiff<Yarn>) {
   for (const remote of diff.toAdd) {
     try {
       const { id, ...dataToPut } = remote as any;
-      await db.yarns.add(dataToPut);
+      const photoDataUrl = await resolveCover(undefined, remote, YARN_COVER, 'YarnFetch');
+      await db.yarns.add({ ...dataToPut, photoDataUrl });
       added++;
     } catch (e) {
       console.error(`[Fetch] Yarn 추가 실패: ${remote.name} (${remote.cloudId})`, e);
@@ -204,11 +228,8 @@ export async function executeYarnFetch(diff: FetchDiff<Yarn>) {
     try {
       const existing = await db.yarns.where('cloudId').equals(remote.cloudId!).first();
       if (existing) {
-        await db.yarns.update(existing.id!, {
-          ...remote,
-          id: existing.id,
-          photoDataUrl: existing.photoDataUrl
-        });
+        const photoDataUrl = await resolveCover(existing.photoDataUrl, remote, YARN_COVER, 'YarnFetch');
+        await db.yarns.update(existing.id!, { ...remote, id: existing.id, photoDataUrl });
         updated++;
       } else {
         failed++;
