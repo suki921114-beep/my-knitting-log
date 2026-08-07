@@ -62,6 +62,17 @@ function normalize(ph: Partial<ProjectPhoto>): ProjectPhoto {
   };
 }
 
+/**
+ * 기기에는 있는데 아직 안 올라간 사진이 있는지.
+ *
+ * 백업은 '기기가 클라우드보다 새로울 때' 만 올린다. 사진을 안 올리던 시절에
+ * 백업해 둔 기록들은 양쪽 시각이 같아 그냥 넘어가고, 사진은 영영 기기에만 남는다.
+ * 이 경우를 찾아내 한 번 더 올리게 한다.
+ */
+export function hasUnuploadedPhotos(photos: ProjectPhoto[] | undefined): boolean {
+  return !!photos?.some(p => !p.isDeleted && !!p.dataUrl && !p.storagePath);
+}
+
 export function toRemotePhoto(photo: ProjectPhoto): RemotePhoto | null {
   if (!photo.storagePath) return null;
   return {

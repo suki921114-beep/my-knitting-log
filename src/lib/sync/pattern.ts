@@ -8,7 +8,7 @@ import { firestore } from '../firebase';
 import { db } from '@/lib/db';
 import type { Pattern } from '@/lib/db';
 import { sanitizeForFirestore, type FetchDiff, type SyncDiff } from './common';
-import { prepareCoverUpload, resolveCover, PATTERN_COVER } from './coverSync';
+import { prepareCoverUpload, resolveCover, needsCoverMigration, PATTERN_COVER } from './coverSync';
 import { readUsage, writeUsage } from '@/lib/cloudUsage';
 import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
@@ -33,7 +33,12 @@ export async function calculatePatternSyncDiff(userId: string): Promise<SyncDiff
       } else if (local.updatedAt < remote.updatedAt) {
         diff.toDownload.push(remote);
       } else {
-        diff.unchanged++;
+        // 시각은 같지만 사진이 아직 문서 안에 박혀 있으면 한 번 더 올려 옮긴다
+        if (needsCoverMigration(local, remote, PATTERN_COVER)) {
+          diff.toUpload.push(local);
+        } else {
+          diff.unchanged++;
+        }
       }
     }
   }

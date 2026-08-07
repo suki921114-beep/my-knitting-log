@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { toRemotePhoto } from '@/lib/sync/photoSync';
+import { toRemotePhoto, hasUnuploadedPhotos } from '@/lib/sync/photoSync';
+import { needsCoverMigration, YARN_COVER } from '@/lib/sync/coverSync';
 import { toRemote, toLocal, type RemoteLog } from '@/lib/sync/logMap';
 import type { KnitLog, ProjectPhoto } from '@/lib/db';
 
@@ -106,5 +107,41 @@ describe('다이어리 기록 ↔ 문서', () => {
       deletedAt: null,
     } as RemoteLog;
     expect(() => toLocal(old, new Map())).not.toThrow();
+  });
+});
+
+describe('한 번 더 올려서 옮겨야 하는 경우', () => {
+  it('문서에 그림이 박혀 있고 위치가 없으면 옮긴다', () => {
+    // 백업은 '기기가 더 새로울 때' 만 올린다. 이 확인이 없으면 예전에
+    // 백업해 둔 사진은 영영 문서 안에 남는다.
+    const local = { photoDataUrl: 'data:image/webp;base64,AAAA' };
+    const remote = { photoDataUrl: 'data:image/webp;base64,AAAA' };
+    expect(needsCoverMigration(local, remote, YARN_COVER)).toBe(true);
+  });
+
+  it('이미 옮겼으면 그냥 둔다', () => {
+    const local = { photoDataUrl: 'data:image/webp;base64,AAAA' };
+    const remote = { photoStoragePath: 'users/u1/projectPhotos/y1/y1.webp' };
+    expect(needsCoverMigration(local, remote, YARN_COVER)).toBe(false);
+  });
+
+  it('사진이 없으면 옮길 것도 없다', () => {
+    expect(needsCoverMigration({}, {}, YARN_COVER)).toBe(false);
+  });
+
+  it('기기에 그림이 없으면 올릴 수 없다', () => {
+    // 문서에만 있고 기기에 없으면 올릴 재료가 없다
+    const remote = { photoDataUrl: 'data:image/webp;base64,AAAA' };
+    expect(needsCoverMigration({}, remote, YARN_COVER)).toBe(false);
+  });
+
+  it('안 올라간 다이어리 사진을 찾아낸다', () => {
+    expect(hasUnuploadedPhotos([photo({ storagePath: undefined })])).toBe(true);
+    expect(hasUnuploadedPhotos([photo()])).toBe(false);
+    expect(hasUnuploadedPhotos(undefined)).toBe(false);
+  });
+
+  it('지운 사진은 올리지 않는다', () => {
+    expect(hasUnuploadedPhotos([photo({ storagePath: undefined, isDeleted: true })])).toBe(false);
   });
 });

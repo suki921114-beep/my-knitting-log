@@ -20,7 +20,7 @@ import { db } from '@/lib/db';
 import type { KnitLog } from '@/lib/db';
 import { sanitizeForFirestore, type FetchResult, type SyncResult } from './common';
 import { toLocal, toRemote, type RemoteLog } from './logMap';
-import { uploadPhotos, downloadPhotos } from './photoSync';
+import { uploadPhotos, downloadPhotos, hasUnuploadedPhotos } from './photoSync';
 import { readUsage, writeUsage } from '@/lib/cloudUsage';
 import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
@@ -84,6 +84,9 @@ export async function calculateLogSyncDiff(userId: string): Promise<LogSyncDiff>
       diff.toUpload.push(local);
     } else if ((local.updatedAt ?? 0) < (remote.updatedAt ?? 0)) {
       diff.toDownload.push(remote);
+    } else if (hasUnuploadedPhotos(local.photos)) {
+      // 시각은 같지만 사진이 아직 안 올라갔다 — 사진을 안 올리던 시절의 기록
+      diff.toUpload.push(local);
     } else {
       diff.unchanged++;
     }

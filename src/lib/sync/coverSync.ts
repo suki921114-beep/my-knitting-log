@@ -95,3 +95,20 @@ export async function resolveCover(
     context,
   );
 }
+
+/**
+ * 아직 문서 안에 그림이 박혀 있는 항목인지.
+ *
+ * 백업은 '기기가 클라우드보다 새로울 때' 만 올린다. 그래서 예전에 백업해 둔
+ * 항목은 양쪽 시각이 같아 그냥 넘어가고, 사진은 영영 문서에 남는다.
+ * 이 경우를 찾아내 한 번 더 올리게 한다 — 한 번 옮기고 나면 다시는 걸리지 않는다.
+ */
+export function needsCoverMigration(
+  local: Record<string, any> | undefined,
+  remote: Record<string, any> | undefined,
+  field: CoverField,
+): boolean {
+  if (!local || !remote) return false;
+  // 문서에 그림이 있는데 Storage 위치가 없다 = 아직 안 옮겨졌다
+  return !!remote[field.dataKey] && !remote[field.pathKey] && !!local[field.dataKey];
+}
