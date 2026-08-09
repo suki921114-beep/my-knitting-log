@@ -6,6 +6,10 @@
 //   · 확대는 크게. 도안 차트는 칸이 작아 기본 크기로는 안 보인다.
 //   · 마지막으로 보던 장을 기억한다. 앱을 닫았다 열 때마다 1장부터면 못 쓴다.
 //
+// 두 가지 모양으로 쓴다.
+//   PdfSurface — 주어진 자리를 채운다. 화면을 반으로 갈라 쓰는 뜨기 모드용.
+//   PdfViewer  — 화면 전체를 덮는다. 도안만 볼 때.
+//
 // pdf.js 는 필요할 때만 불러온다 (동적 import). 도안을 한 번도 안 여는 사람이
 // 1.5MB 를 같이 받을 이유가 없다.
 
@@ -14,13 +18,6 @@ import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Loader2 } from 'lucide-react';
 import type { PatternFile } from '@/lib/db';
 
-interface Props {
-  file: PatternFile;
-  /** 마지막으로 보던 장을 기억해 둘 열쇠 — 대개 도안 id */
-  rememberKey?: string;
-  onClose: () => void;
-}
-
 /** 확대 배율 — 손가락으로 누르기 좋게 띄엄띄엄 둔다 */
 const ZOOM_STEPS = [1, 1.5, 2, 3, 4];
 
@@ -28,7 +25,32 @@ function pageMemoryKey(k?: string) {
   return k ? `pdfPage:${k}` : null;
 }
 
-export default function PdfViewer({ file, rememberKey, onClose }: Props) {
+/** 파일을 기기에 내려받는다 */
+export function downloadPatternFile(file: { name: string; blob: Blob }) {
+  const url = URL.createObjectURL(file.blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name || '도안.pdf';
+  a.click();
+  // 바로 지우면 저장이 시작되기 전에 주소가 사라지는 기기가 있다
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+interface SurfaceProps {
+  file: PatternFile;
+  /** 마지막으로 보던 장을 기억해 둘 열쇠 — 대개 도안 id */
+  rememberKey?: string;
+  className?: string;
+}
+
+/**
+ * 도안을 그리는 부분. 부모가 준 자리를 그대로 채운다.
+ *
+ * ⚠️ 부모는 반드시 높이가 정해져 있어야 한다 (h-full 이나 flex-1).
+ *    높이가 내용에 따라 늘어나는 자리에 두면 캔버스와 부모가 서로를 밀며
+ *    끝없이 커진다.
+ */
+export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // pdf.js 문서 객체. 타입을 가져오려면 pdf.js 를 위에서 import 해야 해서
@@ -47,6 +69,9 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
   useEffect(() => {
     let alive = true;
     let doc: any = null;
+
+    setLoading(true);
+    setError(null);
 
     (async () => {
       try {
@@ -101,7 +126,7 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
       const p = await doc.getPage(page);
       const base = p.getViewport({ scale: 1 });
 
-      // 화면 너비에 맞춘 뒤 확대 배율을 곱한다. 여기에 기기 화소비를 한 번 더
+      // 자리 너비에 맞춘 뒤 확대 배율을 곱한다. 여기에 기기 화소비를 한 번 더
       // 곱해야 글자가 흐려지지 않는다 — 다만 너무 키우면 메모리를 다 먹으므로
       // 2배까지만 쓴다.
       const boxWidth = scrollRef.current?.clientWidth ?? window.innerWidth;
@@ -112,7 +137,7 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
 
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
-      // 화면에 보이는 크기는 화소비를 뺀 값. 이래야 1배가 '화면 폭에 꽉' 이 된다.
+      // 화면에 보이는 크기는 화소비를 뺀 값. 이래야 1배가 '자리 폭에 꽉' 이 된다.
       canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
       canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
 
@@ -137,11 +162,31 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
     if (!loading && !error) void draw();
   }, [draw, loading, error]);
 
-  // 화면을 돌리면 폭이 달라진다. 다시 그려야 한다.
+  // 자리 크기가 달라지면 다시 그린다.
+  // 화면을 돌릴 때뿐 아니라, 뜨기 모드에서 칸막이를 끌어 나눌 때도 바뀐다 —
+  // window resize 만 보면 칸막이를 옮겨도 도안 크기가 그대로다.
   useEffect(() => {
-    const onResize = () => void draw();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') {
+      const onResize = () => void draw();
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }
+
+    // 끄는 동안 매 픽셀마다 다시 그리면 버벅인다. 손을 멈춘 뒤에 한 번만 그린다.
+    let timer: ReturnType<typeof setTimeout>;
+    let lastWidth = el.clientWidth;
+    const ob = new ResizeObserver(() => {
+      if (el.clientWidth === lastWidth) return;
+      lastWidth = el.clientWidth;
+      clearTimeout(timer);
+      timer = setTimeout(() => void draw(), 150);
+    });
+    ob.observe(el);
+    return () => {
+      clearTimeout(timer);
+      ob.disconnect();
+    };
   }, [draw]);
 
   // 보던 자리 기억
@@ -155,58 +200,9 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
     scrollRef.current?.scrollTo({ top: 0, left: 0 });
   }, [page]);
 
-  // ESC 로 닫기 + 뒤 화면 스크롤 잠금
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') setPage(p => Math.max(1, p - 1));
-      if (e.key === 'ArrowRight') setPage(p => Math.min(pageCount || 1, p + 1));
-    };
-    document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose, pageCount]);
-
-  function download() {
-    const url = URL.createObjectURL(file.blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name || '도안.pdf';
-    a.click();
-    // 바로 지우면 저장이 시작되기 전에 주소가 사라지는 기기가 있다
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }
-
-  const body = (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-neutral-900">
-      {/* 위 — 파일 이름과 닫기 */}
-      <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top,0px))]">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-semibold text-white">{file.name}</div>
-        </div>
-        <button
-          type="button"
-          onClick={download}
-          aria-label="내려받기"
-          className="rounded-full p-2 text-white/80 hover:bg-white/10"
-        >
-          <Download className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="닫기"
-          className="rounded-full p-2 text-white/80 hover:bg-white/10"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* 가운데 — 도안 */}
+  return (
+    <div className={`flex min-h-0 flex-col ${className}`}>
+      {/* 도안 */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto overscroll-contain p-2">
         {loading ? (
           <div className="flex h-full items-center justify-center gap-2 text-white/70">
@@ -224,9 +220,9 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
         )}
       </div>
 
-      {/* 아래 — 장 넘기기와 확대 */}
+      {/* 장 넘기기와 확대 */}
       {!loading && !error && (
-        <div className="flex shrink-0 items-center gap-1 border-t border-white/10 px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2">
+        <div className="flex shrink-0 items-center gap-1 border-t border-white/10 px-2 py-1.5">
           <button
             type="button"
             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -288,6 +284,59 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+interface Props extends SurfaceProps {
+  onClose: () => void;
+}
+
+/** 화면 전체를 덮는 뷰어 */
+export default function PdfViewer({ file, rememberKey, onClose }: Props) {
+  // ESC 로 닫기 + 뒤 화면 스크롤 잠금
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const body = (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-neutral-900">
+      <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top,0px))]">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-semibold text-white">{file.name}</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => downloadPatternFile(file)}
+          aria-label="내려받기"
+          className="rounded-full p-2 text-white/80 hover:bg-white/10"
+        >
+          <Download className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="닫기"
+          className="rounded-full p-2 text-white/80 hover:bg-white/10"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <PdfSurface
+        file={file}
+        rememberKey={rememberKey}
+        className="flex-1 pb-[env(safe-area-inset-bottom,0px)]"
+      />
     </div>
   );
 

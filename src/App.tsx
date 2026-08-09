@@ -36,6 +36,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import About from "./pages/About";
 import GaugeCalculator from "./pages/GaugeCalculator";
+import KnitMode from "./pages/KnitMode";
 import NotFound from "./pages/NotFound.tsx";
 import Login from "./pages/Login";
 import { AuthProvider } from "./hooks/useAuth";
@@ -75,6 +76,8 @@ const App = () => (
             <Route path="/projects/new" element={<ProjectForm />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/projects/:id/edit" element={<ProjectForm />} />
+            {/* 뜨기 모드 — 화면을 갈라 위는 카운터, 아래는 도안 */}
+            <Route path="/projects/:id/knit" element={<KnitMode />} />
             <Route path="/library" element={<LibraryHub />} />
             <Route path="/library/yarns" element={<Yarns />} />
             <Route path="/library/yarns/new" element={<YarnForm />} />

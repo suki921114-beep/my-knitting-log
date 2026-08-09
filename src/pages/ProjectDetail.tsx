@@ -314,6 +314,16 @@ export default function ProjectDetail() {
         )}
       </div>
 
+      {/* 도안을 보며 단수를 세는 화면으로. 도안 PDF 가 있을 때만 내놓는다. */}
+      {patternLinks.some(l => patternFileIds.has(l.patternId)) && (
+        <Link
+          to={`/projects/${pid}/knit`}
+          className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-primary-soft py-3 text-[13px] font-bold text-primary"
+        >
+          <FileText className="h-4 w-4" /> 도안 보며 뜨기
+        </Link>
+      )}
+
       {/* 뜨면서 쓰는 도구는 맨 아래. 안 쓰면 아예 안 나온다. */}
       <RowCounterSection projectId={pid} mode="view" />
 

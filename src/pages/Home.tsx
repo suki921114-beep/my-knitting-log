@@ -16,6 +16,7 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  FileText,
 } from 'lucide-react';
 
 function getGreeting(): string {
@@ -332,6 +333,16 @@ function CarouselArrow({
 function HeroCard({ project, counter }: { project: Project; counter?: RowCounter }) {
   const nav = useNavigate();
   const cover = coverPhotoUrl(project.photos);
+
+  // 이 프로젝트에 PDF 도안이 걸려 있는지.
+  // ⚠️ 파일 자체는 안 읽는다 — 홈을 열 때마다 수십 MB 를 읽게 된다.
+  //    있는지 없는지만 알면 버튼을 보일지 정할 수 있다.
+  const hasPatternFile = useLiveQuery(async () => {
+    const links = await db.projectPatterns.where('projectId').equals(project.id!).toArray();
+    if (!links.length) return false;
+    const n = await db.patternFiles.where('patternId').anyOf(links.map(l => l.patternId)).count();
+    return n > 0;
+  }, [project.id]) ?? false;
   const pct =
     counter?.goal && counter.goal > 0
       ? Math.min(100, Math.round((counter.count / counter.goal) * 100))
@@ -413,6 +424,17 @@ function HeroCard({ project, counter }: { project: Project; counter?: RowCounter
           >
             <Plus className="h-3.5 w-3.5" /> 단수 카운터 만들기
           </button>
+        )}
+
+        {/* 도안을 보며 단수를 세는 화면. 도안이 있을 때만 내놓는다 —
+            없는데 버튼만 있으면 눌러보고 빈 화면을 만난다. */}
+        {hasPatternFile && (
+          <Link
+            to={`/projects/${project.id}/knit`}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary-soft py-2.5 text-[12px] font-semibold text-primary"
+          >
+            <FileText className="h-3.5 w-3.5" /> 도안 보며 뜨기
+          </Link>
         )}
 
         <Link
