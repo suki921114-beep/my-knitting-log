@@ -53,7 +53,12 @@ export default function Yarns() {
     [stats],
   );
 
-  // 아무도 종류를 안 적어뒀으면 거를 것도 없다
+  // 종류를 하나라도 적어둔 실이 있는지.
+  //
+  // 예전에는 이 값이 false 면 종류 고르개를 아예 감췄다. '고를 게 없는 필터는
+  // 감추자' 는 생각이었는데, 결과는 반대였다 — 아무도 종류를 안 적어둔 상태에서
+  // 고르개가 안 보이니 그런 기능이 없는 줄 알고, 그래서 아무도 안 적고,
+  // 그래서 계속 안 보였다. 지금은 늘 내놓고 대신 안내로 길을 알려 준다.
   const hasDyeType = useMemo(() => stats.some(s => !!s.yarn.dyeType), [stats]);
 
   const brands = useMemo(
@@ -107,17 +112,15 @@ export default function Yarns() {
         </select>
         {/* 염색실만 모아 보고 합사할 실을 고르는 흐름. 염색실 브랜드가 많아
             브랜드로 찾기는 어렵다는 의견에서 나왔다. */}
-        {hasDyeType && (
-          <select
-            value={dyeType}
-            onChange={e => setDyeType(e.target.value)}
-            aria-label="실 종류"
-            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground"
-          >
-            <option value="all">전체 종류</option>
-            {YARN_DYE_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-        )}
+        <select
+          value={dyeType}
+          onChange={e => setDyeType(e.target.value)}
+          aria-label="실 종류"
+          className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground"
+        >
+          <option value="all">전체 종류</option>
+          {YARN_DYE_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
         {/* 정렬 기준이 다섯 가지가 되어 눌러 넘기는 방식으로는 원하는 걸 찾기 어렵다 */}
         <div className="relative inline-flex items-center">
           <ArrowUpDown className="pointer-events-none absolute left-3 h-3 w-3 text-foreground" />
@@ -154,9 +157,23 @@ export default function Yarns() {
         <div className="ml-auto"><ViewToggle value={view} onChange={setView} /></div>
       </div>
 
-      {filtered.length === 0 ? (
+      {stats.length === 0 ? (
         <div className="card-soft">
           <EmptyState title="아직 등록된 실이 없어요" sub="가지고 있는 실을 등록해 두면 잔량이 자동으로 계산돼요." mood="sleepy" />
+        </div>
+      ) : filtered.length === 0 ? (
+        // 실은 있는데 조건에 안 걸린 경우. 예전에는 여기서도 '등록된 실이 없어요'
+        // 라고 해서, 거르개를 걸어둔 걸 잊으면 실을 다 잃은 줄 알았다.
+        <div className="rounded-2xl bg-secondary/50 px-4 py-8 text-center">
+          <p className="text-[12.5px] text-muted-foreground">조건에 맞는 실이 없어요.</p>
+          {dyeType !== 'all' && !hasDyeType && (
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
+              아직 어떤 실에도 종류를 정해두지 않으셨어요.
+              <br />
+              실을 수정해서 <strong className="text-foreground">일반실 / 염색실</strong>을 골라두면
+              여기서 나눠 볼 수 있어요.
+            </p>
+          )}
         </div>
       ) : view === 'list' ? (
         <ul className="space-y-2">

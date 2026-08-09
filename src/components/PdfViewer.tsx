@@ -18,8 +18,36 @@ import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Loader2 } from 'lucide-react';
 import type { PatternFile } from '@/lib/db';
 
-/** 확대 배율 — 손가락으로 누르기 좋게 띄엄띄엄 둔다 */
-const ZOOM_STEPS = [1, 1.5, 2, 3, 4];
+// ── 확대 ──────────────────────────────────────────────────────────────────
+// 확대는 '어디를' 이 중요하다. 도안에서 보고 싶은 건 지금 뜨는 부분이지
+// 페이지 한가운데가 아니다. 그래서 배율을 바꿀 때 기준점을 잡아 두고,
+// 다시 그린 뒤 그 점이 같은 자리에 오도록 스크롤을 옮긴다.
+//
+// 기준점은 셋 중 하나다.
+//   버튼   — 지금 보고 있는 화면의 한가운데
+//   두 번 톡 — 톡 한 자리
+//   손가락 벌리기 — 두 손가락 사이
+
+/** 버튼으로 오갈 배율 */
+const ZOOM_PRESETS = [1, 1.5, 2, 3, 4, 6];
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 6;
+/** 두 번 톡 했을 때 커지는 배율 */
+const DOUBLE_TAP_ZOOM = 2.5;
+
+const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
+/**
+ * 다시 그린 뒤 되찾을 기준점.
+ *   fx, fy — 도안 안에서의 자리 (0~1). 배율이 바뀌어도 그대로다.
+ *   ax, ay — 화면(보이는 칸) 안에서의 자리. 이 점이 안 움직여야 한다.
+ */
+interface ZoomAnchor {
+  fx: number;
+  fy: number;
+  ax: number;
+  ay: number;
+}
 
 function pageMemoryKey(k?: string) {
   return k ? `pdfPage:${k}` : null;
@@ -60,7 +88,10 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
 
   const [pageCount, setPageCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [zoomIdx, setZoomIdx] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  /** 손가락을 벌리는 동안만 쓰는 미리보기 배율 (실제로 다시 그리지는 않는다) */
+  const [liveScale, setLiveScale] = useState(1);
+  const anchorRef = useRef<ZoomAnchor | null>(null);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +142,67 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
     };
   }, [file, rememberKey]);
 
+  /**
+   * 지금 화면의 어느 점을 붙잡을지 정해 둔다.
+   * clientX/Y 를 안 주면 보이는 칸의 한가운데를 잡는다.
+   *
+   * ⚠️ 손가락으로 벌리는 중(liveScale ≠ 1)에는 부르면 안 된다. 화면에 보이는
+   *    크기가 실제로 그려진 크기와 달라서 자리가 어긋난다. 벌리기 시작할 때
+   *    미리 잡아 둔다.
+   */
+  const captureAnchor = useCallback((clientX?: number, clientY?: number) => {
+    const box = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (!box || !canvas) return;
+
+    const boxRect = box.getBoundingClientRect();
+    const cRect = canvas.getBoundingClientRect();
+    const px = clientX ?? boxRect.left + boxRect.width / 2;
+    const py = clientY ?? boxRect.top + boxRect.height / 2;
+
+    // 도안 밖을 잡으면(좌우 여백) 가장자리로 당겨 둔다
+    const unit = (v: number, min: number, size: number) =>
+      size > 0 ? Math.max(0, Math.min(1, (v - min) / size)) : 0.5;
+
+    anchorRef.current = {
+      fx: unit(px, cRect.left, cRect.width),
+      fy: unit(py, cRect.top, cRect.height),
+      ax: px - boxRect.left,
+      ay: py - boxRect.top,
+    };
+  }, []);
+
+  /** 새로 그린 크기에 맞춰 붙잡아 둔 점을 제자리로 되돌린다 */
+  const restoreAnchor = useCallback(() => {
+    const a = anchorRef.current;
+    const box = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (!a || !box || !canvas) return;
+    anchorRef.current = null;
+
+    const boxRect = box.getBoundingClientRect();
+    const cRect = canvas.getBoundingClientRect();
+    // 그 점이 지금 화면 어디에 있고, 어디에 있어야 하는가
+    box.scrollLeft += cRect.left + a.fx * cRect.width - (boxRect.left + a.ax);
+    box.scrollTop += cRect.top + a.fy * cRect.height - (boxRect.top + a.ay);
+  }, []);
+
+  /**
+   * 기준점을 잡고 배율을 바꾼다.
+   *
+   * ⚠️ 기준점 잡기를 setZoom 안에서 하면 안 된다. 화면을 그리는 중에 끼어드는
+   *    일이 되어, React 가 갱신 함수를 두 번 부르는 경우 두 번 잡힌다.
+   */
+  const zoomTo = useCallback(
+    (next: number, clientX?: number, clientY?: number) => {
+      const target = clampZoom(next);
+      if (Math.abs(zoom - target) < 0.001) return;
+      captureAnchor(clientX, clientY);
+      setZoom(target);
+    },
+    [zoom, captureAnchor],
+  );
+
   // ── 한 장 그리기 ───────────────────────────────────────────────────────
   const draw = useCallback(async () => {
     const doc = docRef.current;
@@ -132,7 +224,6 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
       const boxWidth = scrollRef.current?.clientWidth ?? window.innerWidth;
       const fit = Math.max(boxWidth - 16, 200) / base.width;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const zoom = ZOOM_STEPS[zoomIdx];
       const viewport = p.getViewport({ scale: fit * zoom * dpr });
 
       canvas.width = Math.floor(viewport.width);
@@ -140,6 +231,10 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
       // 화면에 보이는 크기는 화소비를 뺀 값. 이래야 1배가 '자리 폭에 꽉' 이 된다.
       canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
       canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
+
+      // 크기가 정해진 바로 이때 스크롤을 옮긴다. 그림이 다 그려질 때까지
+      // 기다리면 잠깐 엉뚱한 자리가 보였다가 튄다.
+      restoreAnchor();
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -156,7 +251,7 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
     } finally {
       setRendering(false);
     }
-  }, [page, zoomIdx]);
+  }, [page, zoom, restoreAnchor]);
 
   useEffect(() => {
     if (!loading && !error) void draw();
@@ -200,10 +295,108 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
     scrollRef.current?.scrollTo({ top: 0, left: 0 });
   }, [page]);
 
+  // ── 손가락 ─────────────────────────────────────────────────────────────
+  // 벌리기(확대)와 두 번 톡(확대/되돌리기)을 직접 받는다.
+  // 한 손가락으로 끄는 것은 건드리지 않는다 — 브라우저가 알아서 스크롤한다.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; zoom: number } | null>(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+
+  function pointerPair() {
+    const [a, b] = [...pointers.current.values()];
+    return a && b ? { a, b } : null;
+  }
+  function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pair = pointerPair();
+    if (pair && !pinch.current) {
+      // 벌리기 시작. 기준점은 지금 두 손가락 사이 —
+      // 미리보기(liveScale)가 걸리기 전인 지금 잡아야 자리가 안 어긋난다.
+      captureAnchor((pair.a.x + pair.b.x) / 2, (pair.a.y + pair.b.y) / 2);
+      pinch.current = { dist: distance(pair.a, pair.b), zoom };
+      lastTap.current = null;
+    }
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pair = pointerPair();
+    if (!pair || !pinch.current) return;
+    // 벌린 만큼 미리 키워 보여만 준다. 매 순간 다시 그리면 버벅인다.
+    const k = distance(pair.a, pair.b) / (pinch.current.dist || 1);
+    setLiveScale(clampZoom(pinch.current.zoom * k) / pinch.current.zoom);
+  }
+
+  function endPinch() {
+    const start = pinch.current;
+    pinch.current = null;
+    if (!start) return;
+    // 손을 뗀 배율로 실제로 다시 그린다. 기준점은 시작할 때 잡아 둔 것.
+    const next = clampZoom(start.zoom * liveScale);
+    setLiveScale(1);
+    if (Math.abs(zoom - next) < 0.001) {
+      // 배율이 그대로면 다시 그릴 일이 없다 — 잡아 둔 기준점도 버린다
+      anchorRef.current = null;
+      return;
+    }
+    setZoom(next);
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    const p = pointers.current.get(e.pointerId);
+    pointers.current.delete(e.pointerId);
+
+    if (pinch.current) {
+      if (pointers.current.size < 2) endPinch();
+      return;
+    }
+    if (!p) return;
+
+    // 두 번 톡 — 손가락 하나로, 짧은 사이에, 거의 같은 자리를
+    const now = Date.now();
+    const prev = lastTap.current;
+    const near = prev && Math.hypot(prev.x - e.clientX, prev.y - e.clientY) < 30;
+    if (prev && near && now - prev.t < 300) {
+      lastTap.current = null;
+      zoomTo(zoom > 1.01 ? 1 : DOUBLE_TAP_ZOOM, e.clientX, e.clientY);
+    } else {
+      lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+    }
+  }
+
+  function onPointerCancel(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    if (pinch.current && pointers.current.size < 2) endPinch();
+  }
+
+  /** 버튼용 — 다음/이전 눈금으로 */
+  function stepZoom(dir: 1 | -1) {
+    const next =
+      dir > 0
+        ? ZOOM_PRESETS.find(z => z > zoom + 0.01) ?? MAX_ZOOM
+        : [...ZOOM_PRESETS].reverse().find(z => z < zoom - 0.01) ?? MIN_ZOOM;
+    zoomTo(next);
+  }
+
   return (
     <div className={`flex min-h-0 flex-col ${className}`}>
-      {/* 도안 */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto overscroll-contain p-2">
+      {/* 도안.
+          touchAction 을 pan 으로 묶어 두면 브라우저가 두 손가락 벌리기를
+          '앱 전체 확대' 로 가져가지 않는다. 한 손가락 끌기(스크롤)는 그대로다. */}
+      <div
+        ref={scrollRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        style={{ touchAction: 'pan-x pan-y' }}
+        className="min-h-0 flex-1 overflow-auto overscroll-contain p-2"
+      >
         {loading ? (
           <div className="flex h-full items-center justify-center gap-2 text-white/70">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -215,7 +408,12 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
           </div>
         ) : (
           <div className="flex justify-center">
-            <canvas ref={canvasRef} className="rounded bg-white shadow-lg" />
+            <canvas
+              ref={canvasRef}
+              className="rounded bg-white shadow-lg"
+              // 손가락을 벌리는 동안만 늘려 보여준다. 손을 떼면 그 배율로 다시 그린다.
+              style={liveScale === 1 ? undefined : { transform: `scale(${liveScale})` }}
+            />
           </div>
         )}
       </div>
@@ -253,20 +451,26 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
 
           <button
             type="button"
-            onClick={() => setZoomIdx(i => Math.max(0, i - 1))}
-            disabled={zoomIdx <= 0}
+            onClick={() => stepZoom(-1)}
+            disabled={zoom <= MIN_ZOOM + 0.01}
             aria-label="축소"
             className="rounded-full p-2 text-white/80 disabled:opacity-30"
           >
             <ZoomOut className="h-5 w-5" />
           </button>
-          <span className="w-8 text-center text-[11px] tabular-nums text-white/60">
-            {ZOOM_STEPS[zoomIdx]}x
-          </span>
+          {/* 눌러서 원래 크기로 — 많이 키워 놓고 되돌릴 때 버튼을 여러 번 안 눌러도 된다 */}
           <button
             type="button"
-            onClick={() => setZoomIdx(i => Math.min(ZOOM_STEPS.length - 1, i + 1))}
-            disabled={zoomIdx >= ZOOM_STEPS.length - 1}
+            onClick={() => zoomTo(1)}
+            aria-label="원래 크기로"
+            className="w-9 text-center text-[11px] tabular-nums text-white/60"
+          >
+            {zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x
+          </button>
+          <button
+            type="button"
+            onClick={() => stepZoom(1)}
+            disabled={zoom >= MAX_ZOOM - 0.01}
             aria-label="확대"
             className="rounded-full p-2 text-white/80 disabled:opacity-30"
           >

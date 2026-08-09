@@ -16,7 +16,7 @@
 //    src/lib/appVersion.ts 의 APP_VERSION 을 올릴 때 이 값도 같이 올릴 것.
 //    (빌드가 이 파일을 그대로 복사하므로 여기서 import 할 수 없다)
 
-const CACHE = 'knit-app-v1.7.0';
+const CACHE = 'knit-app-v1.7.1';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
