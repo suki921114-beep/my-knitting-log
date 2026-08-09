@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readNeedle, writeNeedle, describeNeedle, needleKindOf, splitSizes, formatNeedleSize } from '@/lib/needleType';
+import { readNeedle, writeNeedle, describeNeedle, needleKindOf, splitSizes, formatNeedleSize, parseQuickSizes } from '@/lib/needleType';
 
 // ----------------------------------------------------------------------------
 // 바늘 종류 — 골라 담기로 바꾸면서 옛 기록이 다치지 않는지
@@ -160,5 +160,44 @@ describe('formatNeedleSize', () => {
   it('비었으면 빈 값', () => {
     expect(formatNeedleSize('')).toBe('');
     expect(formatNeedleSize(undefined)).toBe('');
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 호수만 적었을 때 바로 만들기
+// ----------------------------------------------------------------------------
+// 검색창에 적은 글이 '찾으려는 것' 인지 '만들려는 것' 인지를 가른다.
+// 잘못 가르면 검색하려던 사람에게 만들기 버튼이 튀어나온다.
+
+describe('바늘 간편 입력', () => {
+  it('숫자만 적으면 mm 를 붙여 돌려준다', () => {
+    expect(parseQuickSizes('4')).toEqual(['4mm']);
+    expect(parseQuickSizes('3.5')).toEqual(['3.5mm']);
+  });
+
+  it('mm 를 붙여 적어도 받는다', () => {
+    expect(parseQuickSizes('4.0mm')).toEqual(['4.0mm']);
+    expect(parseQuickSizes('4 mm')).toEqual(['4mm']);
+  });
+
+  it('쉼표나 띄어쓰기로 여러 개', () => {
+    expect(parseQuickSizes('3.5, 4, 4.5')).toEqual(['3.5mm', '4mm', '4.5mm']);
+    expect(parseQuickSizes('3.5 4')).toEqual(['3.5mm', '4mm']);
+  });
+
+  it('같은 호수를 두 번 적어도 하나만', () => {
+    expect(parseQuickSizes('4, 4.0')).toEqual(['4mm', '4.0mm']);
+    expect(parseQuickSizes('4, 4')).toEqual(['4mm']);
+  });
+
+  it('글자가 섞이면 만들기가 아니라 검색이다', () => {
+    expect(parseQuickSizes('치아오구 4')).toBeNull();
+    expect(parseQuickSizes('5호')).toBeNull();
+    expect(parseQuickSizes('줄바늘')).toBeNull();
+  });
+
+  it('비었으면 아무것도 아니다', () => {
+    expect(parseQuickSizes('')).toBeNull();
+    expect(parseQuickSizes('   ')).toBeNull();
   });
 });

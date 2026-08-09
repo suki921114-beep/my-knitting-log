@@ -60,7 +60,27 @@ export const YARN_WEIGHTS = [
 export const YARN_DYE_TYPES = ['일반실', '염색실'] as const;
 
 /** 어떤 뜨기로 잰 게이지인지 */
-export const GAUGE_PATTERNS = ['무메', '무늬'] as const;
+export const GAUGE_PATTERNS = ['메리야스', '무늬'] as const;
+
+/**
+ * 세탁 전인지 후인지.
+ *
+ * 같은 실 같은 바늘이라도 물에 담갔다 말리면 코가 자리를 잡으면서 게이지가
+ * 달라진다. 도안이 어느 쪽 기준인지 모르고 맞추면 옷이 통째로 커지거나 작아진다.
+ */
+export const GAUGE_WASH_STATES = ['세탁 전', '세탁 후'] as const;
+
+/**
+ * 게이지를 잰 뜨기 이름.
+ *
+ * 처음에 '무메' 라고 적어두었는데 쓰는 사람이 알아보기 어려운 줄임말이라
+ * '메리야스' 로 바꿨다. 이미 저장된 값이 있으니 읽을 때 바꿔준다 —
+ * 데이터를 통째로 고치면 기기마다 시점이 어긋나 클라우드에서 부딪힌다.
+ */
+export function gaugePatternLabel(value?: string): string | undefined {
+  if (!value) return undefined;
+  return value === '무메' ? '메리야스' : value;
+}
 
 /**
  * 다 쓴 실인지.

@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { useYarnRemaining, gramsToMeters, formatMeters, yarnRecommendations } from '@/lib/yarnCalc';
+import { useYarnRemaining, gramsToMeters, formatMeters, yarnRecommendations, gaugePatternLabel } from '@/lib/yarnCalc';
 import { formatNeedleSize } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, ExternalLink, Scale, Ruler, CheckCircle2, RotateCcw } from 'lucide-react';
@@ -163,8 +163,9 @@ export default function YarnDetail() {
         <section className="space-y-2">
           <h2 className="section-title">게이지 정보</h2>
           <div className="space-y-2">
-            {recs.map(r => (
-              <div key={r.strands} className="card-soft flex items-center gap-3 p-3.5">
+            {/* 같은 겹수라도 세탁 전후로 두 줄이 될 수 있어 key 에 조건을 모두 넣는다 */}
+            {recs.map((r, i) => (
+              <div key={`${r.strands}-${r.gaugePattern ?? ''}-${r.washState ?? ''}-${i}`} className="card-soft flex items-center gap-3 p-3.5">
                 <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-[11.5px] font-bold text-primary">
                   {r.strands}겹
                 </span>
@@ -174,8 +175,8 @@ export default function YarnDetail() {
                     <div className="truncate text-[13px] font-semibold text-ink">{formatNeedleSize(r.needleSize) || '—'}</div>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10.5px] font-medium text-muted-foreground">
-                      게이지{r.gaugePattern && ` · ${r.gaugePattern}`}
+                    <div className="truncate text-[10.5px] font-medium text-muted-foreground">
+                      게이지{[gaugePatternLabel(r.gaugePattern), r.washState].filter(Boolean).map(v => ` · ${v}`).join('')}
                     </div>
                     <div className="truncate text-[13px] font-semibold text-ink">{r.gauge || '—'}</div>
                   </div>

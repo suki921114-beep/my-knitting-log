@@ -3,7 +3,15 @@ import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, Pattern, Needle, Notion } from '@/lib/db';
 import NeedleTypePicker from '@/components/NeedleTypePicker';
-import { describeNeedle, formatNeedleSize, writeNeedle, type NeedleShape } from '@/lib/needleType';
+import {
+  describeNeedle,
+  formatNeedleSize,
+  writeNeedle,
+  parseQuickSizes,
+  NEEDLE_KINDS,
+  type NeedleShape,
+  type NeedleKind,
+} from '@/lib/needleType';
 import { Plus, X, Search, Check } from 'lucide-react';
 
 export type EntityKind = 'pattern' | 'needle' | 'notion';
@@ -73,14 +81,21 @@ export default function EntityPicker<T extends BaseLink>({ kind, links, onChange
   function remove(idx: number) {
     onChange(links.filter((_, i) => i !== idx));
   }
-  function add(refId: number) {
-    if (links.some(l => l.refId === refId)) {
-      setPickerOpen(false);
-      return;
+  /**
+   * 고른 것들을 한 번에 건다.
+   *
+   * 한 개씩 부르면 안 된다 — links 는 이 함수가 만들어진 시점의 값이라
+   * 연달아 부르면 앞의 것이 뒤의 것에 덮여 마지막 하나만 남는다.
+   */
+  function addMany(refIds: number[]) {
+    const have = new Set(links.map(l => l.refId));
+    const fresh = refIds.filter(id => !have.has(id) && !!id);
+    if (fresh.length) {
+      onChange([
+        ...links,
+        ...fresh.map(refId => (kind === 'notion' ? { refId, quantity: 1 } : { refId }) as T),
+      ]);
     }
-    const base: any = { refId };
-    if (kind === 'notion') base.quantity = 1;
-    onChange([...links, base as T]);
     setPickerOpen(false);
   }
 
@@ -154,7 +169,7 @@ export default function EntityPicker<T extends BaseLink>({ kind, links, onChange
           kind={kind}
           items={items as any[]}
           onClose={() => setPickerOpen(false)}
-          onPick={id => add(id)}
+          onPick={ids => addMany(Array.isArray(ids) ? ids : [ids])}
         />
       )}
     </div>
@@ -170,11 +185,14 @@ function PickerModal({
   kind: EntityKind;
   items: any[];
   onClose: () => void;
-  onPick: (id: number) => void;
+  onPick: (ids: number | number[]) => void;
 }) {
   const meta = META[kind];
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
+  // 바늘 간편 입력에서 고른 갈래. 대개 대바늘이라 그것을 기본으로 둔다.
+  const [quickKind, setQuickKind] = useState<NeedleKind>('대바늘');
+  const [quickSaving, setQuickSaving] = useState(false);
 
   // ESC 닫기 + 배경 스크롤 잠금
   useEffect(() => {
@@ -212,6 +230,46 @@ function PickerModal({
     return filtered.slice(0, 3);
   }, [q, filtered]);
 
+  // ── 바늘 간편 입력 ────────────────────────────────────────────────────
+  // 검색창에 호수만 적었으면(4 / 4.0mm / 3.5, 4) 그 자리에서 바로 만든다.
+  // 프로젝트에 바늘을 걸 때 필요한 건 대개 호수 하나뿐인데, 새 바늘 화면을
+  // 열어 종류·브랜드·메모를 다 지나게 하는 건 과하다.
+  const quickSizes = kind === 'needle' ? parseQuickSizes(q) : null;
+
+  async function quickAddSizes(sizes: string[]) {
+    if (quickSaving) return;
+    setQuickSaving(true);
+    try {
+      const t = now();
+      const ids: number[] = [];
+      for (const sizeMm of sizes) {
+        // 이미 같은 갈래·호수가 있으면 새로 만들지 않고 그것을 건다
+        const existing = items.find(
+          (it: any) => it.type === quickKind && (it.sizeMm ?? '').trim() === sizeMm,
+        );
+        if (existing) {
+          ids.push(existing.id);
+          continue;
+        }
+        ids.push(
+          (await db.needles.add({
+            ...writeNeedle({ kind: quickKind }),
+            sizeMm,
+            createdAt: t,
+            updatedAt: t,
+            cloudId: crypto.randomUUID(),
+            isDeleted: false,
+            deletedAt: null,
+          } as Needle)) as number,
+        );
+      }
+      onPick(ids);
+    } catch (e) {
+      console.error('[EntityPicker] 바늘 간편 추가 실패', e);
+      setQuickSaving(false);
+    }
+  }
+
   const body = (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
@@ -239,10 +297,44 @@ function PickerModal({
                 autoFocus
                 value={q}
                 onChange={e => setQ(e.target.value)}
-                placeholder="검색"
+                placeholder={kind === 'needle' ? '검색 · 호수만 적으면 바로 추가' : '검색'}
                 className="w-full rounded-full border bg-background py-2.5 pl-9 pr-4 text-sm outline-none focus:border-primary"
               />
             </div>
+
+            {quickSizes && (
+              <div className="mb-3 rounded-2xl border border-primary/30 bg-primary/5 p-2.5">
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {NEEDLE_KINDS.filter(k => k !== '기타').map(k => (
+                    <button
+                      type="button"
+                      key={k}
+                      onClick={() => setQuickKind(k)}
+                      className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold transition ${
+                        quickKind === k
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground'
+                      }`}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => quickAddSizes(quickSizes)}
+                  disabled={quickSaving}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  {quickSaving ? '추가하는 중…' : `${quickKind} ${quickSizes.join(' · ')} 바로 추가`}
+                </button>
+                <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+                  브랜드나 줄 길이는 나중에 라이브러리에서 채울 수 있어요.
+                </p>
+              </div>
+            )}
+
             <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
               {items.length === 0 ? (
                 <p className="px-2 py-4 text-center text-sm text-muted-foreground">

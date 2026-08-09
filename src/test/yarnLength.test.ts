@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gramsToMeters, formatMeters, remainingGrams, isUsedUp } from '@/lib/yarnCalc';
+import { gramsToMeters, formatMeters, remainingGrams, isUsedUp, gaugePatternLabel } from '@/lib/yarnCalc';
 
 // ----------------------------------------------------------------------------
 // 실 길이 환산 — 콘사처럼 무게로만 파는 실의 총 길이를 대신 계산해 준다
@@ -82,5 +82,28 @@ describe('isUsedUp', () => {
 
   it('남아 있으면 아직 쓸 수 있는 실', () => {
     expect(isUsedUp({}, 50)).toBe(false);
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 게이지를 잰 조건
+// ----------------------------------------------------------------------------
+// '무메' 는 알아보기 어려운 줄임말이라 '메리야스' 로 바꿨다. 이미 저장된 값이
+// 있으니 읽을 때 바꿔 준다 — 데이터를 통째로 고치면 기기마다 시점이 어긋나
+// 클라우드에서 부딪힌다.
+
+describe('게이지 뜨기 이름', () => {
+  it('예전에 저장된 무메는 메리야스로 보여준다', () => {
+    expect(gaugePatternLabel('무메')).toBe('메리야스');
+  });
+
+  it('나머지는 그대로 둔다', () => {
+    expect(gaugePatternLabel('무늬')).toBe('무늬');
+    expect(gaugePatternLabel('메리야스')).toBe('메리야스');
+  });
+
+  it('안 적었으면 없는 값', () => {
+    expect(gaugePatternLabel(undefined)).toBeUndefined();
+    expect(gaugePatternLabel('')).toBeUndefined();
   });
 });

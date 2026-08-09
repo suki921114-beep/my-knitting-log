@@ -92,10 +92,19 @@ export interface YarnRecommendation {
   /** 권장 게이지 (예: "22코 30단 / 10cm") */
   gauge?: string;
   /**
-   * 어떤 뜨기로 잰 게이지인지 — '무메' | '무늬'
+   * 어떤 뜨기로 잰 게이지인지 — '메리야스' | '무늬'
    * 같은 실 같은 바늘이라도 무늬가 들어가면 코수가 달라진다.
+   *
+   * ⚠️ 예전 값은 '무메' 로 저장돼 있다. 읽을 때 gaugePatternLabel() 을 거칠 것.
    */
   gaugePattern?: string;
+  /**
+   * 세탁 전에 잰 값인지 후에 잰 값인지 — '세탁 전' | '세탁 후'
+   *
+   * 실은 물에 담갔다 말리면 코가 자리를 잡으면서 게이지가 달라진다.
+   * 어느 쪽 기준인지 안 적어두면 나중에 도안과 맞출 때 쓸 수 없는 숫자가 된다.
+   */
+  washState?: string;
 }
 
 export interface Yarn extends SyncMetadata {

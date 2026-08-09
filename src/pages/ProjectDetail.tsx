@@ -161,41 +161,6 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <Section title="메모">
-        <div className="card-soft p-3">
-          <textarea
-            value={memo}
-            onChange={e => {
-              setMemo(e.target.value);
-              setMemoDirty(true);
-            }}
-            placeholder="도안에서 바꾼 부분, 파트별로 든 실 양처럼 두고두고 볼 것을 적어두세요."
-            className="min-h-[76px] w-full resize-y bg-transparent text-[13px] leading-relaxed text-ink outline-none placeholder:text-muted-foreground/70"
-          />
-          {memoDirty && (
-            <div className="mt-1 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setMemo(project?.memo ?? '');
-                  setMemoDirty(false);
-                }}
-                className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-muted-foreground"
-              >
-                되돌리기
-              </button>
-              <button
-                type="button"
-                onClick={saveMemo}
-                className="rounded-full bg-primary px-3.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
-              >
-                저장
-              </button>
-            </div>
-          )}
-        </div>
-      </Section>
-
       {/* 완성 소감은 다 만든 뒤에 쓰는 글이라 완성일 때만 내놓는다 */}
       {project.status === 'done' && project.finishedNote && (
         <Section title="완성 소감">
@@ -319,6 +284,43 @@ export default function ProjectDetail() {
       <RowCounterSection projectId={pid} mode="view" />
 
       <ProjectGaugeSection projectId={pid} mode="view" />
+
+      {/* 메모는 제일 아래. 자주 보는 값(사진·실·바늘)을 먼저 지나가게 두고,
+          길게 쓸 수 있는 칸은 맨 끝에 놓는다 — 위에 있으면 화면을 밀어낸다. */}
+      <Section title="메모">
+        <div className="card-soft p-3">
+          <textarea
+            value={memo}
+            onChange={e => {
+              setMemo(e.target.value);
+              setMemoDirty(true);
+            }}
+            placeholder="도안에서 바꾼 부분, 파트별로 든 실 양처럼 두고두고 볼 것을 적어두세요."
+            className="min-h-[76px] w-full resize-y bg-transparent text-[13px] leading-relaxed text-ink outline-none placeholder:text-muted-foreground/70"
+          />
+          {memoDirty && (
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMemo(project?.memo ?? '');
+                  setMemoDirty(false);
+                }}
+                className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-muted-foreground"
+              >
+                되돌리기
+              </button>
+              <button
+                type="button"
+                onClick={saveMemo}
+                className="rounded-full bg-primary px-3.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+              >
+                저장
+              </button>
+            </div>
+          )}
+        </div>
+      </Section>
 
       {lightbox && (
         <div

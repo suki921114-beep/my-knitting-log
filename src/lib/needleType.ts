@@ -136,3 +136,26 @@ export function formatNeedleSize(raw?: string): string {
   if (!s) return '';
   return /^\d+(\.\d+)?$/.test(s) ? `${s}mm` : s;
 }
+
+/**
+ * 적은 글이 '호수뿐' 인지 본다. 맞으면 mm 를 붙여 돌려주고, 아니면 null.
+ *
+ * 프로젝트에 바늘을 걸 때 대개 필요한 건 '4.0mm 대바늘' 한 줄뿐인데,
+ * 지금은 새 바늘 화면을 열어 종류·호수·브랜드를 다 지나야 한다.
+ * 검색창에 숫자만 적었으면 그 자리에서 바로 만들 수 있게 하려는 것.
+ *
+ * 글자가 섞이면 null 이다 — '치아오구 4' 는 찾으려는 것이지 만들려는 게 아니다.
+ * 쉼표나 띄어쓰기로 여러 개도 받는다: '3.5, 4, 4.5'
+ */
+export function parseQuickSizes(query: string): string[] | null {
+  // '4 mm' 처럼 단위를 띄어 적는 사람이 있다. 띄어쓰기로 끊기 전에 먼저 붙여둔다.
+  const parts = query.replace(/\s+mm/gi, 'mm').split(/[,、/\s]+/).map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  const sizes = parts.map(p => {
+    const m = p.match(/^(\d+(?:\.\d+)?)\s*(?:mm)?$/i);
+    return m ? formatNeedleSize(m[1]) : null;
+  });
+  if (!sizes.every((s): s is string => !!s)) return null;
+  // 같은 호수를 두 번 적었어도 하나만 만든다
+  return [...new Set(sizes as string[])];
+}
