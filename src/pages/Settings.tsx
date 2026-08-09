@@ -3,6 +3,7 @@ import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
 import AppInfoDialog from '@/components/AppInfoDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { isProAccount } from '@/lib/entitlement';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import {
@@ -17,6 +18,7 @@ import {
 
 export default function Settings() {
   const { user, logout } = useAuth();
+  const isPro = isProAccount(user);
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
 
@@ -54,9 +56,17 @@ export default function Settings() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <div className="text-[14px] font-bold text-foreground truncate">{user.displayName || '사용자'}</div>
-                  <span className="rounded-md bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-[9px] font-bold text-green-700 dark:text-green-400">
-                    연결됨
-                  </span>
+                  {/* 로그인만으로는 클라우드 백업이 열리지 않는다.
+                      '연결됨' 하나로 뭉뚱그리면 되는 줄 알고 기다리게 된다. */}
+                  {isPro ? (
+                    <span className="rounded-md bg-green-100 px-1.5 py-0.5 text-[9px] font-bold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      클라우드 백업 사용 중
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground">
+                      로그인됨
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11.5px] text-muted-foreground truncate mt-0.5">{user.email}</div>
               </div>
@@ -65,7 +75,7 @@ export default function Settings() {
               onClick={async () => {
                 const ok = await confirm({
                   title: '로그아웃 할까요?',
-                  description: '이 기기의 기록은 그대로 남아요. 다시 로그인하면 클라우드 백업을 이어서 쓸 수 있어요.',
+                  description: '이 기기의 기록은 그대로 남아요. 다시 로그인하면 이어서 쓸 수 있어요.',
                   confirmLabel: '로그아웃',
                   destructive: false,
                 });
@@ -92,7 +102,7 @@ export default function Settings() {
                     OFFLINE
                   </span>
                 </div>
-                <div className="text-[11.5px] text-muted-foreground mt-0.5">데이터를 동기화하려면 로그인하세요</div>
+                <div className="text-[11.5px] text-muted-foreground mt-0.5">기록은 이 기기에 저장돼요</div>
               </div>
             </div>
             <button
@@ -103,6 +113,7 @@ export default function Settings() {
                 <LogIn className="h-4 w-4" />
               </span>
               <div className="flex-1 text-left text-[13.5px] font-semibold text-foreground">계정 연결 (로그인)</div>
+
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
@@ -114,8 +125,8 @@ export default function Settings() {
         <MenuCard
           icon={CloudDownload}
           tone="primary"
-          title="클라우드 백업 · 자동 백업"
-          desc="가져오기, 자동 백업, 마지막 결과, 파일 백업"
+          title={isPro ? '클라우드 백업 · 파일 백업' : '백업'}
+          desc={isPro ? '클라우드에 올리기, 가져오기, 파일로 내보내기' : '파일로 내보내기, 파일에서 가져오기'}
           onClick={() => navigate('/settings/backup')}
         />
       </Section>

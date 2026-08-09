@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import { db, exportAll, importAll } from '@/lib/db';
 import {
@@ -50,6 +51,7 @@ import {
 } from '@/lib/syncRunner';
 import { readUsage, takeSkippedPhotos, takeFailedPhotoDownloads } from '@/lib/cloudUsage';
 import { SHOW_AUTO_BACKUP, SHOW_SYNC_RESULT } from '@/lib/featureFlags';
+import { isProAccount, accountEmail, PRO_CONTACT_PATH } from '@/lib/entitlement';
 import { markCloudBackup, markFileBackup } from '@/lib/backupClock';
 import {
   FREE_QUOTA_BYTES,
@@ -92,6 +94,7 @@ export default function SettingsBackup() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
+  const isPro = isProAccount(user);
   const { confirm, dialog } = useConfirm();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -510,8 +513,12 @@ export default function SettingsBackup() {
         </p>
       </Section>
 
-      {/* 2. 클라우드 백업 액션 카드 */}
-      {user ? (
+      {/* 2. 클라우드 백업 액션 카드 — 이용 권한이 있는 계정에만 연다.
+             권한이 없으면 왜 안 보이는지와 어떻게 신청하는지를 대신 보여준다.
+             아무 말 없이 사라지면 고장 난 줄 안다. */}
+      {user && !isPro ? (
+        <ProLockedCard email={accountEmail(user)} />
+      ) : user ? (
         <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
           <div className="p-4">
             <h3 className="flex items-center gap-2 text-[14px] font-bold text-foreground">
@@ -558,7 +565,12 @@ export default function SettingsBackup() {
         </div>
       ) : (
         <div className="card-soft p-4 text-center">
-          <p className="text-[13px] text-muted-foreground">클라우드 백업은 로그인 후 사용할 수 있어요.</p>
+          <p className="text-[13px] font-semibold text-foreground">클라우드 백업</p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+            기기를 바꾸거나 앱을 지워도 기록과 사진이 남습니다.
+            <br />
+            신청하신 분께 열어드리는 기능이라 로그인이 필요해요.
+          </p>
           <div className="mt-2 flex justify-center">
             <PhotoWarningPopover label="사진 백업 안내" />
           </div>
@@ -566,7 +578,7 @@ export default function SettingsBackup() {
       )}
 
       {/* 자동 백업 — 추후 프리미엄 기능으로 검토 중이라 UI 만 감춰 둔다 (코드는 유지) */}
-      {SHOW_AUTO_BACKUP && user && (
+      {SHOW_AUTO_BACKUP && user && isPro && (
         <AutoSyncSection mode={autoMode} onChange={handleAutoModeChange} dirty={dirty} lastAutoBackup={lastAutoBackup} />
       )}
 
@@ -983,6 +995,71 @@ function DiffTable({
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 권한이 없는 계정에 보여줄 자리.
+ *
+ * 그냥 감추면 "로그인했는데 아무것도 없다" 가 되어 고장으로 읽힌다.
+ * 왜 안 보이는지, 열려면 무엇을 하면 되는지, 그동안 무엇으로 대신하면 되는지
+ * 셋을 다 적는다. 특히 마지막이 중요하다 — 파일 백업은 누구나 쓸 수 있다.
+ */
+function ProLockedCard({ email }: { email: string }) {
+  const navigate = useNavigate();
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(email);
+      toast.success('이메일 주소를 복사했어요');
+    } catch {
+      // 클립보드를 막아 둔 브라우저도 있다. 화면에 적혀 있으니 보고 옮기면 된다.
+      toast.error('복사하지 못했어요', { description: '화면의 주소를 직접 적어 주세요.' });
+    }
+  }
+
+  return (
+    <div className="card-soft overflow-hidden p-4">
+      <h3 className="flex items-center gap-2 text-[14px] font-bold text-foreground">
+        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+        클라우드 백업
+        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-secondary-foreground">
+          신청제
+        </span>
+      </h3>
+
+      <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+        기기를 바꾸거나 앱을 지워도 기록과 사진이 남습니다.
+        사진을 맡아 두는 비용이 들어서, 신청하신 분께 하나씩 열어드리고 있어요.
+      </p>
+
+      {email && (
+        <button
+          type="button"
+          onClick={copyEmail}
+          className="mt-3 flex w-full items-center gap-2 rounded-xl bg-secondary/60 px-3 py-2.5 text-left"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-[10.5px] font-semibold text-muted-foreground">지금 로그인한 계정</div>
+            <div className="truncate text-[12.5px] font-semibold text-foreground">{email}</div>
+          </div>
+          <span className="shrink-0 text-[11px] font-semibold text-primary">복사</span>
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={() => navigate(PRO_CONTACT_PATH)}
+        className="mt-2 w-full rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground transition active:scale-[0.98]"
+      >
+        이 주소로 신청하기
+      </button>
+
+      <p className="mt-2.5 text-[11px] leading-relaxed text-muted-foreground">
+        그동안에도 위의 <strong className="text-foreground">파일로 내보내기</strong>로 사진까지
+        통째로 보관할 수 있어요. 기기를 바꾸기 전에 한 번 받아 두세요.
+      </p>
     </div>
   );
 }

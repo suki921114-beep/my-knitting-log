@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
 import { Download, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { isProAccount } from '@/lib/entitlement';
 import { daysSinceLastBackup } from '@/lib/backupClock';
 
 // ----------------------------------------------------------------------------
@@ -39,7 +40,10 @@ function daysSince(iso: string | null): number | null {
 
 export default function BackupReminder() {
   const { user } = useAuth();
-  const signedIn = !!user;
+  // ⚠️ 로그인했다고 사진이 클라우드에 있는 게 아니다. 클라우드 백업은 신청한
+  //    계정만 쓴다. 로그인만 보고 '이미 올라가 있다' 고 말하면 거짓말이 되고,
+  //    그 말을 믿고 파일 백업을 안 받다가 기기를 바꾸면 사진을 잃는다.
+  const signedIn = isProAccount(user);
   const [dismissed, setDismissed] = useState(false);
   // 클라우드 백업과 파일 백업 중 더 최근 것 기준. 한 번도 안 했으면 null.
   const [backupDays, setBackupDays] = useState<number | null | undefined>(undefined);
@@ -100,7 +104,7 @@ export default function BackupReminder() {
               : `마지막 백업이 ${backupDays}일 전이에요.`}{' '}
             {signedIn
               ? '클라우드에 올리거나 파일로 내려받아 두면 기기를 바꿔도 남아요.'
-              : '로그인하지 않으면 사진은 이 기기에만 남아요. 파일로 내보내면 사진까지 통째로 보관할 수 있어요.'}
+              : '사진은 지금 이 기기에만 있어요. 파일로 내보내면 사진까지 통째로 보관할 수 있어요.'}
           </p>
           <Link
             to="/settings/backup"
