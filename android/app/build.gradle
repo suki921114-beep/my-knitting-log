@@ -9,8 +9,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionCode 는 업로드할 때마다 반드시 +1. 되돌리거나 재사용할 수 없다.
         // versionName 은 src/lib/appVersion.ts 의 APP_VERSION 과 항상 같게 유지할 것.
-        versionCode 30
-        versionName "1.7.1"
+        versionCode 31
+        versionName "1.7.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
