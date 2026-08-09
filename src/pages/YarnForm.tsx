@@ -7,7 +7,13 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { ImageInput } from '@/components/ImageInput';
 import { toast } from '@/components/ui/sonner';
 import { Plus, Save, Trash2 } from 'lucide-react';
-import { gramsToMeters, formatMeters, yarnRecommendations } from '@/lib/yarnCalc';
+import {
+  gramsToMeters,
+  formatMeters,
+  yarnRecommendations,
+  YARN_WEIGHTS,
+  YARN_DYE_TYPES,
+} from '@/lib/yarnCalc';
 
 export default function YarnForm() {
   const { id } = useParams();
@@ -19,10 +25,12 @@ export default function YarnForm() {
 
   const [f, setF] = useState({
     name: '', brand: '', colorName: '', colorCode: '', shop: '', link: '', fiber: '', weight: '',
-    totalGrams: '', metersPer100g: '', note: '',
+    plySpec: '', dyeType: '', totalGrams: '', metersPer100g: '', note: '',
   });
   // 겹수별 권장 바늘·게이지. 화면에서는 문자열로 다루고 저장할 때 숫자로 바꾼다.
-  const [recs, setRecs] = useState<{ strands: string; needleSize: string; gauge: string }[]>([]);
+  const [recs, setRecs] = useState<
+    { strands: string; needleSize: string; gauge: string; gaugePattern: string }[]
+  >([]);
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
 
@@ -33,6 +41,8 @@ export default function YarnForm() {
         colorCode: existing.colorCode || '', shop: existing.shop || '', link: existing.link || '',
         fiber: existing.fiber || '',
         weight: existing.weight || '',
+        plySpec: existing.plySpec || '',
+        dyeType: existing.dyeType || '',
         totalGrams: existing.totalGrams ? String(existing.totalGrams) : '',
         metersPer100g: existing.metersPer100g ? String(existing.metersPer100g) : '',
         note: existing.note || '',
@@ -43,6 +53,7 @@ export default function YarnForm() {
           strands: String(r.strands),
           needleSize: r.needleSize || '',
           gauge: r.gauge || '',
+          gaugePattern: r.gaugePattern || '',
         })),
       );
       setPhoto(existing.photoDataUrl);
@@ -53,7 +64,7 @@ export default function YarnForm() {
   function addRec() {
     // 다음 겹수를 미리 채워준다 — 대개 1겹 다음은 2겹이다
     const next = recs.reduce((max, r) => Math.max(max, Number(r.strands) || 0), 0) + 1;
-    setRecs([...recs, { strands: String(next), needleSize: '', gauge: '' }]);
+    setRecs([...recs, { strands: String(next), needleSize: '', gauge: '', gaugePattern: '' }]);
   }
 
   function updateRec(i: number, patch: Partial<(typeof recs)[number]>) {
@@ -85,6 +96,7 @@ export default function YarnForm() {
         strands: Number(r.strands) || 0,
         needleSize: r.needleSize.trim() || undefined,
         gauge: r.gauge.trim() || undefined,
+        gaugePattern: r.gaugePattern || undefined,
       }))
       .filter(r => r.strands > 0 && (r.needleSize || r.gauge))
       .sort((a, b) => a.strands - b.strands);
@@ -158,6 +170,9 @@ export default function YarnForm() {
   // 그 0 을 지우기 전에 숫자를 치면 '0100' 같은 값이 된다.
   const u = (k: keyof typeof f) => (e: any) => setF({ ...f, [k]: e.target.value });
 
+  // 목록에 없는 굵기를 적고 있는 중인지. 빈 칸과 구분하려고 공백 하나를 표시로 쓴다.
+  const isCustomWeight = !!f.weight && !(YARN_WEIGHTS as readonly string[]).includes(f.weight.trim());
+
   const grams = Number(f.totalGrams) || 0;
   const per100g = Number(f.metersPer100g) || 0;
 
@@ -196,8 +211,41 @@ export default function YarnForm() {
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="성분"><input className={inp} value={f.fiber} onChange={u('fiber')} placeholder="울 100%" /></Field>
-        <Field label="굵기"><input className={inp} value={f.weight} onChange={u('weight')} placeholder="fingering" /></Field>
+        <Field label="수·합"><input className={inp} value={f.plySpec} onChange={u('plySpec')} placeholder="15수 4합" /></Field>
       </div>
+
+      {/* 글로 적게 두면 '핑거링' 과 '핑거링사' 가 다른 굵기로 갈라진다.
+          그래서 골라 담게 하되, 목록에 없는 실을 위해 직접 적는 길은 남긴다. */}
+      <FieldDiv label="굵기">
+        <div className="flex flex-wrap gap-1.5">
+          {YARN_WEIGHTS.map(w => (
+            <Pill key={w} active={f.weight === w} onClick={() => setF({ ...f, weight: f.weight === w ? '' : w })}>
+              {w}
+            </Pill>
+          ))}
+          <Pill active={isCustomWeight} onClick={() => setF({ ...f, weight: isCustomWeight ? '' : ' ' })}>
+            직접 적기
+          </Pill>
+        </div>
+        {isCustomWeight && (
+          <input
+            className={`${inp} mt-2`}
+            value={f.weight.trim()}
+            onChange={e => setF({ ...f, weight: e.target.value || ' ' })}
+            placeholder="어떤 굵기인가요?"
+          />
+        )}
+      </FieldDiv>
+
+      <FieldDiv label="실 종류">
+        <div className="flex flex-wrap gap-1.5">
+          {YARN_DYE_TYPES.map(d => (
+            <Pill key={d} active={f.dyeType === d} onClick={() => setF({ ...f, dyeType: f.dyeType === d ? '' : d })}>
+              {d}
+            </Pill>
+          ))}
+        </div>
+      </FieldDiv>
       <div className="space-y-2">
         <span className="block text-xs font-medium text-muted-foreground">게이지 정보</span>
         {/* 겹 · 바늘 · 게이지 · 삭제를 한 줄에.
@@ -223,8 +271,26 @@ export default function YarnForm() {
               onChange={e => updateRec(i, { needleSize: e.target.value })}
               placeholder="4.0mm"
             />
+            {/* 무메/무늬 — 한 글자짜리 토글이라 좁은 자리에도 들어간다 */}
+            <button
+              type="button"
+              onClick={() =>
+                updateRec(i, {
+                  gaugePattern:
+                    r.gaugePattern === '무메' ? '무늬' : r.gaugePattern === '무늬' ? '' : '무메',
+                })
+              }
+              aria-label="무메/무늬 고르기"
+              className={`shrink-0 rounded-xl border px-2 py-2.5 text-[11.5px] font-semibold transition ${
+                r.gaugePattern
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground/60'
+              }`}
+            >
+              {r.gaugePattern || '무메'}
+            </button>
             <input
-              className={`${inp} min-w-0 flex-[1.4] px-2.5`}
+              className={`${inp} min-w-0 flex-1 px-2.5`}
               value={r.gauge}
               onChange={e => updateRec(i, { gauge: e.target.value })}
               placeholder="22코 30단"
@@ -295,6 +361,31 @@ export default function YarnForm() {
 }
 
 const inp = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';
+/** 골라 담는 알약 버튼 — 이 화면 안에서만 쓴다 */
+function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+        active ? 'border-primary bg-primary/10 font-semibold text-primary' : 'border-border text-muted-foreground'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** 안에 버튼이 들어가는 칸 — label 로 감싸면 버튼 클릭이 엉킨다 */
+function FieldDiv({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="block">
+      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>{children}</label>;
 }

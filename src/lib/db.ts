@@ -41,6 +41,11 @@ export interface Project extends SyncMetadata {
   size?: string;
   gauge?: string;
   progressNote?: string;
+  /**
+   * 프로젝트 메모 — 도안을 어떻게 바꿨는지, 파트마다 실이 얼마나 들었는지처럼
+   * 뜨는 내내 들춰보는 글. 다이어리는 그날그날의 기록이라 성격이 다르다.
+   */
+  memo?: string;
   finishedNote?: string;
   /**
    * 사진. v6 부터 ProjectPhoto[] 객체 배열.
@@ -86,6 +91,11 @@ export interface YarnRecommendation {
   needleSize?: string;
   /** 권장 게이지 (예: "22코 30단 / 10cm") */
   gauge?: string;
+  /**
+   * 어떤 뜨기로 잰 게이지인지 — '무메' | '무늬'
+   * 같은 실 같은 바늘이라도 무늬가 들어가면 코수가 달라진다.
+   */
+  gaugePattern?: string;
 }
 
 export interface Yarn extends SyncMetadata {
@@ -98,7 +108,18 @@ export interface Yarn extends SyncMetadata {
   /** 구매 링크 (쇼핑몰 상품 페이지 등) */
   link?: string;
   fiber?: string;
+  /** 굵기 — 핑거링·DK 처럼 흔히 쓰는 이름. 목록에 없으면 직접 적는다. */
   weight?: string;
+  /**
+   * 실 자체의 성질 — '15수 4합' 처럼 몇 수 몇 합인지.
+   *
+   * ⚠️ 겹(recommendations 의 strands) 과 다르다.
+   *    합 — 실이 몇 가닥으로 꼬여 있는지. 실을 살 때 정해진다.
+   *    겹 — 뜰 때 몇 가닥을 함께 잡는지. 뜨는 사람이 정한다.
+   */
+  plySpec?: string;
+  /** 일반실 | 염색실. 염색실만 모아 보고 합사할 실을 고를 때 쓴다. */
+  dyeType?: string;
   /**
    * @deprecated 합수별로 나뉘기 전에 쓰던 한 줄짜리 값.
    * 새로 저장할 때는 recommendations 로 옮기고 비운다.

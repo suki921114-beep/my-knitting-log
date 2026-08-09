@@ -78,6 +78,7 @@ export default function ProjectForm() {
   const [size, setSize] = useState('');
   const [gauge, setGauge] = useState('');
   const [progressNote, setProgressNote] = useState('');
+  const [memo, setMemo] = useState('');
   const [finishedNote, setFinishedNote] = useState('');
   const [photos, setPhotos] = useState<ProjectPhoto[]>([]);
   const [yarnLinks, setYarnLinks] = useState<YarnLink[]>([]);
@@ -102,6 +103,7 @@ export default function ProjectForm() {
       setSize(existing.size || '');
       setGauge(existing.gauge || '');
       setProgressNote(existing.progressNote || '');
+      setMemo(existing.memo || '');
       setFinishedNote(existing.finishedNote || '');
       setPhotos((existing.photos as ProjectPhoto[]) || []);
       setHydrated(true);
@@ -156,6 +158,7 @@ export default function ProjectForm() {
     size: size || undefined,
     gauge: gauge || undefined,
     progressNote: progressNote || undefined,
+    memo: memo || undefined,
     finishedNote: finishedNote || undefined,
     photos: photos.length ? photos : undefined,
 
@@ -366,6 +369,16 @@ export default function ProjectForm() {
         </p>
       </Field>
 
+
+      {/* 뜨는 내내 들춰보는 글. 다이어리는 그날그날의 기록이라 성격이 다르다. */}
+      <Field label="메모">
+        <textarea
+          className={`${inputCls} min-h-[88px] resize-y`}
+          value={memo}
+          onChange={e => setMemo(e.target.value)}
+          placeholder="도안에서 바꾼 부분, 파트별로 든 실 양처럼 두고두고 볼 것을 적어두세요."
+        />
+      </Field>
 
       {/* 완성 소감은 다 만든 뒤에 쓰는 글이다.
           진행중인데 칸이 비어 있으면 뭘 적어야 하나 싶어 자리만 차지한다. */}

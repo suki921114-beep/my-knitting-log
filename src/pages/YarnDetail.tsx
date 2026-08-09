@@ -81,10 +81,12 @@ export default function YarnDetail() {
             </div>
           </div>
 
-          {(yarn.fiber || yarn.weight || yarn.shop || yarn.link) && (
+          {(yarn.fiber || yarn.weight || yarn.plySpec || yarn.dyeType || yarn.shop || yarn.link) && (
             <div className="space-y-0.5 text-[12.5px] text-primary/85 sm:max-w-[260px] sm:text-right">
               {yarn.fiber && <div className="truncate"><span className="text-primary/55">성분 </span>{yarn.fiber}</div>}
+              {yarn.plySpec && <div className="truncate"><span className="text-primary/55">수·합 </span>{yarn.plySpec}</div>}
               {yarn.weight && <div className="truncate"><span className="text-primary/55">굵기 </span>{yarn.weight}</div>}
+              {yarn.dyeType && <div className="truncate"><span className="text-primary/55">종류 </span>{yarn.dyeType}</div>}
               {yarn.shop && <div className="truncate"><span className="text-primary/55">구매처 </span>{yarn.shop}</div>}
               {yarn.link && (
                 <a
@@ -172,7 +174,9 @@ export default function YarnDetail() {
                     <div className="truncate text-[13px] font-semibold text-ink">{formatNeedleSize(r.needleSize) || '—'}</div>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10.5px] font-medium text-muted-foreground">게이지</div>
+                    <div className="text-[10.5px] font-medium text-muted-foreground">
+                      게이지{r.gaugePattern && ` · ${r.gaugePattern}`}
+                    </div>
                     <div className="truncate text-[13px] font-semibold text-ink">{r.gauge || '—'}</div>
                   </div>
                 </div>

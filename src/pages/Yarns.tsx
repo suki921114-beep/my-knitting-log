@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useAllYarnStats, gramsToMeters, formatMeters, isUsedUp } from '@/lib/yarnCalc';
+import { useAllYarnStats, gramsToMeters, formatMeters, isUsedUp, YARN_DYE_TYPES } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -35,6 +35,7 @@ export default function Yarns() {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('updated');
   const [brand, setBrand] = useState<string>('all');
+  const [dyeType, setDyeType] = useState<string>('all');
   const [view, setView] = useViewMode('yarns', 'grid');
   // 다 쓴 실은 대개 다시 볼 일이 없다. 기본으로 감추되 선택은 기억한다.
   const [hideUsedUp, setHideUsedUp] = useState(
@@ -52,6 +53,9 @@ export default function Yarns() {
     [stats],
   );
 
+  // 아무도 종류를 안 적어뒀으면 거를 것도 없다
+  const hasDyeType = useMemo(() => stats.some(s => !!s.yarn.dyeType), [stats]);
+
   const brands = useMemo(
     () => Array.from(new Set(stats.map(s => s.yarn.brand).filter(Boolean))) as string[],
     [stats]
@@ -62,6 +66,7 @@ export default function Yarns() {
     let arr = stats.filter(x =>
       (!s || [x.yarn.name, x.yarn.brand, x.yarn.colorName, x.yarn.fiber, x.yarn.weight].filter(Boolean).some(v => v!.toLowerCase().includes(s))) &&
       (brand === 'all' || x.yarn.brand === brand) &&
+      (dyeType === 'all' || x.yarn.dyeType === dyeType) &&
       (!hideUsedUp || !isUsedUp(x.yarn, x.remaining))
     );
     if (sort === 'updated') arr = arr.sort((a, b) => b.yarn.updatedAt - a.yarn.updatedAt);
@@ -76,7 +81,7 @@ export default function Yarns() {
       });
     }
     return arr;
-  }, [stats, q, sort, brand, hideUsedUp]);
+  }, [stats, q, sort, brand, dyeType, hideUsedUp]);
 
   return (
     <div>
@@ -100,6 +105,19 @@ export default function Yarns() {
           <option value="all">전체 브랜드</option>
           {brands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
+        {/* 염색실만 모아 보고 합사할 실을 고르는 흐름. 염색실 브랜드가 많아
+            브랜드로 찾기는 어렵다는 의견에서 나왔다. */}
+        {hasDyeType && (
+          <select
+            value={dyeType}
+            onChange={e => setDyeType(e.target.value)}
+            aria-label="실 종류"
+            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground"
+          >
+            <option value="all">전체 종류</option>
+            {YARN_DYE_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
         {/* 정렬 기준이 다섯 가지가 되어 눌러 넘기는 방식으로는 원하는 걸 찾기 어렵다 */}
         <div className="relative inline-flex items-center">
           <ArrowUpDown className="pointer-events-none absolute left-3 h-3 w-3 text-foreground" />

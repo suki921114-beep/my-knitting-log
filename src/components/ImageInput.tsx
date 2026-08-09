@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ImagePlus, X, Loader2 } from 'lucide-react';
+import { ImagePlus, Camera, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { fileToCompressedDataUrl, estimateDataUrlBytes, formatBytes } from '@/lib/image';
 import { toast } from '@/components/ui/sonner';
@@ -112,6 +112,10 @@ const MULTI_HARD_MAX_BYTES = 1.5 * 1024 * 1024; // 1.5MB
 
 export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
   const ref = useRef<HTMLInputElement>(null);
+  // 카메라를 바로 여는 입력은 따로 둔다.
+  // 같은 입력에 capture 를 붙이면 갤러리에서 고르는 길이 막힌다 —
+  // 뜨다가 바로 찍고 싶을 때도 있고, 예전 사진을 고르고 싶을 때도 있다.
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
   async function handle(files: FileList | null) {
@@ -184,6 +188,17 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
           e.target.value = '';
         }}
       />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={e => {
+          handle(e.target.files);
+          e.target.value = '';
+        }}
+      />
       <div className="grid grid-cols-3 gap-2">
         {values.map((src, i) => (
           <div key={i} className="relative aspect-square overflow-hidden rounded-xl border bg-muted">
@@ -199,13 +214,24 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
           </div>
         ))}
         {values.length < max && (
-          <button
-            type="button"
-            onClick={() => ref.current?.click()}
-            className="flex aspect-square items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
-          >
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-          </button>
+          <div className="flex aspect-square flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => ref.current?.click()}
+              aria-label="사진 고르기"
+              className="flex flex-1 items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
+            >
+              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => cameraRef.current?.click()}
+              aria-label="사진 찍기"
+              className="flex flex-1 items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
+            >
+              <Camera className="h-5 w-5" />
+            </button>
+          </div>
         )}
       </div>
     </div>

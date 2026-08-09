@@ -143,6 +143,14 @@ export default function ProjectDetail() {
         </div>
       </div>
 
+      {project.memo && (
+        <Section title="메모">
+          <div className="card-soft whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
+            {project.memo}
+          </div>
+        </Section>
+      )}
+
       {/* 완성 소감은 다 만든 뒤에 쓰는 글이라 완성일 때만 내놓는다 */}
       {project.status === 'done' && project.finishedNote && (
         <Section title="완성 소감">
