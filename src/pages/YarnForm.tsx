@@ -21,7 +21,7 @@ export default function YarnForm() {
     name: '', brand: '', colorName: '', colorCode: '', shop: '', link: '', fiber: '', weight: '',
     totalGrams: '', metersPer100g: '', note: '',
   });
-  // 합수별 권장 바늘·게이지. 화면에서는 문자열로 다루고 저장할 때 숫자로 바꾼다.
+  // 겹수별 권장 바늘·게이지. 화면에서는 문자열로 다루고 저장할 때 숫자로 바꾼다.
   const [recs, setRecs] = useState<{ strands: string; needleSize: string; gauge: string }[]>([]);
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
@@ -37,7 +37,7 @@ export default function YarnForm() {
         metersPer100g: existing.metersPer100g ? String(existing.metersPer100g) : '',
         note: existing.note || '',
       });
-      // 예전에 한 줄로 적어둔 값도 1합으로 올라온다
+      // 예전에 한 줄로 적어둔 값도 1겹으로 올라온다
       setRecs(
         yarnRecommendations(existing).map(r => ({
           strands: String(r.strands),
@@ -51,7 +51,7 @@ export default function YarnForm() {
   }, [editing, existing, hyd]);
 
   function addRec() {
-    // 다음 합수를 미리 채워준다 — 대개 1합 다음은 2합이다
+    // 다음 겹수를 미리 채워준다 — 대개 1겹 다음은 2겹이다
     const next = recs.reduce((max, r) => Math.max(max, Number(r.strands) || 0), 0) + 1;
     setRecs([...recs, { strands: String(next), needleSize: '', gauge: '' }]);
   }
@@ -79,7 +79,7 @@ export default function YarnForm() {
     const t = now();
     
     // 공통 업데이트 필드
-    // 합수가 없거나 바늘·게이지를 둘 다 비워둔 줄은 버린다
+    // 겹수가 없거나 바늘·게이지를 둘 다 비워둔 줄은 버린다
     const recommendations = recs
       .map(r => ({
         strands: Number(r.strands) || 0,
@@ -200,20 +200,22 @@ export default function YarnForm() {
       </div>
       <div className="space-y-2">
         <span className="block text-xs font-medium text-muted-foreground">게이지 정보</span>
-        {/* 합 · 바늘 · 게이지 · 삭제를 한 줄에 — 위아래로 나뉘면 어느 합의 값인지 눈이 헤맨다 */}
+        {/* 겹 · 바늘 · 게이지 · 삭제를 한 줄에.
+            ⚠️ 폭을 정하는 칸은 반드시 바깥 div 로 감쌀 것. inp 에 w-full 이 들어 있어서
+               input 에 w-12 를 직접 붙이면 둘이 부딪혀 칸이 제멋대로 벌어진다. */}
         {recs.map((r, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex w-[3.75rem] shrink-0 items-center gap-1">
               <input
                 type="number"
                 inputMode="numeric"
                 min={1}
-                aria-label="합수"
-                className={`${inp} w-12 px-1 text-center`}
+                aria-label="겹수"
+                className={`${inp} px-1 text-center`}
                 value={r.strands}
                 onChange={e => updateRec(i, { strands: e.target.value })}
               />
-              <span className="text-[12.5px] font-semibold text-muted-foreground">합</span>
+              <span className="text-[12.5px] font-semibold text-muted-foreground">겹</span>
             </div>
             <input
               className={`${inp} min-w-0 flex-1 px-2.5`}
@@ -230,7 +232,7 @@ export default function YarnForm() {
             <button
               type="button"
               onClick={() => removeRec(i)}
-              aria-label={`${r.strands || ''}합 지우기`}
+              aria-label={`${r.strands || ''}겹 지우기`}
               className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -245,7 +247,7 @@ export default function YarnForm() {
           <Plus className="h-4 w-4" /> 게이지 추가
         </button>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          ※ 같은 실이라도 합수에 따라 권장 바늘과 게이지가 달라져요. 1합, 2합을 따로 적어두면 도안 맞출 때 편합니다.
+          ※ 몇 겹으로 뜨느냐에 따라 권장 바늘과 게이지가 달라져요. 1겹, 2겹을 따로 적어두면 도안 맞출 때 편합니다.
         </p>
       </div>
 

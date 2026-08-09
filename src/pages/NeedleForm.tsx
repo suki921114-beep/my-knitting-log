@@ -132,15 +132,18 @@ export default function NeedleForm() {
         <Field label="길이"><input className={inp} value={f.length} onChange={u('length')} placeholder="80cm" /></Field>
       </div>
       <Field label="개수">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={1}
-          className={`${inp} w-24`}
-          value={f.quantity}
-          onChange={u('quantity')}
-          placeholder="1"
-        />
+        {/* ⚠️ 폭은 바깥 div 로 정한다. inp 에 w-full 이 있어 input 에 직접 붙이면 부딪힌다. */}
+        <div className="w-24">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            className={inp}
+            value={f.quantity}
+            onChange={u('quantity')}
+            placeholder="1"
+          />
+        </div>
       </Field>
       <Field label="메모"><textarea className={`${inp} min-h-[72px]`} value={f.note} onChange={u('note')} /></Field>
       {editing && <ReverseProjectsSection kind="needle" refId={nid} />}

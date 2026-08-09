@@ -164,7 +164,7 @@ export default function YarnDetail() {
             {recs.map(r => (
               <div key={r.strands} className="card-soft flex items-center gap-3 p-3.5">
                 <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-[11.5px] font-bold text-primary">
-                  {r.strands}합
+                  {r.strands}겹
                 </span>
                 <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
                   <div className="min-w-0">
