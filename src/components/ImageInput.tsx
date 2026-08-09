@@ -3,6 +3,7 @@ import { ImagePlus, Camera, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { fileToCompressedDataUrl, estimateDataUrlBytes, formatBytes } from '@/lib/image';
 import { toast } from '@/components/ui/sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 // 단일 이미지(라이브러리 대표 사진 등)
 // TARGET: 압축이 목표로 삼는 크기 / HARD_MAX: 이걸 넘으면 저장 거부
@@ -117,6 +118,7 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
   // 뜨다가 바로 찍고 싶을 때도 있고, 예전 사진을 고르고 싶을 때도 있다.
   const cameraRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function handle(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -214,24 +216,41 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
           </div>
         ))}
         {values.length < max && (
-          <div className="flex aspect-square flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => ref.current?.click()}
-              aria-label="사진 고르기"
-              className="flex flex-1 items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
-            >
-              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => cameraRef.current?.click()}
-              aria-label="사진 찍기"
-              className="flex flex-1 items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
-            >
-              <Camera className="h-5 w-5" />
-            </button>
-          </div>
+          // 들어가는 자리는 한 칸. 누르면 카메라와 앨범 중에 고른다.
+          // 버튼 두 개를 나란히 두면 아직 사진이 없을 때 화면이 어수선하다.
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="사진 넣기"
+                className="flex aspect-square items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
+              >
+                {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="center" className="w-44 p-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerOpen(false);
+                  cameraRef.current?.click();
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground hover:bg-secondary"
+              >
+                <Camera className="h-4 w-4 text-primary" /> 사진 찍기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerOpen(false);
+                  ref.current?.click();
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground hover:bg-secondary"
+              >
+                <ImagePlus className="h-4 w-4 text-primary" /> 앨범에서 고르기
+              </button>
+            </PopoverContent>
+          </Popover>
         )}
       </div>
     </div>

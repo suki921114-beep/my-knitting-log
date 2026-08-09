@@ -5,9 +5,10 @@ import { statusLabel, statusColor } from '@/lib/yarnCalc';
 import { describeNeedle, formatNeedleSize } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, Image as ImageIcon, PenLine } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import RowCounterSection from '@/components/RowCounterSection';
 import ProjectGaugeSection from '@/components/ProjectGaugeSection';
+import { toast } from '@/components/ui/sonner';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -34,6 +35,23 @@ export default function ProjectDetail() {
   const notionMap = new Map(notions.map(n => [n.id!, n]));
 
   const [lightbox, setLightbox] = useState<string | null>(null);
+  // 메모는 수정 화면까지 들어가지 않고 여기서 바로 고친다 —
+  // 뜨다 말고 한 줄 적으려고 화면을 두 번 넘기는 건 번거롭다.
+  const [memo, setMemo] = useState('');
+  const [memoDirty, setMemoDirty] = useState(false);
+
+  useEffect(() => {
+    // 아직 손대지 않았을 때만 저장된 값을 따라간다.
+    // 적는 중에 덮어쓰면 방금 친 글자가 날아간다.
+    if (!memoDirty) setMemo(project?.memo ?? '');
+  }, [project?.memo, memoDirty]);
+
+  async function saveMemo() {
+    if (!memoDirty) return;
+    await db.projects.update(pid, { memo: memo.trim() || undefined, updatedAt: Date.now() } as any);
+    setMemoDirty(false);
+    toast.success('메모를 저장했어요');
+  }
 
   if (!project) return <p className="p-8 text-center text-sm text-muted-foreground">불러오는 중…</p>;
   if (project.isDeleted) {
@@ -143,13 +161,40 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {project.memo && (
-        <Section title="메모">
-          <div className="card-soft whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
-            {project.memo}
-          </div>
-        </Section>
-      )}
+      <Section title="메모">
+        <div className="card-soft p-3">
+          <textarea
+            value={memo}
+            onChange={e => {
+              setMemo(e.target.value);
+              setMemoDirty(true);
+            }}
+            placeholder="도안에서 바꾼 부분, 파트별로 든 실 양처럼 두고두고 볼 것을 적어두세요."
+            className="min-h-[76px] w-full resize-y bg-transparent text-[13px] leading-relaxed text-ink outline-none placeholder:text-muted-foreground/70"
+          />
+          {memoDirty && (
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMemo(project?.memo ?? '');
+                  setMemoDirty(false);
+                }}
+                className="rounded-full px-3 py-1.5 text-[12px] font-semibold text-muted-foreground"
+              >
+                되돌리기
+              </button>
+              <button
+                type="button"
+                onClick={saveMemo}
+                className="rounded-full bg-primary px-3.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+              >
+                저장
+              </button>
+            </div>
+          )}
+        </div>
+      </Section>
 
       {/* 완성 소감은 다 만든 뒤에 쓰는 글이라 완성일 때만 내놓는다 */}
       {project.status === 'done' && project.finishedNote && (

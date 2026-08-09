@@ -13,6 +13,7 @@ import {
   yarnRecommendations,
   YARN_WEIGHTS,
   YARN_DYE_TYPES,
+  GAUGE_PATTERNS,
 } from '@/lib/yarnCalc';
 
 export default function YarnForm() {
@@ -224,7 +225,7 @@ export default function YarnForm() {
             </Pill>
           ))}
           <Pill active={isCustomWeight} onClick={() => setF({ ...f, weight: isCustomWeight ? '' : ' ' })}>
-            직접 적기
+            기타
           </Pill>
         </div>
         {isCustomWeight && (
@@ -253,7 +254,17 @@ export default function YarnForm() {
                input 에 w-12 를 직접 붙이면 둘이 부딪혀 칸이 제멋대로 벌어진다. */}
         {recs.map((r, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <div className="flex w-[3.75rem] shrink-0 items-center gap-1">
+            {/* 무메 · 겹 · 바늘 · 코단 순서. 무엇을 잰 게이지인지가 맨 앞에 온다. */}
+            <select
+              value={r.gaugePattern}
+              onChange={e => updateRec(i, { gaugePattern: e.target.value })}
+              aria-label="무메 / 무늬"
+              className={`${inp} w-[4.25rem] shrink-0 appearance-none px-1.5 text-center text-[12px]`}
+            >
+              <option value="">—</option>
+              {GAUGE_PATTERNS.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <div className="flex w-[3.5rem] shrink-0 items-center gap-0.5">
               <input
                 type="number"
                 inputMode="numeric"
@@ -263,34 +274,16 @@ export default function YarnForm() {
                 value={r.strands}
                 onChange={e => updateRec(i, { strands: e.target.value })}
               />
-              <span className="text-[12.5px] font-semibold text-muted-foreground">겹</span>
+              <span className="text-[12px] font-semibold text-muted-foreground">겹</span>
             </div>
             <input
-              className={`${inp} min-w-0 flex-1 px-2.5`}
+              className={`${inp} min-w-0 flex-1 px-2`}
               value={r.needleSize}
               onChange={e => updateRec(i, { needleSize: e.target.value })}
               placeholder="4.0mm"
             />
-            {/* 무메/무늬 — 한 글자짜리 토글이라 좁은 자리에도 들어간다 */}
-            <button
-              type="button"
-              onClick={() =>
-                updateRec(i, {
-                  gaugePattern:
-                    r.gaugePattern === '무메' ? '무늬' : r.gaugePattern === '무늬' ? '' : '무메',
-                })
-              }
-              aria-label="무메/무늬 고르기"
-              className={`shrink-0 rounded-xl border px-2 py-2.5 text-[11.5px] font-semibold transition ${
-                r.gaugePattern
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground/60'
-              }`}
-            >
-              {r.gaugePattern || '무메'}
-            </button>
             <input
-              className={`${inp} min-w-0 flex-1 px-2.5`}
+              className={`${inp} min-w-0 flex-[1.3] px-2`}
               value={r.gauge}
               onChange={e => updateRec(i, { gauge: e.target.value })}
               placeholder="22코 30단"
