@@ -16,7 +16,19 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, type PatternFile, type RowCounter } from '@/lib/db';
 import { PdfSurface } from '@/components/PdfViewer';
 import { getPatternFile } from '@/lib/patternFile';
-import { ChevronLeft, Plus, Minus, GripHorizontal, FileText, Loader2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  Plus,
+  Minus,
+  GripHorizontal,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  RotateCcw,
+  Trash2,
+  Check,
+} from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 function vibrate(ms = 10) {
   try { (navigator as any).vibrate?.(ms); } catch { /* 진동을 못 켜도 그만 */ }
@@ -74,6 +86,18 @@ export default function KnitMode() {
     });
     return () => { alive = false; };
   }, [activeId, filed.length]);
+
+  async function addCounter() {
+    const t = now();
+    await db.rowCounters.add({
+      projectId: pid,
+      name: `카운터 ${counters.length + 1}`,
+      count: 0,
+      createdAt: t,
+      updatedAt: t,
+      cloudId: crypto.randomUUID(),
+    });
+  }
 
   // ── 칸막이 ────────────────────────────────────────────────────────────
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -191,18 +215,30 @@ export default function KnitMode() {
       >
         {counters.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <Link
-              to={`/projects/${pid}/edit`}
-              className="rounded-full border border-dashed border-white/30 px-4 py-2 text-[12.5px] font-semibold text-white/70"
+            <button
+              type="button"
+              onClick={addCounter}
+              className="flex items-center gap-1.5 rounded-full border border-dashed border-white/30 px-4 py-2 text-[12.5px] font-semibold text-white/70"
             >
-              단수 카운터를 먼저 만들어 주세요
-            </Link>
+              <Plus className="h-4 w-4" /> 첫 카운터 만들기
+            </button>
           </div>
         ) : (
           <div className="flex h-full gap-2 py-1">
             {counters.map(c => (
               <CompactCounter key={c.id} counter={c} single={counters.length === 1} />
             ))}
+            {/* 뜨다 보면 소매·고무단처럼 셀 것이 늘어난다.
+                그때마다 화면을 나갔다 오게 하지 않는다. */}
+            <button
+              type="button"
+              onClick={addCounter}
+              aria-label="카운터 추가"
+              className="flex h-full w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-white/25 text-white/50 transition active:scale-95"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="text-[10.5px] font-semibold">추가</span>
+            </button>
           </div>
         )}
       </div>
@@ -258,37 +294,185 @@ export default function KnitMode() {
 /**
  * 뜨기 모드용 카운터.
  *
- * 라이브러리의 카운터 카드와 달리 이름 수정·목표 설정 같은 것은 없다.
- * 뜨는 중에 필요한 건 숫자와 +/− 뿐이고, 자리는 좁다.
+ * 두 얼굴을 오간다.
+ *   세기  — 숫자와 +/− 만. 뜨는 중에는 이것만 보인다.
+ *   고치기 — 이름·목표·초기화·삭제.
+ *
+ * 목록 화면처럼 작은 메뉴를 띄우지 않고 카드를 통째로 뒤집는다.
+ * 카운터 칸이 옆으로 넘기는 자리라, 떠 있는 메뉴는 잘려서 안 보인다.
  */
 function CompactCounter({ counter, single }: { counter: RowCounter; single: boolean }) {
+  const [face, setFace] = useState<'count' | 'edit'>('count');
+  const [editingCount, setEditingCount] = useState(false);
+  const [countStr, setCountStr] = useState('');
+  const [name, setName] = useState(counter.name);
+  const [goalStr, setGoalStr] = useState(counter.goal?.toString() ?? '');
+
+  async function update(patch: Partial<RowCounter>) {
+    await db.rowCounters.update(counter.id!, { ...patch, updatedAt: now() });
+  }
+
   async function bump(delta: number) {
     const next = Math.max(0, counter.count + delta);
     if (next === counter.count) return;
     vibrate(delta > 0 ? 10 : 8);
-    await db.rowCounters.update(counter.id!, { count: next, updatedAt: now() });
+    await update({ count: next });
+  }
+
+  /** 직접 적은 단수 저장 — 숫자가 아니면 원래 값으로 되돌린다 */
+  async function saveCount() {
+    setEditingCount(false);
+    const n = parseInt(countStr, 10);
+    if (Number.isNaN(n)) return;
+    const next = Math.max(0, n);
+    if (next !== counter.count) await update({ count: next });
+  }
+
+  async function saveEdits() {
+    const trimmed = name.trim() || counter.name;
+    const g = parseInt(goalStr, 10);
+    const goal = Number.isNaN(g) || g <= 0 ? undefined : g;
+    setFace('count');
+    if (trimmed !== counter.name || goal !== counter.goal) {
+      await update({ name: trimmed, goal });
+    }
+  }
+
+  async function remove() {
+    // 뜨는 중에 실수로 지울 수 있으니 되돌리기를 길게 띄운다.
+    // 여기서 확인 창을 띄우면 손이 두 번 가고, 도안이 가려진다.
+    const t = now();
+    setFace('count');
+    await db.rowCounters.update(counter.id!, { isDeleted: true, deletedAt: t, updatedAt: t } as any);
+    toast.success(`"${counter.name}" 카운터를 지웠어요`, {
+      duration: 8000,
+      action: {
+        label: '되돌리기',
+        onClick: async () => {
+          const n = now();
+          await db.rowCounters.update(counter.id!, { isDeleted: false, deletedAt: null, updatedAt: n } as any);
+        },
+      },
+    });
   }
 
   const pct = counter.goal && counter.goal > 0
     ? Math.min(100, Math.round((counter.count / counter.goal) * 100))
     : null;
 
-  return (
-    <div
-      className={`flex h-full shrink-0 flex-col justify-center rounded-2xl bg-white/10 px-3 py-2 ${
-        single ? 'w-full' : 'w-[64vw] max-w-[16rem]'
-      }`}
-    >
-      <div className="truncate text-[11px] text-white/60">{counter.name}</div>
+  const cardClass = `flex h-full shrink-0 flex-col justify-center rounded-2xl bg-white/10 px-3 py-2 ${
+    single ? 'w-full' : 'w-[64vw] max-w-[16rem]'
+  }`;
 
-      <div className="flex items-baseline gap-1">
-        <span className="text-[30px] font-extrabold leading-none tabular-nums text-white">
-          {counter.count}
-        </span>
-        <span className="text-[11.5px] text-white/50">
-          {counter.goal ? `/ ${counter.goal}단` : '단'}
-        </span>
+  // ── 고치기 얼굴 ────────────────────────────────────────────────────────
+  if (face === 'edit') {
+    return (
+      <div className={cardClass}>
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="이름"
+          aria-label="카운터 이름"
+          className="w-full rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-[12.5px] text-white outline-none focus:border-white/50"
+        />
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span className="shrink-0 text-[11px] text-white/60">목표</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={goalStr}
+            onChange={e => setGoalStr(e.target.value)}
+            placeholder="—"
+            aria-label="목표 단수"
+            className="w-16 rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-center text-[12.5px] text-white outline-none focus:border-white/50"
+          />
+          <span className="shrink-0 text-[11px] text-white/60">단</span>
+          <button
+            type="button"
+            onClick={() => update({ count: 0 })}
+            className="ml-auto flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1.5 text-[11.5px] font-semibold text-white/80"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> 0으로
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={remove}
+            aria-label="카운터 삭제"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-red-300 transition active:scale-90"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={saveEdits}
+            className="flex h-10 flex-1 items-center justify-center gap-1 rounded-full bg-primary text-[12.5px] font-bold text-primary-foreground transition active:scale-95"
+          >
+            <Check className="h-4 w-4" /> 완료
+          </button>
+        </div>
       </div>
+    );
+  }
+
+  // ── 세기 얼굴 ──────────────────────────────────────────────────────────
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center gap-1">
+        <span className="min-w-0 flex-1 truncate text-[11px] text-white/60">{counter.name}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setName(counter.name);
+            setGoalStr(counter.goal?.toString() ?? '');
+            setFace('edit');
+          }}
+          aria-label="카운터 고치기"
+          className="-m-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/50 hover:bg-white/10"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* 숫자를 눌러 직접 적을 수 있다. 한참 뜨다가 중간부터 세거나
+          잘못 누른 것을 바로잡을 때 +/− 만으로는 번거롭다. */}
+      {editingCount ? (
+        <input
+          autoFocus
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={countStr}
+          onChange={e => setCountStr(e.target.value)}
+          onFocus={e => e.currentTarget.select()}
+          onBlur={saveCount}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void saveCount();
+            if (e.key === 'Escape') setEditingCount(false);
+          }}
+          aria-label="단수 직접 입력"
+          className="w-full rounded-lg border border-white/20 bg-white/10 px-1 py-0.5 text-center text-[28px] font-extrabold leading-none tabular-nums text-white outline-none focus:border-white/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setCountStr(String(counter.count));
+            setEditingCount(true);
+          }}
+          aria-label={`현재 ${counter.count}단, 눌러서 직접 입력`}
+          className="flex items-baseline gap-1 text-left"
+        >
+          <span className="text-[30px] font-extrabold leading-none tabular-nums text-white">
+            {counter.count}
+          </span>
+          <span className="text-[11.5px] text-white/50">
+            {counter.goal ? `/ ${counter.goal}단` : '단'}
+          </span>
+        </button>
+      )}
 
       {pct !== null && (
         <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/15">
