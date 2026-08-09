@@ -98,6 +98,9 @@ export async function savePatternFile(patternId: number, file: File): Promise<Sa
       await db.patternFiles.where('patternId').equals(patternId).delete();
       record.id = (await db.patternFiles.add(record)) as number;
     });
+    // 도안 쪽 표시를 지우고 시각을 올린다.
+    // 안 하면 클라우드에는 옛 파일 자리가 남아, 새로 넣은 파일이 안 올라간다.
+    await markPatternFileChanged(patternId);
     return { ok: true, file: record };
   } catch (e) {
     console.error('[patternFile] 저장 실패', e);
@@ -128,9 +131,29 @@ async function removeFromCloud(rows: { storagePath?: string }[]): Promise<void> 
   }
 }
 
+/**
+ * 도안 파일이 바뀌었다고 도안 쪽에 알린다.
+ *
+ * 두 가지를 한다.
+ *   · 클라우드에 적어 둔 파일 자리를 지운다 — 안 지우면 옛 파일이 계속 딸려 온다
+ *   · 시각을 올린다 — 백업은 '기기가 더 새로울 때' 만 올리므로, 안 올리면
+ *     파일만 바꾸고 저장을 안 한 도안은 영영 안 올라간다
+ */
+async function markPatternFileChanged(patternId: number): Promise<void> {
+  const pattern = await db.patterns.get(patternId);
+  if (!pattern) return;
+  await db.patterns.update(patternId, {
+    fileStoragePath: undefined,
+    fileName: undefined,
+    fileSize: undefined,
+    updatedAt: Date.now(),
+  } as any);
+}
+
 export async function deletePatternFile(patternId: number): Promise<void> {
   const rows = await db.patternFiles.where('patternId').equals(patternId).toArray();
   await db.patternFiles.where('patternId').equals(patternId).delete();
+  await markPatternFileChanged(patternId);
   await removeFromCloud(rows);
 }
 

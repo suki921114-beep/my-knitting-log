@@ -33,6 +33,23 @@ export function canSyncPatternFiles(): boolean {
   return ENABLE_CLOUD_PHOTO_SYNC && isProAccount(auth.currentUser);
 }
 
+/**
+ * 아직 안 올라간 도안 파일이 있는지.
+ *
+ * 백업은 '기기가 클라우드보다 새로울 때' 만 올린다. 도안 파일을 올리지 않던
+ * 시절에 백업해 둔 도안은 양쪽 시각이 같아 그냥 넘어가고, 파일은 영영
+ * 기기에만 남는다. 이 경우를 찾아내 한 번 더 올리게 한다.
+ *
+ * ⚠️ count() 로만 확인한다. first() 를 쓰면 확인하자고 몇 MB 짜리 파일을
+ *    통째로 읽게 되고, 도안이 여럿이면 백업을 누를 때마다 그만큼 읽는다.
+ */
+export async function needsPatternFileUpload(local: Pattern, remote: Pattern): Promise<boolean> {
+  if (!canSyncPatternFiles() || local.id == null) return false;
+  // 문서에 이미 자리가 적혀 있으면 올라간 것이다
+  if (remote.fileStoragePath || local.fileStoragePath) return false;
+  return (await db.patternFiles.where('patternId').equals(local.id).count()) > 0;
+}
+
 export interface PatternFilePayload {
   fileStoragePath?: string;
   fileName?: string;
@@ -59,7 +76,17 @@ export async function uploadPatternFileFor(
   context: string,
 ): Promise<UploadPatternFileResult> {
   const none: UploadPatternFileResult = { payload: {}, usage, usageChanged: false };
-  if (!canSyncPatternFiles() || !pattern.cloudId || pattern.id == null) return none;
+
+  // 왜 안 올라갔는지는 조용히 넘어가면 알 길이 없다. 백업은 성공했다고 나오고
+  // 파일만 없으니, 나중에 기기를 바꾼 뒤에야 알게 된다. 이유를 남긴다.
+  if (!canSyncPatternFiles()) {
+    console.info(
+      `[${context}] 도안 파일 업로드 건너뜀 — 이 계정은 클라우드 보관 대상이 아니에요`,
+      { email: auth.currentUser?.email ?? '(로그인 안 됨)' },
+    );
+    return none;
+  }
+  if (!pattern.cloudId || pattern.id == null) return none;
 
   const local = await db.patternFiles.where('patternId').equals(pattern.id).first();
   if (!local) {
@@ -89,12 +116,15 @@ export async function uploadPatternFileFor(
   }
 
   try {
+    console.info(`[${context}] 도안 파일 올리는 중 — ${local.name} (${local.size} bytes)`);
     const path = await uploadPatternFile(userId, pattern.cloudId, local.blob);
-    // 기기에도 자리를 적어 둔다 — 안 적으면 다음 백업에 같은 파일을 또 올린다
+    // 기기에도 자리를 적어 둔다 — 안 적으면 다음 백업에 같은 파일을 또 올린다.
+    // 도안 쪽에도 적는 이유는 '올라갔는지' 를 파일을 안 읽고 알기 위해서다.
     await db.patternFiles.update(local.id!, {
       storagePath: path,
       patternCloudId: pattern.cloudId,
     });
+    await db.patterns.update(pattern.id, { fileStoragePath: path } as any);
     return {
       payload: { fileStoragePath: path, fileName: local.name, fileSize: local.size },
       usage: { ...usage, bytes: usage.bytes + local.size },

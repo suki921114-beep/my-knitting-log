@@ -9,7 +9,7 @@ import { db } from '@/lib/db';
 import type { Pattern } from '@/lib/db';
 import { sanitizeForFirestore, type FetchDiff, type SyncDiff } from './common';
 import { prepareCoverUpload, resolveCover, needsCoverMigration, PATTERN_COVER } from './coverSync';
-import { uploadPatternFileFor, downloadPatternFileFor } from './patternFileSync';
+import { uploadPatternFileFor, downloadPatternFileFor, needsPatternFileUpload } from './patternFileSync';
 import { readUsage, writeUsage } from '@/lib/cloudUsage';
 import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
@@ -34,8 +34,11 @@ export async function calculatePatternSyncDiff(userId: string): Promise<SyncDiff
       } else if (local.updatedAt < remote.updatedAt) {
         diff.toDownload.push(remote);
       } else {
-        // 시각은 같지만 사진이 아직 문서 안에 박혀 있으면 한 번 더 올려 옮긴다
-        if (needsCoverMigration(local, remote, PATTERN_COVER)) {
+        // 시각은 같아도 아직 안 옮겨진 것이 남아 있으면 한 번 더 올린다.
+        //   · 사진이 문서 안에 글자로 박혀 있는 경우
+        //   · 도안 PDF 를 올리지 않던 시절에 넣어 둔 파일
+        const staleFile = await needsPatternFileUpload(local, remote);
+        if (needsCoverMigration(local, remote, PATTERN_COVER) || staleFile) {
           diff.toUpload.push(local);
         } else {
           diff.unchanged++;

@@ -98,6 +98,24 @@ describe('도안 파일이 새면 안 되는 곳', () => {
     expect(gates.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('예전에 넣어둔 파일도 한 번 더 올려 옮긴다', () => {
+    // 백업은 '기기가 더 새로울 때' 만 올린다. 이 확인이 없으면 도안 파일을
+    // 올리지 않던 시절에 백업해 둔 도안은 시각이 같아 그냥 넘어가고,
+    // PDF 는 영영 기기에만 남는다. (사진에서 똑같이 겪었던 문제다)
+    const src = read('../lib/sync/pattern.ts');
+    expect(src).toContain('needsPatternFileUpload');
+  });
+
+  it('확인하자고 파일을 통째로 읽지 않는다', () => {
+    // first() 를 쓰면 '올라갔나' 를 보려고 몇 MB 를 읽는다.
+    // 도안이 여럿이면 백업을 누를 때마다 그만큼 읽게 된다.
+    const src = read('../lib/sync/patternFileSync.ts');
+    const fn = src.slice(src.indexOf('export async function needsPatternFileUpload'));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+    expect(body).toContain('.count()');
+    expect(body).not.toContain('.first()');
+  });
+
   it('짝은 기기 안 번호가 아니라 cloudId 로 맞춘다', () => {
     // patternId 로 맞추면 폰의 3번 도안 파일이 PC 의 3번(다른 도안)에 붙는다
     const src = read('../lib/sync/patternFileStorage.ts');
