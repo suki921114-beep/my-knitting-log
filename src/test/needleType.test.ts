@@ -146,6 +146,13 @@ describe('formatNeedleSize', () => {
     expect(formatNeedleSize('4')).toBe('4mm');
   });
 
+  it('범위로 적었어도 단위를 붙인다', () => {
+    // 실 라벨의 권장 호수는 범위로 적힌 경우가 많다. 단위는 뒤에 한 번만.
+    expect(formatNeedleSize('5.5~6.5')).toBe('5.5~6.5mm');
+    expect(formatNeedleSize('4-5')).toBe('4-5mm');
+    expect(formatNeedleSize('5.5 ~ 6.5')).toBe('5.5 ~ 6.5mm');
+  });
+
   it('단위를 이미 적었으면 건드리지 않는다', () => {
     // 사람이 적어둔 말을 앱이 고쳐 쓰지 않는다
     expect(formatNeedleSize('4.0mm')).toBe('4.0mm');

@@ -134,7 +134,13 @@ export function splitSizes(raw: string): string[] {
 export function formatNeedleSize(raw?: string): string {
   const s = (raw ?? '').trim();
   if (!s) return '';
-  return /^\d+(\.\d+)?$/.test(s) ? `${s}mm` : s;
+  // 숫자 하나 — 4 → 4mm
+  if (/^\d+(\.\d+)?$/.test(s)) return `${s}mm`;
+  // 범위 — 5.5~6.5 → 5.5~6.5mm
+  // 실 라벨에는 권장 호수가 범위로 적혀 있는 경우가 많다. 이것도 단위가 붙어야
+  // 읽힌다. 단위는 뒤에 한 번만 — '5.5mm~6.5mm' 는 눈에 시끄럽다.
+  if (/^\d+(\.\d+)?\s*[~\-–]\s*\d+(\.\d+)?$/.test(s)) return `${s}mm`;
+  return s;
 }
 
 /**
