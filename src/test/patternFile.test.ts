@@ -69,25 +69,39 @@ function read(rel: string) {
   return readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 }
 
-describe('도안 파일이 밖으로 새지 않는다', () => {
+describe('도안 파일이 새면 안 되는 곳', () => {
   it('백업 파일(exportAll)에 patternFiles 가 없다', () => {
-    // 새면 백업 한 번에 수백 MB 가 된다 — 열지도 보내지도 못한다
+    // 새면 백업 한 번에 수백 MB 가 된다 — 열지도 보내지도 못한다.
+    // 클라우드에는 올라가도 파일 백업에는 절대 안 담는다.
     const src = read('../lib/db.ts');
     const body = src.slice(src.indexOf('export async function exportAll'));
     expect(body).not.toContain('patternFiles');
   });
 
-  it('클라우드 업로드에서 fileDataUrl 을 지운다', () => {
-    // 안 쓰는 옛 칸이지만 남아 있는 기기가 있으면 문서와 함께 올라간다.
-    // Firestore 문서 한도(1MB)를 그 자리에서 넘겨 백업이 통째로 실패한다.
+  it('Firestore 문서에는 파일이 아니라 자리만 적는다', () => {
+    // fileDataUrl 은 안 쓰는 옛 칸이다. 남아 있는 기기가 있으면 문서와 함께
+    // 올라가는데, PDF 한 개면 문서 한도(1MB)를 그 자리에서 넘긴다.
     const src = read('../lib/sync/pattern.ts');
     expect(src).toContain('fileDataUrl: _dropped');
+    // 올리는 것은 '자리'(fileStoragePath)뿐이다
+    expect(read('../lib/sync/patternFileSync.ts')).toContain('fileStoragePath');
   });
 
-  it('동기화 코드는 patternFiles 표를 아예 읽지 않는다', () => {
-    // 설명하는 주석에는 이름이 나오므로 실제로 표를 건드리는 모양만 본다
-    for (const f of ['pattern.ts', 'project.ts', 'yarn.ts', 'needle.ts', 'notion.ts', 'log.ts']) {
-      expect(read(`../lib/sync/${f}`)).not.toContain('db.patternFiles');
-    }
+  it('도안 파일 동기화는 신청한 계정에만 열린다', () => {
+    // 이 문이 열리면 사람 수만큼 보관 비용이 늘어난다.
+    // PDF 는 한 개가 3~10MB 라 사진과는 무게가 다르다.
+    const src = read('../lib/sync/patternFileSync.ts');
+    expect(src).toContain('isProAccount');
+    // 올리기·받기 양쪽 모두 이 판단을 거쳐야 한다
+    expect(src).toContain('canSyncPatternFiles()');
+    const gates = src.match(/canSyncPatternFiles\(\)/g) ?? [];
+    expect(gates.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('짝은 기기 안 번호가 아니라 cloudId 로 맞춘다', () => {
+    // patternId 로 맞추면 폰의 3번 도안 파일이 PC 의 3번(다른 도안)에 붙는다
+    const src = read('../lib/sync/patternFileStorage.ts');
+    expect(src).toContain('patternCloudId');
+    expect(src).not.toContain('patternId');
   });
 });

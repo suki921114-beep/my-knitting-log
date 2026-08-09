@@ -12,7 +12,8 @@
 //   pending === File      → 새로 고른 파일 (아직 저장 전)
 
 import { useRef, useState } from 'react';
-import { FileText, Trash2, Eye, Download, Paperclip } from 'lucide-react';
+import { FileText, Trash2, Eye, Download, Paperclip, Cloud, CloudOff } from 'lucide-react';
+import { canSyncPatternFiles } from '@/lib/sync/patternFileSync';
 import PdfViewer from '@/components/PdfViewer';
 import type { PatternFile } from '@/lib/db';
 import {
@@ -38,6 +39,7 @@ interface Props {
 export default function PatternFileInput({ saved, pending, onPending, rememberKey }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = useState(false);
+  const cloudEnabled = canSyncPatternFiles();
 
   // 지금 화면에 보여줄 파일. 새로 고른 게 있으면 그것이 이긴다.
   const shown: { name: string; size: number; blob: Blob; isNew: boolean } | null =
@@ -96,9 +98,27 @@ export default function PatternFileInput({ saved, pending, onPending, rememberKe
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-semibold text-ink">{shown.name}</div>
-              <div className="text-[11px] text-muted-foreground">
-                {formatBytes(shown.size)}
-                {shown.isNew && <span className="ml-1.5 font-semibold text-primary">저장하면 반영돼요</span>}
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span>{formatBytes(shown.size)}</span>
+                {shown.isNew ? (
+                  <span className="font-semibold text-primary">저장하면 반영돼요</span>
+                ) : cloudEnabled && (
+                  // 올라갔는지 아닌지를 보여준다. '백업했으니 괜찮겠지' 하고
+                  // 넘어갔다가 안 올라가 있으면 기기를 바꿀 때 잃는다.
+                  <span className="inline-flex items-center gap-1 font-semibold">
+                    {saved?.storagePath ? (
+                      <>
+                        <Cloud className="h-3 w-3 text-primary" />
+                        <span className="text-primary">클라우드에 있어요</span>
+                      </>
+                    ) : (
+                      <>
+                        <CloudOff className="h-3 w-3" />
+                        <span>백업하면 올라가요</span>
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
             <button
@@ -147,10 +167,20 @@ export default function PatternFileInput({ saved, pending, onPending, rememberKe
 
       {/* 이 안내는 접어두지 않는다. 도안은 돈 주고 산 파일이라 사라지면
           사진과는 이야기가 다르다 — 처음 넣을 때 꼭 읽고 넘어가야 한다. */}
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        ※ 도안 파일은 이 기기에만 저장돼요. 클라우드 백업과 백업 파일에는 담기지 않으니,
-        원본은 따로 보관해 주세요.
-      </p>
+      {/* 안내는 계정에 따라 다르게 말해야 한다.
+          클라우드가 열린 계정에 "이 기기에만 저장된다" 고 하면 거짓말이고,
+          안 열린 계정에 "백업된다" 고 하면 파일을 잃게 만든다. */}
+      {cloudEnabled ? (
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          ※ 도안 파일은 <strong className="text-foreground">백업할 때 클라우드에 함께 올라가요.</strong>{' '}
+          다른 기기에서는 가져오기를 하면 받아집니다. 파일로 내보내기에는 담기지 않아요.
+        </p>
+      ) : (
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          ※ 도안 파일은 이 기기에만 저장돼요. 백업에는 담기지 않아서 <strong className="text-foreground">다른
+          기기에서 넣은 도안은 여기 보이지 않아요.</strong> 원본은 따로 보관해 주세요.
+        </p>
+      )}
 
       {viewing && shown && (
         <PdfViewer

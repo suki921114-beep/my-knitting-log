@@ -72,17 +72,27 @@ export async function savePatternFile(patternId: number, file: File): Promise<Sa
   if (!isPdf(file)) return { ok: false, error: 'type' };
   if (file.size > MAX_PATTERN_FILE_BYTES) return { ok: false, error: 'size' };
 
-  const record: PatternFile = {
-    patternId,
-    name: file.name || '도안.pdf',
-    size: file.size,
-    type: 'application/pdf',
-    blob: file,
-    createdAt: Date.now(),
-  };
-
   try {
     await requestPersistentStorage();
+
+    // ⚠️ 고른 File 을 그대로 담으면 안 된다.
+    //    브라우저가 주는 File 은 컴퓨터에 있는 원본 파일을 '가리키기만' 하는
+    //    경우가 있다. 그러면 나중에 원본을 옮기거나 지웠을 때 읽기가 실패하고,
+    //    화면에는 '파일이 손상되었을 수 있어요' 로 보인다.
+    //    내용을 통째로 읽어 새 Blob 으로 만들면 원본과 끊어져 그럴 일이 없다.
+    const bytes = await file.arrayBuffer();
+    const record: PatternFile = {
+      patternId,
+      // 도안의 cloudId 를 함께 적어 둔다. 클라우드에서 짝을 맞추는 열쇠는
+      // 기기마다 다른 patternId 가 아니라 이 값이다.
+      patternCloudId: (await db.patterns.get(patternId))?.cloudId,
+      name: file.name || '도안.pdf',
+      size: bytes.byteLength || file.size,
+      type: 'application/pdf',
+      blob: new Blob([bytes], { type: 'application/pdf' }),
+      createdAt: Date.now(),
+    };
+
     // 지우고 넣는다. 도안 하나에 파일 하나이므로 옛것이 남아 자리를 먹으면 안 된다.
     await db.transaction('rw', db.patternFiles, async () => {
       await db.patternFiles.where('patternId').equals(patternId).delete();
@@ -101,8 +111,27 @@ export async function getPatternFile(patternId: number): Promise<PatternFile | u
   return db.patternFiles.where('patternId').equals(patternId).first();
 }
 
+/**
+ * 클라우드에 올라간 파일도 함께 지운다.
+ *
+ * 안 지우면 쓰지 않는 파일이 남아 용량만 먹는다. 여기서 실패해도 기기에서
+ * 지우는 것까지 막지는 않는다 — 다음에 계정을 지울 때 폴더째 정리된다.
+ */
+async function removeFromCloud(rows: { storagePath?: string }[]): Promise<void> {
+  const paths = rows.map(r => r.storagePath).filter(Boolean) as string[];
+  if (!paths.length) return;
+  try {
+    const { deletePatternFileObject } = await import('@/lib/sync/patternFileStorage');
+    await Promise.all(paths.map(p => deletePatternFileObject(p)));
+  } catch (e) {
+    console.warn('[patternFile] 클라우드 파일 삭제 실패', e);
+  }
+}
+
 export async function deletePatternFile(patternId: number): Promise<void> {
+  const rows = await db.patternFiles.where('patternId').equals(patternId).toArray();
   await db.patternFiles.where('patternId').equals(patternId).delete();
+  await removeFromCloud(rows);
 }
 
 /**
@@ -113,7 +142,9 @@ export async function deletePatternFile(patternId: number): Promise<void> {
  */
 export async function deletePatternFiles(patternIds: number[]): Promise<void> {
   if (!patternIds.length) return;
+  const rows = await db.patternFiles.where('patternId').anyOf(patternIds).toArray();
   await db.patternFiles.where('patternId').anyOf(patternIds).delete();
+  await removeFromCloud(rows);
 }
 
 /**

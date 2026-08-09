@@ -9,6 +9,7 @@ import { db } from '@/lib/db';
 import type { Pattern } from '@/lib/db';
 import { sanitizeForFirestore, type FetchDiff, type SyncDiff } from './common';
 import { prepareCoverUpload, resolveCover, needsCoverMigration, PATTERN_COVER } from './coverSync';
+import { uploadPatternFileFor, downloadPatternFileFor } from './patternFileSync';
 import { readUsage, writeUsage } from '@/lib/cloudUsage';
 import { EMPTY_USAGE, type StorageUsage } from '@/lib/quota';
 
@@ -134,13 +135,18 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
           Object.assign(local, prepared.localPatch);
         }
 
+        // 도안 PDF 는 Storage 로 보내고 문서에는 자리만 적는다.
+        // 권한이 없는 계정에서는 아무 일도 안 하고 빈 값이 돌아온다.
+        const filePayload = await uploadPatternFileFor(userId, local, usage, 'PatternSync');
+        usage = filePayload.usage;
+        usageChanged = usageChanged || filePayload.usageChanged;
+
         const docRef = doc(firestore, `users/${userId}/patterns`, local.cloudId!);
-        // ⚠️ 도안 파일은 클라우드에 올리지 않기로 했다. fileDataUrl 은 안 쓰는
-        //    옛 칸이지만, 남아 있는 기기가 있으면 문서와 함께 올라간다.
-        //    PDF 한 개면 1MB 한도를 그 자리에서 넘겨 백업이 통째로 실패한다.
-        //    (PDF 본체는 patternFiles 표에 따로 있고 sync 는 그 표를 읽지 않는다)
+        // ⚠️ fileDataUrl 은 안 쓰는 옛 칸이다. 남아 있는 기기가 있으면 문서와
+        //    함께 올라가는데, PDF 한 개면 Firestore 문서 한도(1MB)를 그 자리에서
+        //    넘겨 백업이 통째로 실패한다. 반드시 지운다.
         const { fileDataUrl: _dropped, ...withoutFile } = prepared.payload as any;
-        const uploadData = sanitizeForFirestore(withoutFile);
+        const uploadData = sanitizeForFirestore({ ...withoutFile, ...filePayload.payload });
 
         console.log(`[Sync Upload] 도안 대상: ${local.name || 'Unknown'}`);
         batch.set(docRef, uploadData);
@@ -174,6 +180,7 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
         // 기기에 그림이 없으면 Storage 에서 받아온다.
         // 예전에 문서 안에 글자로 박아 올린 사진도 그대로 읽어 준다.
         const imageDataUrl = await resolveCover(existing?.imageDataUrl, remote, PATTERN_COVER, 'PatternSync');
+        let localId: number;
         if (existing) {
           await db.patterns.update(existing.id!, {
             ...remote,
@@ -181,10 +188,13 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
             imageDataUrl,
             fileDataUrl: existing.fileDataUrl
           });
+          localId = existing.id!;
         } else {
           const { id, ...dataToPut } = remote as any;
-          await db.patterns.add({ ...dataToPut, imageDataUrl });
+          localId = (await db.patterns.add({ ...dataToPut, imageDataUrl })) as number;
         }
+        // 도안 PDF 는 문서 밖(Storage)에 있어 따로 받아 온다
+        await downloadPatternFileFor(localId, remote, 'PatternSync');
         downloaded++;
       } catch(e) {
         console.error(`[Sync] Pattern 다운로드/저장 실패: ${remote.name || 'Unknown'} (${remote.cloudId})`, e);
@@ -208,7 +218,8 @@ export async function executePatternFetch(diff: FetchDiff<Pattern>) {
     try {
       const { id, ...dataToPut } = remote as any;
       const imageDataUrl = await resolveCover(undefined, remote, PATTERN_COVER, 'PatternFetch');
-      await db.patterns.add({ ...dataToPut, imageDataUrl });
+      const localId = (await db.patterns.add({ ...dataToPut, imageDataUrl })) as number;
+      await downloadPatternFileFor(localId, remote, 'PatternFetch');
       added++;
     } catch (e) {
       console.error(`[Fetch] Pattern 추가 실패: ${remote.name} (${remote.cloudId})`, e);
@@ -227,6 +238,7 @@ export async function executePatternFetch(diff: FetchDiff<Pattern>) {
           imageDataUrl,
           fileDataUrl: existing.fileDataUrl
         });
+        await downloadPatternFileFor(existing.id!, remote, 'PatternFetch');
         updated++;
       } else {
         failed++;

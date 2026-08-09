@@ -128,7 +128,14 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
       } catch (e) {
         console.error('[PdfViewer] 문서를 열지 못했습니다', e);
         if (alive) {
-          setError('도안을 열지 못했어요. 파일이 손상되었을 수 있어요.');
+          // 원인을 나눠서 알린다. '손상' 이라고만 하면 고칠 방법이 없어 보인다.
+          // 실제로 가장 흔한 건 원본 파일이 사라진 경우이고, 그건 다시 넣으면 된다.
+          const name = (e as { name?: string })?.name ?? '';
+          setError(
+            name === 'NotReadableError' || name === 'NotFoundError'
+              ? '도안 파일을 읽지 못했어요. 원본이 옮겨졌거나 지워졌을 수 있어요. 도안 수정 화면에서 PDF를 다시 넣어주세요.'
+              : '도안을 열지 못했어요. PDF가 아니거나 파일이 손상되었을 수 있어요.',
+          );
           setLoading(false);
         }
       }

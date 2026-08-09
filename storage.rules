@@ -48,6 +48,24 @@ service firebase.storage {
                    && withinQuota(uid);
     }
 
+    // ------------------------------------------------------------------
+    // 도안 PDF — users/{uid}/patternFiles/{patternCloudId}.pdf
+    // ------------------------------------------------------------------
+    // 사진과 경로를 나눈 덕에 크기 제한을 따로 걸 수 있다.
+    // PDF 는 사진보다 크지만(30MB) 그만큼 총량 확인이 중요하다.
+    // ⚠️ src/lib/patternFile.ts 의 MAX_PATTERN_FILE_BYTES 와 값을 맞출 것.
+    match /users/{uid}/patternFiles/{allPaths=**} {
+      allow read: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    match /users/{uid}/patternFiles/{fileName} {
+      allow write: if isOwner(uid)
+                   && request.resource.size < 30 * 1024 * 1024         // 한 개 30MB
+                   && request.resource.contentType == 'application/pdf'
+                   && withinQuota(uid);
+    }
+
     // 그 외 모든 경로는 거부
     match /{allPaths=**} {
       allow read, write: if false;

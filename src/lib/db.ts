@@ -57,21 +57,25 @@ export interface Project extends SyncMetadata {
 }
 
 /**
- * 도안 PDF — 이 기기에만 있는 파일.
+ * 도안 PDF.
  *
- * 다른 표와 달리 cloudId 도 isDeleted 도 없다. 일부러 그렇다.
- * 클라우드에 올리지 않기로 했으니 동기화에 필요한 것이 아무것도 없다.
- * (유료로 풀 때 이 표에 cloudId 를 더하고 sync 를 붙이면 된다)
+ * 기본은 이 기기에만 둔다. 클라우드 보관은 신청한 계정에만 열린다
+ * (src/lib/entitlement.ts). 사진과 달리 한 개가 3~10MB 라 사람이 늘면
+ * 보관 비용이 그만큼 든다.
  *
- * ⚠️ 세 곳에서 이 표를 빼야 한다. 하나라도 새면 도안 파일이 클라우드로 간다.
- *    · sync/*.ts       — 애초에 db.patternFiles 를 읽지 않는다
- *    · exportAll()     — 백업 파일이 수백 MB 가 된다
- *    · sync/pattern.ts — payload 에서 fileDataUrl 을 지운다 (옛 칸)
+ * ⚠️ patternId 는 이 기기 안에서만 통하는 번호다. 기기마다 값이 다르다.
+ *    클라우드에서 짝을 맞출 때는 반드시 patternCloudId 를 쓸 것 —
+ *    번호로 맞추면 폰의 3번 도안 파일이 PC 의 3번(다른 도안)에 붙는다.
+ *
+ * ⚠️ exportAll() 에는 넣지 않는다. 백업 파일은 글자(JSON)라 PDF 가 base64 로
+ *    또 부풀어, 도안 스무 개면 백업 한 번에 200MB 가 된다.
  */
 export interface PatternFile {
   id?: number;
-  /** 어느 도안의 파일인지. 도안 하나에 파일 하나. */
+  /** 어느 도안의 파일인지 — 이 기기 안에서 쓰는 번호 */
   patternId: number;
+  /** 도안의 cloudId. 기기가 달라도 같은 값이라 클라우드에서 짝이 맞는다. */
+  patternCloudId?: string;
   /** 사람이 고른 원래 파일명 — 내려받을 때 이 이름으로 준다 */
   name: string;
   size: number;
@@ -81,6 +85,8 @@ export interface PatternFile {
    * 읽을 때마다 글자를 다시 파일로 되돌리는 값을 치러야 한다.
    */
   blob: Blob;
+  /** 클라우드에 올라간 자리. 없으면 아직 이 기기에만 있다는 뜻. */
+  storagePath?: string;
   createdAt: number;
 }
 
@@ -101,6 +107,11 @@ export interface Pattern extends SyncMetadata {
   imageDataUrl?: string; // 대표 이미지
   /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
   imageStoragePath?: string;
+  /** 도안 PDF 가 올라간 Storage 자리. 파일 자체는 문서에 담지 않는다. */
+  fileStoragePath?: string;
+  /** 내려받을 때 쓸 원래 파일명과 크기 */
+  fileName?: string;
+  fileSize?: number;
   difficulty?: string;
   sizeInfo?: string;
   note?: string;
@@ -635,6 +646,37 @@ class KnitDB extends Dexie {
       projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
       logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
       patternFiles: '++id, patternId',
+    });
+
+    // 도안 PDF 를 클라우드에 올릴 수 있게 되면서 patternCloudId 가 필요해졌다.
+    // patternId 는 기기 안에서만 통하는 번호라 짝을 맞출 수 없다.
+    this.version(10).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+      logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
+      patternFiles: '++id, patternId, patternCloudId',
+    }).upgrade(async (tx) => {
+      // 이미 넣어둔 파일에 도안의 cloudId 를 채운다.
+      // 이 표는 동기화 대상이 아니므로 dirty 표시를 건드릴 필요가 없다.
+      const patterns = await tx.table('patterns').toArray();
+      const cloudIdById = new Map<number, string>(
+        patterns.filter(p => p.id != null && p.cloudId).map(p => [p.id, p.cloudId]),
+      );
+      const files = tx.table('patternFiles');
+      for (const f of await files.toArray()) {
+        const cid = cloudIdById.get(f.patternId);
+        if (cid && !f.patternCloudId) await files.put({ ...f, patternCloudId: cid });
+      }
     });
 
   }

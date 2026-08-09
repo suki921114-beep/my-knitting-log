@@ -54,13 +54,22 @@ export default function KnitMode() {
     [pid],
   ) || [];
 
-  // 이 프로젝트에 걸린 도안 중 PDF 가 있는 것들
+  // 이 프로젝트에 걸린 도안 중 PDF 가 있는 것들.
+  //
+  // ⚠️ toArray() 를 쓰면 안 된다 — 파일 내용까지 통째로 읽어서, 도안이 몇 개만
+  //    있어도 화면을 열 때마다 수십 MB 를 메모리에 올린다. 여기서 필요한 건
+  //    '어느 도안에 파일이 있나' 뿐이므로 색인 값만 가져온다.
+  //    실제 파일은 고른 하나만 따로 꺼낸다.
   const filed = useLiveQuery(async () => {
     const ids = patternLinks.map(l => l.patternId);
     if (!ids.length) return [];
-    const files = await db.patternFiles.where('patternId').anyOf(ids).toArray();
-    const patterns = await db.patterns.bulkGet(files.map(f => f.patternId));
-    return files.map((f, i) => ({ patternId: f.patternId, name: patterns[i]?.name || f.name }));
+    const withFile = [
+      ...new Set(
+        (await db.patternFiles.where('patternId').anyOf(ids).keys()) as number[],
+      ),
+    ];
+    const patterns = await db.patterns.bulkGet(withFile);
+    return withFile.map((pid, i) => ({ patternId: pid, name: patterns[i]?.name || '도안' }));
   }, [patternLinks.map(l => l.patternId).join(',')]) || [];
 
   const [pickedId, setPickedId] = useState<number | null>(null);
