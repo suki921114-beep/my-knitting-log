@@ -6,6 +6,8 @@ import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
+import PatternFileInput, { type PendingPatternFile } from '@/components/PatternFileInput';
+import { deletePatternFile, savePatternFile, saveErrorMessage } from '@/lib/patternFile';
 import { Save, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
@@ -20,6 +22,13 @@ export default function PatternForm() {
   const [f, setF] = useState({ name: '', designer: '', source: '', link: '', difficulty: '', sizeInfo: '', note: '' });
   const [image, setImage] = useState<string | undefined>(undefined);
   const [hyd, setHyd] = useState(false);
+  // 도안 PDF 는 patterns 표가 아니라 patternFiles 에 따로 있다.
+  // 목록을 그릴 때마다 몇 MB 를 읽지 않으려고 갈라 두었다.
+  const savedFile = useLiveQuery(
+    () => (pid ? db.patternFiles.where('patternId').equals(pid).first() : undefined),
+    [pid],
+  );
+  const [pendingFile, setPendingFile] = useState<PendingPatternFile>(undefined);
   useEffect(() => {
     if (editing && existing && !hyd) {
       setF({
@@ -54,15 +63,30 @@ export default function PatternForm() {
       deletedAt: null
     };
     
+    let targetId: number;
     if (editing && pid) {
       await db.patterns.update(pid, payload);
+      targetId = pid;
     } else {
-      await db.patterns.add({ 
-        ...payload, 
+      targetId = (await db.patterns.add({
+        ...payload,
         createdAt: t,
         cloudId: crypto.randomUUID()
-      });
+      })) as number;
     }
+
+    // PDF 는 도안이 저장돼 id 가 생긴 뒤에 붙인다.
+    // 파일 저장이 실패해도 도안 자체는 이미 저장됐다 — 알리기만 하고 넘어간다.
+    if (pendingFile === null) {
+      await deletePatternFile(targetId);
+    } else if (pendingFile) {
+      const r = await savePatternFile(targetId, pendingFile);
+      if (!r.ok) {
+        const m = saveErrorMessage(r.error ?? 'unknown');
+        toast.error(m.title, { description: m.description });
+      }
+    }
+
     nav('/library/patterns', { replace: true });
   }
   async function remove() {
@@ -112,6 +136,15 @@ export default function PatternForm() {
         <Field label="난이도"><input className={inp} value={f.difficulty} onChange={u('difficulty')} placeholder="초·중·상" /></Field>
       </div>
       <Field label="도안 링크"><input className={inp} value={f.link} onChange={u('link')} placeholder="https://" /></Field>
+      <div>
+        <span className="mb-1.5 block text-xs font-medium text-muted-foreground">도안 파일 (PDF)</span>
+        <PatternFileInput
+          saved={savedFile}
+          pending={pendingFile}
+          onPending={setPendingFile}
+          rememberKey={pid ? String(pid) : undefined}
+        />
+      </div>
       <Field label="사이즈 정보"><input className={inp} value={f.sizeInfo} onChange={u('sizeInfo')} /></Field>
       <Field label="메모"><textarea className={`${inp} min-h-[80px]`} value={f.note} onChange={u('note')} /></Field>
       {editing && <ReverseProjectsSection kind="pattern" refId={pid} />}

@@ -7,6 +7,7 @@
 
 import { db } from '@/lib/db';
 import { purgeFromCloud } from '@/lib/sync/purge';
+import { deletePatternFiles } from '@/lib/patternFile';
 
 /** 휴지통 보관 기간 (일) */
 export const TRASH_RETENTION_DAYS = 7;
@@ -102,6 +103,9 @@ export async function purgeExpiredTrash(nowMs: number = Date.now()): Promise<num
             .map(r => ({ table: name, cloudId: r.cloudId })),
         );
         await table.bulkDelete(expiredIds);
+        // 도안 PDF 는 별도 표에 있어 도안을 지워도 따라 지워지지 않는다.
+        // 안 지우면 몇 MB 짜리 파일이 주인 없이 기기에 계속 남는다.
+        if (name === 'patterns') await deletePatternFiles(expiredIds);
         purged += expiredIds.length;
       }
     } catch (e) {

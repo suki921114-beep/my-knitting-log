@@ -39,3 +39,6 @@ design/store/raw/*
 design/store/out/
 design/store/assets/*
 !design/store/assets/README.md
+
+# pdf.js 가 실행 중에 쓰는 파일 — npm install 뒤 scripts/copy-pdfjs-assets.mjs 가 채운다
+public/pdfjs/

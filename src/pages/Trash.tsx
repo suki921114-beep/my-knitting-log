@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { purgeFromCloud } from '@/lib/sync/purge';
 import { purgeExpiredTrash, trashDaysLeft, TRASH_RETENTION_DAYS } from '@/lib/autoPurge';
+import { deletePatternFiles } from '@/lib/patternFile';
 import PageHeader from '@/components/PageHeader';
 import { toast } from '@/components/ui/sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -69,6 +70,8 @@ export default function Trash() {
         if (rows.length) {
           await purgeFromCloud(rows.map((x: any) => ({ table: name, cloudId: x.cloudId })));
           await table.bulkDelete(rows.map((x: any) => x.id));
+          // 도안 PDF 는 별도 표라 도안을 지워도 따라 지워지지 않는다
+          if (name === 'patterns') await deletePatternFiles(rows.map((x: any) => x.id));
           removed += rows.length;
         }
       }
@@ -108,6 +111,8 @@ export default function Trash() {
       const row = await table.get(pendingPurge.id);
       await purgeFromCloud([{ table: pendingPurge.table, cloudId: row?.cloudId }]);
       await table.delete(pendingPurge.id);
+      // 도안 PDF 는 별도 표라 도안을 지워도 따라 지워지지 않는다
+      if (pendingPurge.table === 'patterns') await deletePatternFiles([pendingPurge.id]);
       toast.success('영구 삭제했어요', {
         id: 'trash-action',
         description: '기기와 클라우드에서 완전히 지웠습니다.',

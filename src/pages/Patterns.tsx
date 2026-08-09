@@ -5,11 +5,18 @@ import { db } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
-import { Plus, Search, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Image as ImageIcon, FileText } from 'lucide-react';
 import { EmptyState } from '@/components/Mascot';
 
 export default function Patterns() {
   const items = useLiveQuery(() => db.patterns.orderBy('updatedAt').reverse().filter(x => !x.isDeleted).toArray(), []) || [];
+  // PDF 가 붙은 도안에 표시를 단다.
+  // ⚠️ 파일 자체는 절대 읽지 않는다 — 목록 한 번 그리는 데 수십 MB 를 읽게 된다.
+  //    색인(patternId) 값만 가져오면 크기가 붙지 않는다.
+  const withFile = useLiveQuery(
+    async () => new Set((await db.patternFiles.orderBy('patternId').keys()) as number[]),
+    [],
+  ) || new Set<number>();
   const [q, setQ] = useState('');
   const [view, setView] = useViewMode('patterns', 'grid');
   const filtered = items.filter(p => !q || [p.name, p.designer, p.source].filter(Boolean).some(v => v!.toLowerCase().includes(q.toLowerCase())));
@@ -45,7 +52,10 @@ export default function Patterns() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold text-foreground">{p.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[14px] font-semibold text-foreground">{p.name}</span>
+                    {withFile.has(p.id!) && <FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-label="PDF 있음" />}
+                  </div>
                   <div className="truncate text-[11.5px] text-muted-foreground">
                     {[p.designer, p.difficulty, p.sizeInfo].filter(Boolean).join(' · ') || '—'}
                   </div>
@@ -59,11 +69,19 @@ export default function Patterns() {
           {filtered.map(p => (
             <li key={p.id}>
               <Link to={`/library/patterns/${p.id}/edit`} className="card-soft block overflow-hidden hover:shadow-soft">
-                <div className="aspect-[4/5] overflow-hidden">
+                <div className="relative aspect-[4/5] overflow-hidden">
                   {p.imageDataUrl ? (
                     <img src={p.imageDataUrl} alt={p.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="img-placeholder"><ImageIcon className="h-6 w-6" /></div>
+                  )}
+                  {withFile.has(p.id!) && (
+                    <span
+                      className="absolute right-1.5 top-1.5 rounded-full bg-card/90 p-1 shadow-soft"
+                      aria-label="PDF 있음"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-primary" />
+                    </span>
                   )}
                 </div>
                 <div className="p-2.5">

@@ -135,7 +135,12 @@ export async function executePatternSync(userId: string, diff: SyncDiff<Pattern>
         }
 
         const docRef = doc(firestore, `users/${userId}/patterns`, local.cloudId!);
-        const uploadData = sanitizeForFirestore(prepared.payload);
+        // ⚠️ 도안 파일은 클라우드에 올리지 않기로 했다. fileDataUrl 은 안 쓰는
+        //    옛 칸이지만, 남아 있는 기기가 있으면 문서와 함께 올라간다.
+        //    PDF 한 개면 1MB 한도를 그 자리에서 넘겨 백업이 통째로 실패한다.
+        //    (PDF 본체는 patternFiles 표에 따로 있고 sync 는 그 표를 읽지 않는다)
+        const { fileDataUrl: _dropped, ...withoutFile } = prepared.payload as any;
+        const uploadData = sanitizeForFirestore(withoutFile);
 
         console.log(`[Sync Upload] 도안 대상: ${local.name || 'Unknown'}`);
         batch.set(docRef, uploadData);

@@ -4,10 +4,13 @@ import { db } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
 import { describeNeedle, formatNeedleSize } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
-import { Pencil, Image as ImageIcon, PenLine } from 'lucide-react';
+import { Pencil, Image as ImageIcon, PenLine, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import RowCounterSection from '@/components/RowCounterSection';
 import ProjectGaugeSection from '@/components/ProjectGaugeSection';
+import PdfViewer from '@/components/PdfViewer';
+import { getPatternFile } from '@/lib/patternFile';
+import type { PatternFile } from '@/lib/db';
 import { toast } from '@/components/ui/sonner';
 
 export default function ProjectDetail() {
@@ -33,6 +36,20 @@ export default function ProjectDetail() {
   const patternMap = new Map(patterns.map(p => [p.id!, p]));
   const needleMap = new Map(needles.map(n => [n.id!, n]));
   const notionMap = new Map(notions.map(n => [n.id!, n]));
+
+  // 어느 도안에 PDF 가 붙어 있는지. 파일 자체는 안 읽는다 — 화면을 열 때마다
+  // 수십 MB 를 읽게 된다. 실제 파일은 눌렀을 때 한 개만 꺼낸다.
+  const patternFileIds = useLiveQuery(
+    async () => new Set((await db.patternFiles.orderBy('patternId').keys()) as number[]),
+    [],
+  ) || new Set<number>();
+  const [viewingFile, setViewingFile] = useState<PatternFile | null>(null);
+
+  async function openPatternFile(patternId: number) {
+    const file = await getPatternFile(patternId);
+    if (file) setViewingFile(file);
+    else toast.error('도안 파일을 찾지 못했어요');
+  }
 
   const [lightbox, setLightbox] = useState<string | null>(null);
   // 메모는 수정 화면까지 들어가지 않고 여기서 바로 고친다 —
@@ -194,6 +211,23 @@ export default function ProjectDetail() {
                       {deleted ? '삭제됨' : [p?.designer, p?.difficulty].filter(Boolean).join(' · ') || '—'}
                     </div>
                   </div>
+                  {/* 뜨는 중에 가장 자주 누를 자리다. 도안 수정 화면을 거치지 않고
+                      여기서 바로 연다.
+                      ⚠️ 카드 전체가 링크라, 눌림이 위로 새면 수정 화면으로 넘어간다. */}
+                  {!deleted && patternFileIds.has(l.patternId) && (
+                    <button
+                      type="button"
+                      aria-label="도안 보기"
+                      onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void openPatternFile(l.patternId);
+                      }}
+                      className="shrink-0 rounded-full bg-primary-soft p-2 text-primary transition hover:bg-primary hover:text-primary-foreground"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </button>
+                  )}
                 </MaybeLink>
               );
             })}
@@ -321,6 +355,14 @@ export default function ProjectDetail() {
           )}
         </div>
       </Section>
+
+      {viewingFile && (
+        <PdfViewer
+          file={viewingFile}
+          rememberKey={String(viewingFile.patternId)}
+          onClose={() => setViewingFile(null)}
+        />
+      )}
 
       {lightbox && (
         <div

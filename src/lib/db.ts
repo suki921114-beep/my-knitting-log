@@ -56,12 +56,47 @@ export interface Project extends SyncMetadata {
   updatedAt: number;
 }
 
+/**
+ * 도안 PDF — 이 기기에만 있는 파일.
+ *
+ * 다른 표와 달리 cloudId 도 isDeleted 도 없다. 일부러 그렇다.
+ * 클라우드에 올리지 않기로 했으니 동기화에 필요한 것이 아무것도 없다.
+ * (유료로 풀 때 이 표에 cloudId 를 더하고 sync 를 붙이면 된다)
+ *
+ * ⚠️ 세 곳에서 이 표를 빼야 한다. 하나라도 새면 도안 파일이 클라우드로 간다.
+ *    · sync/*.ts       — 애초에 db.patternFiles 를 읽지 않는다
+ *    · exportAll()     — 백업 파일이 수백 MB 가 된다
+ *    · sync/pattern.ts — payload 에서 fileDataUrl 을 지운다 (옛 칸)
+ */
+export interface PatternFile {
+  id?: number;
+  /** 어느 도안의 파일인지. 도안 하나에 파일 하나. */
+  patternId: number;
+  /** 사람이 고른 원래 파일명 — 내려받을 때 이 이름으로 준다 */
+  name: string;
+  size: number;
+  type: string;
+  /**
+   * 파일 그대로. base64 로 바꾸지 않는다 — 용량이 3분의 1 늘고,
+   * 읽을 때마다 글자를 다시 파일로 되돌리는 값을 치러야 한다.
+   */
+  blob: Blob;
+  createdAt: number;
+}
+
 export interface Pattern extends SyncMetadata {
   id?: number;
   name: string;
   designer?: string;
   source?: string;
   link?: string;
+  /**
+   * @deprecated 도안 파일을 글자로 박아 두려던 칸. 쓰인 적이 없고 앞으로도 안 쓴다.
+   *
+   * PDF 는 patternFiles 테이블에 파일 그대로 담는다. 글자(base64)로 바꾸면
+   * 용량이 3분의 1쯤 불어나고, 도안 목록을 열 때마다 몇 MB 를 함께 읽게 된다.
+   * ⚠️ 클라우드로 새지 않도록 업로드 payload 에서도 지운다 — sync/pattern.ts 참고.
+   */
   fileDataUrl?: string;
   imageDataUrl?: string; // 대표 이미지
   /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
@@ -324,6 +359,7 @@ class KnitDB extends Dexie {
   gaugePresets!: Table<GaugePreset, number>;
   projectGauges!: Table<ProjectGauge, number>;
   logs!: Table<KnitLog, number>;
+  patternFiles!: Table<PatternFile, number>;
 
   constructor() {
     super('knit-db');
@@ -579,6 +615,28 @@ class KnitDB extends Dexie {
       }
     });
 
+    // 도안 PDF 를 담을 자리. 앞선 표들은 손대지 않으므로 stores 를 그대로 옮겨 적고
+    // patternFiles 한 줄만 더한다 (Dexie 는 버전마다 전체 모양을 요구한다).
+    //
+    // patternId 에만 색인을 둔다 — '이 도안의 파일' 을 찾는 것 말고는 쓸 일이 없다.
+    // blob 에는 색인을 걸 수 없고 걸어서도 안 된다.
+    this.version(9).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+      logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
+      patternFiles: '++id, patternId',
+    });
+
   }
 }
 
@@ -586,6 +644,14 @@ export const db = new KnitDB();
 
 export const now = () => Date.now();
 
+/**
+ * 백업 파일에 담을 것.
+ *
+ * ⚠️ patternFiles 는 일부러 뺐다. 도안 PDF 한 개가 3~10MB 인데 백업 파일은
+ *    글자(JSON)라 base64 로 바뀌며 또 3분의 1 불어난다. 도안 스무 개면
+ *    백업 한 번에 200MB 다 — 열지도 못하고 보내지도 못한다.
+ *    PDF 는 기기에만 두기로 한 파일이라 백업 대상이 아니다.
+ */
 export async function exportAll() {
   const data = {
     version: 5,
