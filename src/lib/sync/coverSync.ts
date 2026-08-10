@@ -68,9 +68,18 @@ export async function prepareCoverUpload<T extends Record<string, any>>(
   if (result.storagePath) payload[field.pathKey] = result.storagePath;
   else delete payload[field.pathKey];
 
+  // 기기에 다시 적어 둘 것.
+  //   · Storage 자리 — 안 적으면 다음 백업에 같은 사진을 또 올린다
+  //   · 줄인 그림 — 큰 사진을 줄여 올렸으면 기기에도 줄인 것을 남긴다.
+  //     안 그러면 기기에는 큰 그림이 그대로 남아 저장 공간을 계속 먹고,
+  //     다음 백업 때 또 줄이는 값을 치른다.
+  const localPatch: Record<string, unknown> = {};
+  if (result.usageChanged) localPatch[field.pathKey] = result.storagePath;
+  if (result.shrunkDataUrl) localPatch[field.dataKey] = result.shrunkDataUrl;
+
   return {
     payload: payload as T,
-    localPatch: result.usageChanged ? { [field.pathKey]: result.storagePath } : undefined,
+    localPatch: Object.keys(localPatch).length ? localPatch : undefined,
     usage: result.usage,
     usageChanged: result.usageChanged,
   };

@@ -115,6 +115,51 @@ export async function fileToCompressedDataUrl(
   return result || originalDataUrl;
 }
 
+/**
+ * 이미 저장된 dataURL 을 더 작게 다시 인코딩한다.
+ *
+ * 넣을 때 거르는 것과 별개로 필요하다. 크기 검사가 생기기 전에 들어온 사진,
+ * 그리고 압축이 실패해 원본이 그대로 들어온 사진(HEIC 디코드 실패 등)이
+ * 기기에 남아 있다. 그런 사진은 클라우드 한 장 상한(2MB)에 걸려 영영 안 올라간다.
+ *
+ * 줄이지 못하면 원본을 그대로 돌려준다 — 여기서 실패해도 백업 자체는 이어져야 한다.
+ */
+export async function shrinkDataUrl(
+  dataUrl: string | undefined,
+  opts: CompressOptions = {},
+): Promise<string | undefined> {
+  if (!dataUrl) return dataUrl;
+  const { maxDim, quality, maxBytes } = { ...DEFAULTS, ...opts };
+  if (estimateDataUrlBytes(dataUrl) <= maxBytes) return dataUrl;
+
+  let img: HTMLImageElement;
+  try {
+    img = await loadImage(dataUrl);
+  } catch {
+    // 이 형식은 브라우저가 못 읽는다. 줄일 방법이 없다.
+    return dataUrl;
+  }
+
+  const mime = supportsWebP() ? 'image/webp' : 'image/jpeg';
+  let result = drawAndEncode(img, maxDim, quality, mime);
+  if (!result) return dataUrl;
+
+  for (const step of [
+    { dim: maxDim, q: Math.max(0.6, quality - 0.1) },
+    { dim: Math.min(1024, maxDim), q: 0.7 },
+    { dim: 800, q: 0.6 },
+    { dim: 640, q: 0.5 },
+  ]) {
+    if (estimateDataUrlBytes(result) <= maxBytes) break;
+    const next = drawAndEncode(img, step.dim, step.q, mime);
+    if (!next) break;
+    result = next;
+  }
+
+  // 줄인 것이 더 크면(작은 PNG 를 WebP 로 바꾼 경우 등) 원본을 쓴다
+  return estimateDataUrlBytes(result) < estimateDataUrlBytes(dataUrl) ? result : dataUrl;
+}
+
 // ----------------------------------------------------------------------------
 // 내부 유틸
 // ----------------------------------------------------------------------------

@@ -23,7 +23,8 @@
 import type { ProjectPhoto } from '@/lib/db';
 import { uploadPhotoDataUrl, downloadPhotoAsDataUrl } from './photoStorage';
 import { reportSkippedPhoto, reportFailedPhotoDownload } from '@/lib/cloudUsage';
-import { canUpload, dataUrlBytes, type StorageUsage } from '@/lib/quota';
+import { canUpload, dataUrlBytes, MAX_PHOTO_BYTES, type StorageUsage } from '@/lib/quota';
+import { shrinkDataUrl } from '@/lib/image';
 import { captureError } from '@/lib/errorLog';
 import { ENABLE_CLOUD_PHOTO_SYNC } from '@/lib/featureFlags';
 
@@ -45,6 +46,29 @@ export interface UploadPhotosResult {
   payloads: RemotePhoto[];
   usage: StorageUsage;
   usageChanged: boolean;
+}
+
+/**
+ * 클라우드 한 장 상한(2MB)을 넘는 사진을 줄인다.
+ *
+ * 상한을 넘으면 Storage 규칙에서도 막히므로 올릴 방법이 아예 없다.
+ * 못 줄이면(브라우저가 못 읽는 형식) 원본을 그대로 돌려주고, 그때는
+ * 기존대로 건너뛴다.
+ */
+async function shrinkForCloud(dataUrl: string, context: string): Promise<string> {
+  if (dataUrlBytes(dataUrl) <= MAX_PHOTO_BYTES) return dataUrl;
+  try {
+    const smaller = await shrinkDataUrl(dataUrl, { maxDim: 1280, quality: 0.75, maxBytes: 800 * 1024 });
+    if (smaller && smaller !== dataUrl) {
+      console.info(
+        `[${context}] 큰 사진을 줄였어요: ${dataUrlBytes(dataUrl)} → ${dataUrlBytes(smaller)} bytes`,
+      );
+      return smaller;
+    }
+  } catch (e) {
+    console.warn(`[${context}] 사진 줄이기 실패`, e);
+  }
+  return dataUrl;
 }
 
 /** 빠진 값을 채워 온전한 사진 메타로 만든다 */
@@ -108,6 +132,11 @@ export async function uploadPhotos(
     const photo = normalize(raw);
 
     if (ENABLE_CLOUD_PHOTO_SYNC && !photo.storagePath && photo.dataUrl && !photo.isDeleted) {
+      // 한 장 상한을 넘는 사진은 그냥 건너뛰지 않고 줄여서 올린다.
+      // 크기 검사가 생기기 전에 들어온 사진들은 이대로 두면 영영 안 올라간다.
+      // 줄인 결과는 photo 에 그대로 남아 기기에도 다시 저장된다 —
+      // 다음 백업 때 또 줄이지 않아도 되고, 기기 저장 공간도 함께 준다.
+      photo.dataUrl = await shrinkForCloud(photo.dataUrl, context);
       const bytes = dataUrlBytes(photo.dataUrl);
       const verdict = canUpload(next, bytes);
 
@@ -195,6 +224,8 @@ export async function downloadPhotos(
 
 export interface UploadCoverResult {
   storagePath?: string;
+  /** 줄여서 올렸으면 줄인 그림. 기기에도 이 값으로 다시 저장해야 한다. */
+  shrunkDataUrl?: string;
   usage: StorageUsage;
   usageChanged: boolean;
 }
@@ -212,18 +243,22 @@ export async function uploadCoverImage(
     return { storagePath: existingPath, usage, usageChanged: false };
   }
 
-  const bytes = dataUrlBytes(dataUrl);
+  // 한 장 상한을 넘으면 줄여서 올린다. 건너뛰면 영영 안 올라간다.
+  const source = await shrinkForCloud(dataUrl, context);
+  const shrunkDataUrl = source === dataUrl ? undefined : source;
+
+  const bytes = dataUrlBytes(source);
   const verdict = canUpload(usage, bytes);
   if (!verdict.ok) {
     reportSkippedPhoto(verdict.reason!);
-    return { storagePath: undefined, usage, usageChanged: false };
+    return { storagePath: undefined, shrunkDataUrl, usage, usageChanged: false };
   }
 
   try {
     const path = await uploadPhotoDataUrl(userId, ownerCloudId, {
       cloudId: ownerCloudId,
-      dataUrl,
-      contentType: contentTypeOf(dataUrl),
+      dataUrl: source,
+      contentType: contentTypeOf(source),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       isDeleted: false,
@@ -231,6 +266,7 @@ export async function uploadCoverImage(
     });
     return {
       storagePath: path,
+      shrunkDataUrl,
       usage: { ...usage, bytes: usage.bytes + bytes, photoCount: usage.photoCount + 1 },
       usageChanged: true,
     };
@@ -240,7 +276,7 @@ export async function uploadCoverImage(
       `대표 이미지 업로드 실패 | ${ownerCloudId} | ${String((e as Error)?.message ?? e)}`,
       `${context}/coverUpload`,
     );
-    return { storagePath: undefined, usage, usageChanged: false };
+    return { storagePath: undefined, shrunkDataUrl, usage, usageChanged: false };
   }
 }
 
