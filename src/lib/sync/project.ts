@@ -34,6 +34,13 @@ type ProjectSyncPayload = {
   gauge?: string;
   progressNote?: string;
   finishedNote?: string;
+  /**
+   * 상세 화면에서 바로 적는 메모.
+   *
+   * ⚠️ 이 payload 는 칸을 하나씩 적어 만든다. 프로젝트에 칸을 더할 때 여기에도
+   *    적지 않으면 그 값은 영영 백업되지 않는다 — 실제로 memo 가 그랬다.
+   */
+  memo?: string;
   createdAt: number;
   updatedAt: number;
   isDeleted: boolean;
@@ -436,6 +443,7 @@ export async function buildProjectSyncPayload(projectId: number, userId: string)
     gauge: cleanProjectText(project.gauge),
     progressNote: cleanProjectText(project.progressNote),
     finishedNote: cleanProjectText(project.finishedNote),
+    memo: cleanProjectText(project.memo),
     createdAt: project.createdAt,
     updatedAt: projectPayloadUpdatedAt,
     isDeleted: project.isDeleted ?? false,
@@ -570,6 +578,7 @@ async function upsertProjectFromCloud(remote: ProjectSyncPayload, force = false)
       gauge: remote.gauge,
       progressNote: remote.progressNote,
       finishedNote: remote.finishedNote,
+      memo: remote.memo,
       cloudId: remote.cloudId,
       createdAt: remote.createdAt,
       updatedAt: remote.updatedAt,

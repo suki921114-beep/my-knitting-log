@@ -402,26 +402,29 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         style={{ touchAction: 'pan-x pan-y' }}
-        className="min-h-0 flex-1 overflow-auto overscroll-contain p-2"
+        // ⚠️ 가운데 정렬에 justify-center 를 쓰면 안 된다.
+        //    내용이 화면보다 커졌을 때 왼쪽(위쪽)으로 넘친 부분이 스크롤로
+        //    닿지 않는다 — 4배로 키우면 왼쪽 절반이 갈 수 없는 자리가 된다.
+        //    flex 컨테이너에 자식 margin:auto 를 쓰면 남을 땐 가운데로 오고
+        //    넘칠 땐 양쪽 다 스크롤된다.
+        className="flex min-h-0 flex-1 overflow-auto overscroll-contain p-2"
       >
         {loading ? (
-          <div className="flex h-full items-center justify-center gap-2 text-white/70">
+          <div className="m-auto flex items-center gap-2 text-white/70">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm">도안을 여는 중…</span>
           </div>
         ) : error ? (
-          <div className="flex h-full items-center justify-center px-6">
-            <p className="text-center text-sm leading-relaxed text-white/80">{error}</p>
-          </div>
+          <p className="m-auto max-w-xs text-center text-sm leading-relaxed text-white/80">
+            {error}
+          </p>
         ) : (
-          <div className="flex justify-center">
-            <canvas
-              ref={canvasRef}
-              className="rounded bg-white shadow-lg"
-              // 손가락을 벌리는 동안만 늘려 보여준다. 손을 떼면 그 배율로 다시 그린다.
-              style={liveScale === 1 ? undefined : { transform: `scale(${liveScale})` }}
-            />
-          </div>
+          <canvas
+            ref={canvasRef}
+            className="m-auto rounded bg-white shadow-lg"
+            // 손가락을 벌리는 동안만 늘려 보여준다. 손을 떼면 그 배율로 다시 그린다.
+            style={liveScale === 1 ? undefined : { transform: `scale(${liveScale})` }}
+          />
         )}
       </div>
 
