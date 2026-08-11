@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { useAllYarnStats } from '@/lib/yarnCalc';
 import { Scroll, ChevronRight, Calculator } from 'lucide-react';
 import { YarnBallIcon, NeedlesIcon, ButtonIcon } from '@/components/CraftIcons';
+import LibrarySearch from '@/components/LibrarySearch';
 
 export default function LibraryHub() {
   const counts = useLiveQuery(async () => ({
@@ -51,6 +52,9 @@ export default function LibraryHub() {
   return (
     <div>
       <PageHeader title="라이브러리" />
+      {/* 통합 검색 — 그게 실인지 바늘인지 기억나지 않을 때가 많다.
+          아무것도 안 치면 아무것도 안 나오므로 평소 화면은 그대로다. */}
+      <LibrarySearch />
       <ul className="space-y-2">
         {items.map(it => (
           <li key={it.to}>

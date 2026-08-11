@@ -112,6 +112,14 @@ export interface Pattern extends SyncMetadata {
   /** 내려받을 때 쓸 원래 파일명과 크기 */
   fileName?: string;
   fileSize?: number;
+  /**
+   * 도안이 요구하는 게이지. 실의 것과 같은 모양이다.
+   *
+   * 한 도안에 여러 줄이 나올 수 있다 — 몸판은 메리야스, 무늬 부분은 따로,
+   * 세탁 전후로 또 다르게 적힌 도안이 흔하다.
+   * 가진 실의 게이지에 맞는 도안을 찾을 때 쓴다.
+   */
+  gauges?: GaugeSpec[];
   difficulty?: string;
   sizeInfo?: string;
   note?: string;
@@ -130,7 +138,7 @@ export interface Pattern extends SyncMetadata {
  *    겹 — 뜰 때 몇 가닥을 함께 잡는지. 뜨는 방법이다.
  *    여기 strands 는 '겹' 이다. 처음에 '합' 이라고 잘못 적어두었다.
  */
-export interface YarnRecommendation {
+export interface GaugeSpec {
   /** 몇 겹으로 잡고 떴을 때인지 */
   strands: number;
   /** 권장 바늘 호수 (예: "4.0mm", "5호") */
@@ -152,6 +160,15 @@ export interface YarnRecommendation {
    */
   washState?: string;
 }
+
+/**
+ * @deprecated 이름만 남긴 옛 이름.
+ *
+ * 처음에는 실에만 있던 값이라 '실의 권장값' 이라고 불렀다. 지금은 도안에도
+ * 같은 모양으로 붙어서 GaugeSpec 이 맞는 이름이다. 저장된 데이터는 그대로라
+ * 타입 이름만 바꾸고 옛 이름을 남겨 둔다.
+ */
+export type YarnRecommendation = GaugeSpec;
 
 export interface Yarn extends SyncMetadata {
   id?: number;

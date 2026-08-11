@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { gaugeSearchText } from '@/lib/gauge';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
@@ -19,7 +20,17 @@ export default function Patterns() {
   ) || new Set<number>();
   const [q, setQ] = useState('');
   const [view, setView] = useViewMode('patterns', 'grid');
-  const filtered = items.filter(p => !q || [p.name, p.designer, p.source].filter(Boolean).some(v => v!.toLowerCase().includes(q.toLowerCase())));
+  // 게이지로도 찾을 수 있어야 한다 — '4.0mm' 나 '22코' 를 치면 그 게이지를
+  // 요구하는 도안이 나온다. 가진 실에 맞는 도안을 고를 때 쓰는 흐름이다.
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return items;
+    return items.filter(p =>
+      [p.name, p.designer, p.source, p.sizeInfo, p.difficulty]
+        .filter(Boolean)
+        .some(v => v!.toLowerCase().includes(s)) || gaugeSearchText(p.gauges).includes(s),
+    );
+  }, [items, q]);
 
   return (
     <div>
@@ -30,7 +41,12 @@ export default function Patterns() {
       } />
       <div className="relative mb-3">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="검색" className="input-pill" />
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="검색 · 게이지로도 찾아요 (4.0mm, 22코)"
+          className="input-pill"
+        />
       </div>
       <div className="mb-4 flex justify-end">
         <ViewToggle value={view} onChange={setView} />

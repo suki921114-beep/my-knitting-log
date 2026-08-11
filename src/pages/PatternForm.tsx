@@ -8,6 +8,8 @@ import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import PatternFileInput, { type PendingPatternFile } from '@/components/PatternFileInput';
 import { deletePatternFile, savePatternFile, saveErrorMessage } from '@/lib/patternFile';
+import GaugeRowsInput from '@/components/GaugeRowsInput';
+import { toGaugeRows, fromGaugeRows, type GaugeRow } from '@/lib/gauge';
 import { Save, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
@@ -29,6 +31,8 @@ export default function PatternForm() {
     [pid],
   );
   const [pendingFile, setPendingFile] = useState<PendingPatternFile>(undefined);
+  // 도안이 요구하는 게이지. 실과 같은 모양이라 같은 부품을 쓴다.
+  const [gauges, setGauges] = useState<GaugeRow[]>([]);
   useEffect(() => {
     if (editing && existing && !hyd) {
       setF({
@@ -36,6 +40,7 @@ export default function PatternForm() {
         link: existing.link || '', difficulty: existing.difficulty || '', sizeInfo: existing.sizeInfo || '', note: existing.note || ''
       });
       setImage(existing.imageDataUrl);
+      setGauges(toGaugeRows(existing.gauges));
       setHyd(true);
     }
   }, [editing, existing, hyd]);
@@ -57,7 +62,8 @@ export default function PatternForm() {
     // 공통 업데이트 필드
     const payload = { 
       ...f, 
-      imageDataUrl: image, 
+      imageDataUrl: image,
+      gauges: fromGaugeRows(gauges), 
       updatedAt: t,
       isDeleted: false,
       deletedAt: null
@@ -146,6 +152,11 @@ export default function PatternForm() {
         />
       </div>
       <Field label="사이즈 정보"><input className={inp} value={f.sizeInfo} onChange={u('sizeInfo')} /></Field>
+      <GaugeRowsInput
+        rows={gauges}
+        onChange={setGauges}
+        hint="도안이 요구하는 게이지예요. 적어두면 가진 실의 게이지로 도안을 찾을 수 있어요."
+      />
       <Field label="메모"><textarea className={`${inp} min-h-[80px]`} value={f.note} onChange={u('note')} /></Field>
       {editing && <ReverseProjectsSection kind="pattern" refId={pid} />}
       <Actions editing={editing} onSave={save} onRemove={remove} />

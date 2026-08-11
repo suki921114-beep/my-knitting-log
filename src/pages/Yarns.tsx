@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useAllYarnStats, gramsToMeters, formatMeters, isUsedUp, YARN_DYE_TYPES } from '@/lib/yarnCalc';
+import { useAllYarnStats, gramsToMeters, formatMeters, isUsedUp, YARN_DYE_TYPES, yarnRecommendations } from '@/lib/yarnCalc';
+import { gaugeSearchText } from '@/lib/gauge';
 import PageHeader from '@/components/PageHeader';
 import ViewToggle from '@/components/ViewToggle';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -69,7 +70,13 @@ export default function Yarns() {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     let arr = stats.filter(x =>
-      (!s || [x.yarn.name, x.yarn.brand, x.yarn.colorName, x.yarn.fiber, x.yarn.weight].filter(Boolean).some(v => v!.toLowerCase().includes(s))) &&
+      // 게이지로도 찾을 수 있어야 한다 — '4.0mm' 나 '22코' 를 치면 그 게이지가
+      // 나오는 실이 걸린다. 도안에 맞는 실을 고를 때 쓰는 흐름이다.
+      (!s ||
+        [x.yarn.name, x.yarn.brand, x.yarn.colorName, x.yarn.fiber, x.yarn.weight, x.yarn.plySpec]
+          .filter(Boolean)
+          .some(v => v!.toLowerCase().includes(s)) ||
+        gaugeSearchText(yarnRecommendations(x.yarn)).includes(s)) &&
       (brand === 'all' || x.yarn.brand === brand) &&
       (dyeType === 'all' || x.yarn.dyeType === dyeType) &&
       (!hideUsedUp || !isUsedUp(x.yarn, x.remaining))
@@ -102,7 +109,12 @@ export default function Yarns() {
 
       <div className="relative mb-3">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="검색" className="input-pill" />
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="검색 · 게이지로도 찾아요 (4.0mm, 22코)"
+          className="input-pill"
+        />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
