@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useGoBack } from '@/hooks/useGoBack';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -15,6 +16,7 @@ export default function NeedleForm() {
   const nid = id ? Number(id) : undefined;
   const editing = !!nid;
   const nav = useNavigate();
+  const goBack = useGoBack();
   const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (nid ? db.needles.get(nid) : undefined), [nid]);
   const [f, setF] = useState({ sizeMm: '', brand: '', material: '', length: '', note: '', quantity: '' });
@@ -65,7 +67,7 @@ export default function NeedleForm() {
       }
       if (sizes.length > 1) toast.success(`바늘 ${sizes.length}개를 만들었어요`);
     }
-    nav('/library/needles', { replace: true });
+    goBack('/library/needles');
   }
   async function remove() {
     if (!nid) return;
@@ -81,7 +83,7 @@ export default function NeedleForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/needles', { replace: true });
+    goBack('/library/needles');
     toast.success('바늘을 삭제했어요', {
       duration: 8000,
       action: {

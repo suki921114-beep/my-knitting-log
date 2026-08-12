@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useGoBack } from '@/hooks/useGoBack';
 import { ImageInput } from '@/components/ImageInput';
 import { toast } from '@/components/ui/sonner';
 import { Save, Trash2 } from 'lucide-react';
@@ -22,6 +23,7 @@ export default function YarnForm() {
   const yid = id ? Number(id) : undefined;
   const editing = !!yid;
   const nav = useNavigate();
+  const goBack = useGoBack();
   const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (yid ? db.yarns.get(yid) : undefined), [yid]);
 
@@ -91,7 +93,9 @@ export default function YarnForm() {
     if (editing && yid) {
       // 수정 시 기존 createdAt, cloudId는 그대로 유지됨 (update 동작)
       await db.yarns.update(yid, payload);
-      nav(`/library/yarns/${yid}`, { replace: true });
+      // 수정은 왔던 길로 되돌아간다. 상세 주소로 갈아 끼우면 앞뒤가 같은
+      // 화면이 되어 뒤로가기가 한 번 헛돈다.
+      goBack(`/library/yarns/${yid}`);
     } else {
       // 신규 생성 시 누락된 필수 필드 전부 주입
       const id = (await db.yarns.add({ 
@@ -119,7 +123,7 @@ export default function YarnForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/yarns', { replace: true });
+    goBack('/library/yarns');
     toast.success('실을 삭제했어요', {
       duration: 8000,
       action: {

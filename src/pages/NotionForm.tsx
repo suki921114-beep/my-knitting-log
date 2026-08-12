@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useGoBack } from '@/hooks/useGoBack';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import { Save, Trash2 } from 'lucide-react';
@@ -14,6 +15,7 @@ export default function NotionForm() {
   const nid = id ? Number(id) : undefined;
   const editing = !!nid;
   const nav = useNavigate();
+  const goBack = useGoBack();
   const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (nid ? db.notions.get(nid) : undefined), [nid]);
   const [f, setF] = useState({ name: '', kind: '', quantity: 0, shop: '', note: '' });
@@ -59,7 +61,7 @@ export default function NotionForm() {
         cloudId: crypto.randomUUID()
       });
     }
-    nav('/library/notions', { replace: true });
+    goBack('/library/notions');
   }
   async function remove() {
     if (!nid) return;
@@ -75,7 +77,7 @@ export default function NotionForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/notions', { replace: true });
+    goBack('/library/notions');
     toast.success('부자재를 삭제했어요', {
       duration: 8000,
       action: {

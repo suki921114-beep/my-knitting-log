@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useGoBack } from '@/hooks/useGoBack';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
 import PatternFileInput, { type PendingPatternFile } from '@/components/PatternFileInput';
@@ -18,6 +19,7 @@ export default function PatternForm() {
   const pid = id ? Number(id) : undefined;
   const editing = !!pid;
   const nav = useNavigate();
+  const goBack = useGoBack();
   const { confirm, dialog } = useConfirm();
   const existing = useLiveQuery(() => (pid ? db.patterns.get(pid) : undefined), [pid]);
 
@@ -93,7 +95,7 @@ export default function PatternForm() {
       }
     }
 
-    nav('/library/patterns', { replace: true });
+    goBack('/library/patterns');
   }
   async function remove() {
     if (!pid) return;
@@ -109,7 +111,7 @@ export default function PatternForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/library/patterns', { replace: true });
+    goBack('/library/patterns');
     toast.success('도안을 삭제했어요', {
       duration: 8000,
       action: {

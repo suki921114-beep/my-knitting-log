@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { statusLabel, statusColor } from '@/lib/yarnCalc';
@@ -16,6 +16,7 @@ import { toast } from '@/components/ui/sonner';
 export default function ProjectDetail() {
   const { id } = useParams();
   const pid = Number(id);
+  const nav = useNavigate();
   const project = useLiveQuery(() => db.projects.get(pid), [pid]);
 
   const yarnLinks = useLiveQuery(() => db.projectYarns.where('projectId').equals(pid).toArray(), [pid]) || [];
@@ -52,6 +53,12 @@ export default function ProjectDetail() {
   }
 
   const [lightbox, setLightbox] = useState<string | null>(null);
+
+  // 지운 프로젝트의 상세에 머물 이유가 없다. 수정 화면에서 지우면 뒤에 쌓여
+  // 있던 이 화면이 드러나면서 '삭제된 프로젝트' 가 떴다 — 안 지워진 줄 안다.
+  useEffect(() => {
+    if (project?.isDeleted) nav('/projects', { replace: true });
+  }, [project?.isDeleted, nav]);
   // 메모는 수정 화면까지 들어가지 않고 여기서 바로 고친다 —
   // 뜨다 말고 한 줄 적으려고 화면을 두 번 넘기는 건 번거롭다.
   const [memo, setMemo] = useState('');
@@ -71,15 +78,9 @@ export default function ProjectDetail() {
   }
 
   if (!project) return <p className="p-8 text-center text-sm text-muted-foreground">불러오는 중…</p>;
+  // 지워진 프로젝트면 잠깐 스치고 목록으로 넘어간다 (아래 useEffect 가 보낸다)
   if (project.isDeleted) {
-    return (
-      <div className="space-y-3">
-        <PageHeader title="삭제된 프로젝트" back />
-        <p className="card-soft p-8 text-center text-sm text-muted-foreground">
-          이 프로젝트는 삭제된 상태입니다. 목록에서는 보이지 않아요.
-        </p>
-      </div>
-    );
+    return <p className="p-8 text-center text-sm text-muted-foreground">목록으로 돌아가는 중…</p>;
   }
 
   const photos = project.photos || [];

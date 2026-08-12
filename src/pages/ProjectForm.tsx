@@ -5,6 +5,7 @@ import { db, now, ProjectStatus, ProjectPhoto} from '@/lib/db';
 import { statusLabel } from '@/lib/yarnCalc';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useGoBack } from '@/hooks/useGoBack';
 import { syncLinks } from '@/lib/linkSync';
 import YarnPicker, { YarnLink } from '@/components/YarnPicker';
 import EntityPicker, { PatternLink, NeedleLink, NotionLink } from '@/components/EntityPicker';
@@ -49,6 +50,7 @@ function reconcilePhotos(prev: ProjectPhoto[], dataUrls: string[]): ProjectPhoto
 export default function ProjectForm() {
   const { id } = useParams();
   const editing = !!id;
+  const goBack = useGoBack();
   const nav = useNavigate();
   const { confirm, dialog } = useConfirm();
   const projectId = id ? Number(id) : undefined;
@@ -244,7 +246,10 @@ export default function ProjectForm() {
     t
   );
 
-  nav(`/projects/${pid}`, { replace: true });
+  // 수정은 왔던 길로 되돌아간다. 상세 주소로 갈아 끼우면 앞뒤가 같은 화면이
+  // 되어 뒤로가기가 한 번 헛돈다. 새로 만든 것은 방금 만든 상세를 보여준다.
+  if (editing) goBack(`/projects/${pid}`);
+  else nav(`/projects/${pid}`, { replace: true });
 }
 
   async function remove() {
@@ -265,7 +270,7 @@ export default function ProjectForm() {
       deletedAt: t,
       updatedAt: t,
     } as any);
-    nav('/projects', { replace: true });
+    goBack('/projects');
     toast.success('프로젝트를 삭제했어요', {
       duration: 8000,
       action: {

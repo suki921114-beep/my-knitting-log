@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useYarnRemaining, gramsToMeters, formatMeters, yarnRecommendations, gaugePatternLabel } from '@/lib/yarnCalc';
@@ -21,17 +22,22 @@ export default function YarnDetail() {
   const links = useLiveQuery(() => db.projectYarns.where('yarnId').equals(yid).toArray(), [yid]) || [];
   const projects = useLiveQuery(() => db.projects.filter(p => !p.isDeleted).toArray(), []) || [];
   const pmap = new Map(projects.map(p => [p.id!, p]));
+  const nav = useNavigate();
+
+  // 지운 실의 상세 화면에 머물 이유가 없다.
+  //
+  // 수정 화면에서 지우면 뒤로 쌓여 있던 이 화면이 드러나면서
+  // '삭제된 실입니다' 가 떴다. 지웠는데 화면이 하나 더 나오면
+  // 안 지워진 줄 안다. 그냥 목록으로 보낸다.
+  useEffect(() => {
+    if (yarn?.isDeleted) nav('/library/yarns', { replace: true });
+  }, [yarn?.isDeleted, nav]);
 
   if (!yarn) return <p className="p-8 text-center text-sm text-muted-foreground">불러오는 중…</p>;
+  // 지워진 실이면 잠깐 이 화면이 스치고 목록으로 넘어간다.
+  // (실제 이동은 위의 useEffect 가 한다)
   if (yarn.isDeleted) {
-    return (
-      <div className="space-y-3">
-        <PageHeader title="삭제된 실" back />
-        <p className="card-soft p-8 text-center text-sm text-muted-foreground">
-          이 실은 삭제된 상태입니다. 라이브러리에서는 보이지 않아요.
-        </p>
-      </div>
-    );
+    return <p className="p-8 text-center text-sm text-muted-foreground">목록으로 돌아가는 중…</p>;
   }
 
   const total = stats?.total ?? yarn.totalGrams;
