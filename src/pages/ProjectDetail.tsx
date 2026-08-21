@@ -169,6 +169,15 @@ export default function ProjectDetail() {
                     <Link to={`/diary/${l.id}/edit`} className="flex items-baseline gap-2">
                       <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">{l.date}</span>
                       {l.mood && <span className="shrink-0 text-[13px] leading-none">{l.mood}</span>}
+                      {/* 그날 몇 단 떴는지. 다이어리 목록에는 있는데 여기만 빠져 있었다 —
+                          '언제 얼마나 떴나' 를 훑는 자리라 오히려 여기가 더 필요하다.
+                          날짜·기분과 함께 왼쪽에 모아 둔다. 글 길이에 따라 오른쪽 끝이
+                          들쭉날쭉하면 숫자가 세로로 안 맞아 눈으로 훑기 어렵다. */}
+                      {l.rows != null && (
+                        <span className="shrink-0 text-[10.5px] font-bold tabular-nums text-primary">
+                          {l.rows}단
+                        </span>
+                      )}
                       <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink">{l.text}</span>
                     </Link>
                   </li>

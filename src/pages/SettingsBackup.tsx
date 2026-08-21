@@ -49,7 +49,7 @@ import {
   runFullRestore,
 } from '@/lib/syncRunner';
 import { readUsage, takeSkippedPhotos, takeFailedPhotoDownloads } from '@/lib/cloudUsage';
-import { SHOW_AUTO_BACKUP, SHOW_SYNC_RESULT } from '@/lib/featureFlags';
+import { SHOW_AUTO_BACKUP, SHOW_SYNC_RESULT, SHOW_CLOUD_BACKUP_INTRO } from '@/lib/featureFlags';
 import { isProAccount } from '@/lib/entitlement';
 import CloudBackupIntro from '@/components/CloudBackupIntro';
 import { markCloudBackup, markFileBackup } from '@/lib/backupClock';
@@ -516,8 +516,11 @@ export default function SettingsBackup() {
       {/* 2. 클라우드 백업 액션 카드 — 이용 권한이 있는 계정에만 연다.
              권한이 없으면 왜 안 보이는지와 어떻게 신청하는지를 대신 보여준다.
              아무 말 없이 사라지면 고장 난 줄 안다. */}
+      {/* 명단에 있는 계정에는 그대로 보인다.
+          못 쓰는 사람에게 '준비 중' 을 보여줄지는 플래그가 정한다 —
+          스토어에 내놓으면 처음 오는 사람이 미완성 앱으로 여긴다. */}
       {!isPro ? (
-        <CloudBackupIntro />
+        SHOW_CLOUD_BACKUP_INTRO ? <CloudBackupIntro /> : null
       ) : user ? (
         <div className="card-soft overflow-hidden border-primary/20 bg-primary/5">
           <div className="p-4">
@@ -564,7 +567,7 @@ export default function SettingsBackup() {
           </div>
         </div>
       ) : (
-        <CloudBackupIntro />
+        SHOW_CLOUD_BACKUP_INTRO ? <CloudBackupIntro /> : null
       )}
 
       {/* 자동 백업 — 추후 프리미엄 기능으로 검토 중이라 UI 만 감춰 둔다 (코드는 유지) */}

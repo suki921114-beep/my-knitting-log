@@ -4,6 +4,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import AppInfoDialog from '@/components/AppInfoDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { isProAccount } from '@/lib/entitlement';
+import { SHOW_CLOUD_BACKUP_INTRO } from '@/lib/featureFlags';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import {
@@ -41,7 +42,12 @@ export default function Settings() {
       <PageHeader title="설정" />
       {dialog}
 
-      {/* 1. 계정 */}
+      {/* 1. 계정
+          ⚠️ 로그인해도 지금은 클라우드 백업이 명단 계정에만 열린다.
+             그래서 아직 못 쓰는 사람에게는 로그인 자리를 내놓지 않는다 —
+             눌러서 로그인했는데 아무것도 안 달라지면 고장으로 읽힌다.
+             (로그인해 둔 사람에게는 계정과 로그아웃이 그대로 보인다) */}
+      {(user || SHOW_CLOUD_BACKUP_INTRO) && (
       <Section title="계정">
         {user ? (
           <div className="card-soft overflow-hidden">
@@ -119,6 +125,7 @@ export default function Settings() {
           </div>
         )}
       </Section>
+      )}
 
       {/* 2. 백업 및 동기화 */}
       <Section title="백업 및 동기화">
