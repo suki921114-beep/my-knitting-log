@@ -16,6 +16,7 @@
 // — navigator.storage.persist(). 들어줄지는 브라우저가 정한다.
 
 import { db, type PatternFile } from '@/lib/db';
+import { deleteMarksForFiles } from '@/lib/patternMark';
 
 /**
  * 받을 수 있는 파일 크기.
@@ -142,6 +143,8 @@ export async function deletePatternFileById(id: number): Promise<void> {
   const row = await db.patternFiles.get(id);
   if (!row) return;
   await db.patternFiles.delete(id);
+  // 자국은 파일에 딸린 것이다. 파일이 없으면 남을 이유가 없다.
+  await deleteMarksForFiles([id]);
   await markPatternFileChanged(row.patternId);
   await removeFromCloud([row]);
 }
@@ -185,6 +188,7 @@ async function markPatternFileChanged(patternId: number): Promise<void> {
 export async function deletePatternFile(patternId: number): Promise<void> {
   const rows = await db.patternFiles.where('patternId').equals(patternId).toArray();
   await db.patternFiles.where('patternId').equals(patternId).delete();
+  await deleteMarksForFiles(rows.map(r => r.id!).filter(Boolean));
   await markPatternFileChanged(patternId);
   await removeFromCloud(rows);
 }
@@ -199,6 +203,7 @@ export async function deletePatternFiles(patternIds: number[]): Promise<void> {
   if (!patternIds.length) return;
   const rows = await db.patternFiles.where('patternId').anyOf(patternIds).toArray();
   await db.patternFiles.where('patternId').anyOf(patternIds).delete();
+  await deleteMarksForFiles(rows.map(r => r.id!).filter(Boolean));
   await removeFromCloud(rows);
 }
 

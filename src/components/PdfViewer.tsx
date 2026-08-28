@@ -15,8 +15,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Loader2 } from 'lucide-react';
-import type { PatternFile } from '@/lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import {
+  X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Loader2,
+  Highlighter, Undo2, Eraser,
+} from 'lucide-react';
+import { db, type PatternFile } from '@/lib/db';
+import {
+  MARK_COLORS, MARK_WIDTH, addMark, undoLastMark, clearMarks, marksFor,
+  markAt, shouldAddPoint,
+} from '@/lib/patternMark';
 
 // ── 확대 ──────────────────────────────────────────────────────────────────
 // 확대는 '어디를' 이 중요하다. 도안에서 보고 싶은 건 지금 뜨는 부분이지
@@ -69,6 +77,11 @@ interface SurfaceProps {
   /** 마지막으로 보던 장을 기억해 둘 열쇠 — 대개 도안 id */
   rememberKey?: string;
   className?: string;
+  /**
+   * 형광펜을 쓸 수 있는지. 저장된 파일에만 켠다 —
+   * 아직 저장 안 한 파일에 그으면 자국을 어디에 붙일지 알 수 없다.
+   */
+  allowMarks?: boolean;
 }
 
 /**
@@ -78,8 +91,9 @@ interface SurfaceProps {
  *    높이가 내용에 따라 늘어나는 자리에 두면 캔버스와 부모가 서로를 밀며
  *    끝없이 커진다.
  */
-export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) {
+export function PdfSurface({ file, rememberKey, className = '', allowMarks = true }: SurfaceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const markRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // pdf.js 문서 객체. 타입을 가져오려면 pdf.js 를 위에서 import 해야 해서
   // (=묶음에 딸려 들어가서) 여기서는 any 로 둔다.
@@ -95,6 +109,19 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── 형광펜 ─────────────────────────────────────────────────────────────
+  const fileId = allowMarks ? file.id ?? null : null;
+  const [penOn, setPenOn] = useState(false);
+  const [erasing, setErasing] = useState(false);
+  const [color, setColor] = useState<string>(MARK_COLORS[0].css);
+  /** 지금 손가락이 긋고 있는 선 — 다 긋고 손을 떼면 저장한다 */
+  const drawingRef = useRef<number[] | null>(null);
+
+  const marks = useLiveQuery(
+    () => (fileId == null ? Promise.resolve([]) : marksFor(fileId, page)),
+    [fileId, page],
+  ) || [];
 
   // ── 문서 열기 ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -210,6 +237,53 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
     [zoom, captureAnchor],
   );
 
+  /**
+   * 형광펜 자국을 덧그린다.
+   *
+   * 도안 좌표(0~1)에 지금 캔버스 크기를 곱한다. 그래서 몇 배로 키우든
+   * 밑줄이 같은 글자 위에 남는다.
+   *
+   * multiply 로 겹쳐야 아래 글자가 비친다. 그냥 덮으면 형광펜이 아니라
+   * 물감이 되어 글자가 안 보인다.
+   */
+  const paintMarks = useCallback((live?: number[] | null) => {
+    const base = canvasRef.current;
+    const layer = markRef.current;
+    if (!base || !layer) return;
+
+    layer.width = base.width;
+    layer.height = base.height;
+    layer.style.width = base.style.width;
+    layer.style.height = base.style.height;
+
+    const ctx = layer.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, layer.width, layer.height);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const stroke = (points: number[], css: string, w: number) => {
+      if (points.length < 2) return;
+      ctx.strokeStyle = css;
+      ctx.lineWidth = Math.max(2, w * layer.width);
+      ctx.beginPath();
+      ctx.moveTo(points[0] * layer.width, points[1] * layer.height);
+      for (let i = 2; i + 1 < points.length; i += 2) {
+        ctx.lineTo(points[i] * layer.width, points[i + 1] * layer.height);
+      }
+      // 점 하나만 찍었으면 선이 안 그려진다 — 제자리에 한 번 더 이어 점으로 만든다
+      if (points.length === 2) ctx.lineTo(points[0] * layer.width + 0.1, points[1] * layer.height);
+      ctx.stroke();
+    };
+
+    for (const m of marks) stroke(m.points, m.color, m.width);
+    if (live) stroke(live, color, MARK_WIDTH);
+  }, [marks, color]);
+
+  // 자국이 바뀌거나 장을 넘기면 다시 덧그린다
+  useEffect(() => { paintMarks(); }, [paintMarks, page, zoom]);
+
   // ── 한 장 그리기 ───────────────────────────────────────────────────────
   const draw = useCallback(async () => {
     const doc = docRef.current;
@@ -250,6 +324,8 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
       renderTaskRef.current = task;
       await task.promise;
       renderTaskRef.current = null;
+      // 도안이 새 크기로 그려졌으니 자국도 그 크기에 맞춰 다시
+      paintMarks(drawingRef.current);
     } catch (e) {
       // 다음 장으로 넘겨서 멈춘 것은 잘못이 아니다
       if ((e as { name?: string })?.name !== 'RenderingCancelledException') {
@@ -258,7 +334,7 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
     } finally {
       setRendering(false);
     }
-  }, [page, zoom, restoreAnchor]);
+  }, [page, zoom, restoreAnchor, paintMarks]);
 
   useEffect(() => {
     if (!loading && !error) void draw();
@@ -317,7 +393,30 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
+  /** 화면의 한 점을 도안 좌표(0~1)로 바꾼다 */
+  function toPaper(clientX: number, clientY: number): { x: number; y: number } | null {
+    const c = canvasRef.current;
+    if (!c) return null;
+    const r = c.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return null;
+    return { x: (clientX - r.left) / r.width, y: (clientY - r.top) / r.height };
+  }
+
   function onPointerDown(e: React.PointerEvent) {
+    // 그리는 중에는 확대·스크롤을 잡지 않는다. 손가락 하나가 두 일을 할 수 없다.
+    if (penOn && fileId != null && pointers.current.size === 0) {
+      const p = toPaper(e.clientX, e.clientY);
+      if (!p) return;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      if (erasing) {
+        const hit = markAt(marks, p.x, p.y, 0.03);
+        if (hit?.id != null) void db.patternMarks.delete(hit.id);
+        return;
+      }
+      drawingRef.current = [p.x, p.y];
+      paintMarks(drawingRef.current);
+      return;
+    }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const pair = pointerPair();
     if (pair && !pinch.current) {
@@ -330,6 +429,14 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    if (drawingRef.current) {
+      const p = toPaper(e.clientX, e.clientY);
+      if (p && shouldAddPoint(drawingRef.current, p.x, p.y)) {
+        drawingRef.current.push(p.x, p.y);
+        paintMarks(drawingRef.current);
+      }
+      return;
+    }
     if (!pointers.current.has(e.pointerId)) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const pair = pointerPair();
@@ -355,6 +462,17 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
   }
 
   function onPointerUp(e: React.PointerEvent) {
+    if (drawingRef.current) {
+      const points = drawingRef.current;
+      drawingRef.current = null;
+      // 점 하나뿐이면 톡 친 것이다. 자국으로 남길 만하지 않다.
+      if (points.length >= 4 && fileId != null) {
+        void addMark({ patternFileId: fileId, page, points, color, width: MARK_WIDTH });
+      } else {
+        paintMarks();
+      }
+      return;
+    }
     const p = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
 
@@ -377,6 +495,7 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
   }
 
   function onPointerCancel(e: React.PointerEvent) {
+    if (drawingRef.current) { drawingRef.current = null; paintMarks(); }
     pointers.current.delete(e.pointerId);
     if (pinch.current && pointers.current.size < 2) endPinch();
   }
@@ -401,7 +520,8 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        style={{ touchAction: 'pan-x pan-y' }}
+        // 그리는 동안에는 스크롤이 끼어들면 안 된다. 선이 끊기고 화면이 튄다.
+        style={{ touchAction: penOn ? 'none' : 'pan-x pan-y' }}
         // ⚠️ 가운데 정렬에 justify-center 를 쓰면 안 된다.
         //    내용이 화면보다 커졌을 때 왼쪽(위쪽)으로 넘친 부분이 스크롤로
         //    닿지 않는다 — 4배로 키우면 왼쪽 절반이 갈 수 없는 자리가 된다.
@@ -419,18 +539,79 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
             {error}
           </p>
         ) : (
-          <canvas
-            ref={canvasRef}
-            className="m-auto rounded bg-white shadow-lg"
-            // 손가락을 벌리는 동안만 늘려 보여준다. 손을 떼면 그 배율로 다시 그린다.
+          <div
+            className="relative m-auto"
             style={liveScale === 1 ? undefined : { transform: `scale(${liveScale})` }}
-          />
+          >
+            <canvas ref={canvasRef} className="block rounded bg-white shadow-lg" />
+            {/* 형광펜 자국은 도안 위에 따로 얹는다. 도안을 다시 그릴 때마다
+                자국까지 다시 그리지 않아도 되고, 지울 때도 도안이 안 상한다.
+                손가락은 아래 도안이 받으므로 여기서는 안 받는다. */}
+            <canvas ref={markRef} className="pointer-events-none absolute left-0 top-0" />
+          </div>
         )}
       </div>
+
+      {/* 형광펜을 켜면 색과 지우개가 나온다. 평소에는 자리를 차지하지 않는다. */}
+      {!loading && !error && penOn && fileId != null && (
+        <div className="flex shrink-0 items-center gap-1.5 border-t border-white/10 px-3 py-2">
+          {MARK_COLORS.map(c => (
+            <button
+              type="button"
+              key={c.key}
+              onClick={() => { setColor(c.css); setErasing(false); }}
+              aria-label={c.label}
+              className={`h-8 w-8 shrink-0 rounded-full border-2 transition ${
+                color === c.css && !erasing ? 'border-white' : 'border-transparent'
+              }`}
+              style={{ background: c.css }}
+            />
+          ))}
+          <span className="mx-1 h-6 w-px bg-white/15" />
+          <button
+            type="button"
+            onClick={() => setErasing(v => !v)}
+            aria-label="지우개"
+            className={`rounded-full p-2 transition ${
+              erasing ? 'bg-white text-neutral-900' : 'text-white/80 hover:bg-white/10'
+            }`}
+          >
+            <Eraser className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void undoLastMark(fileId, page)}
+            aria-label="되돌리기"
+            className="rounded-full p-2 text-white/80 hover:bg-white/10"
+          >
+            <Undo2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void clearMarks(fileId, page)}
+            className="ml-auto rounded-full px-3 py-1.5 text-[12px] font-semibold text-white/70 hover:bg-white/10"
+          >
+            이 쪽 지우기
+          </button>
+        </div>
+      )}
 
       {/* 장 넘기기와 확대 */}
       {!loading && !error && (
         <div className="flex shrink-0 items-center gap-1 border-t border-white/10 px-2 py-1.5">
+          {fileId != null && (
+            <button
+              type="button"
+              onClick={() => { setPenOn(v => !v); setErasing(false); }}
+              aria-label="형광펜"
+              aria-pressed={penOn}
+              className={`mr-1 shrink-0 rounded-full p-2 transition ${
+                penOn ? 'bg-white text-neutral-900' : 'text-white/80 hover:bg-white/10'
+              }`}
+            >
+              <Highlighter className="h-5 w-5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setPage(p => Math.max(1, p - 1))}

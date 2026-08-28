@@ -99,6 +99,33 @@ export interface PatternFile {
   createdAt: number;
 }
 
+/**
+ * 도안에 그어둔 형광펜 자국.
+ *
+ * ⚠️ 점은 반드시 도안 좌표(0~1)로 저장한다. 화면 좌표로 두면 확대하는 순간
+ *    밑줄이 엉뚱한 자리로 간다 — 같은 도안이라도 폰과 태블릿에서 화면 크기가
+ *    다르니 애초에 화면 좌표로는 남길 수가 없다.
+ *
+ * 이 표는 기기에만 둔다. 자국은 몇 KB 밖에 안 되지만, 클라우드에 태우려면
+ * 파일과 짝을 맞추는 일이 또 붙는다. 먼저 쓸 만한지 보고 나중에 정한다.
+ */
+export interface PatternMark {
+  id?: number;
+  /** 어느 파일의 것인지 — patternFiles 의 id */
+  patternFileId: number;
+  /** 몇 쪽인지 (1부터) */
+  page: number;
+  /**
+   * 이어 그은 점들. [x0,y0, x1,y1, …] 로 납작하게 담는다.
+   * 값은 0~1 — 도안 왼쪽 위가 (0,0), 오른쪽 아래가 (1,1).
+   */
+  points: number[];
+  color: string;
+  /** 선 굵기. 도안 너비에 대한 비율이라 배율이 바뀌어도 두께가 같아 보인다. */
+  width: number;
+  createdAt: number;
+}
+
 /** 문서에 실리는 도안 파일 정보 — 파일 자체는 Storage 에 있다 */
 export interface RemotePatternFileRef {
   cloudId: string;
@@ -416,6 +443,7 @@ class KnitDB extends Dexie {
   projectGauges!: Table<ProjectGauge, number>;
   logs!: Table<KnitLog, number>;
   patternFiles!: Table<PatternFile, number>;
+  patternMarks!: Table<PatternMark, number>;
 
   constructor() {
     super('knit-db');
@@ -751,6 +779,27 @@ class KnitDB extends Dexie {
           sortOrder: f.sortOrder ?? 0,
         });
       }
+    });
+
+    // 형광펜 자국. 기기에만 둔다.
+    // [patternFileId+page] 로 묶어 색인한다 — 화면에 그릴 때 '이 파일의 이 쪽'
+    // 만 꺼내면 되고, 다른 쪽 자국까지 읽을 이유가 없다.
+    this.version(12).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+      logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
+      patternFiles: '++id, patternId, patternCloudId, cloudId',
+      patternMarks: '++id, patternFileId, [patternFileId+page]',
     });
 
   }
