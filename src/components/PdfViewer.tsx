@@ -22,8 +22,9 @@ import {
 } from 'lucide-react';
 import { db, type PatternFile } from '@/lib/db';
 import {
-  MARK_COLORS, MARK_WIDTH, addMark, undoLastMark, clearMarks, marksFor,
-  markAt, shouldAddPoint,
+  MARK_COLORS, MARK_WIDTH, MARK_OPACITY, MIN_MARK_WIDTH, MAX_MARK_WIDTH,
+  MIN_MARK_OPACITY, MAX_MARK_OPACITY, markOpacity,
+  addMark, undoLastMark, clearMarks, marksFor, markAt, shouldAddPoint,
 } from '@/lib/patternMark';
 
 // ── 확대 ──────────────────────────────────────────────────────────────────
@@ -115,6 +116,10 @@ export function PdfSurface({ file, rememberKey, className = '', allowMarks = tru
   const [penOn, setPenOn] = useState(false);
   const [erasing, setErasing] = useState(false);
   const [color, setColor] = useState<string>(MARK_COLORS[0].css);
+  const [opacity, setOpacity] = useState(MARK_OPACITY);
+  const [penWidth, setPenWidth] = useState(MARK_WIDTH);
+  /** 색을 한 번 더 누르면 진하기·굵기를 여는 자리 */
+  const [tuning, setTuning] = useState(false);
   /** 지금 손가락이 긋고 있는 선 — 다 긋고 손을 떼면 저장한다 */
   const drawingRef = useRef<number[] | null>(null);
 
@@ -259,12 +264,15 @@ export function PdfSurface({ file, rememberKey, className = '', allowMarks = tru
     const ctx = layer.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, layer.width, layer.height);
-    ctx.globalCompositeOperation = 'multiply';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    const stroke = (points: number[], css: string, w: number) => {
+    // ⚠️ 여기서 multiply 를 걸어도 소용없다. 캔버스 안에서만 섞이고 아래에 깔린
+    //    도안까지는 닿지 않는다. 겹치는 일은 CSS(mix-blend-mode)가 맡는다.
+    //    진하기는 여기서 획마다 따로 준다 — 자국마다 값이 다를 수 있다.
+    const stroke = (points: number[], css: string, w: number, alpha: number) => {
       if (points.length < 2) return;
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = css;
       ctx.lineWidth = Math.max(2, w * layer.width);
       ctx.beginPath();
@@ -277,9 +285,10 @@ export function PdfSurface({ file, rememberKey, className = '', allowMarks = tru
       ctx.stroke();
     };
 
-    for (const m of marks) stroke(m.points, m.color, m.width);
-    if (live) stroke(live, color, MARK_WIDTH);
-  }, [marks, color]);
+    for (const m of marks) stroke(m.points, m.color, m.width, markOpacity(m));
+    if (live) stroke(live, color, penWidth, opacity);
+    ctx.globalAlpha = 1;
+  }, [marks, color, opacity, penWidth]);
 
   // 자국이 바뀌거나 장을 넘기면 다시 덧그린다
   useEffect(() => { paintMarks(); }, [paintMarks, page, zoom]);
@@ -467,7 +476,7 @@ export function PdfSurface({ file, rememberKey, className = '', allowMarks = tru
       drawingRef.current = null;
       // 점 하나뿐이면 톡 친 것이다. 자국으로 남길 만하지 않다.
       if (points.length >= 4 && fileId != null) {
-        void addMark({ patternFileId: fileId, page, points, color, width: MARK_WIDTH });
+        void addMark({ patternFileId: fileId, page, points, color, width: penWidth, opacity });
       } else {
         paintMarks();
       }
@@ -547,71 +556,160 @@ export function PdfSurface({ file, rememberKey, className = '', allowMarks = tru
             {/* 형광펜 자국은 도안 위에 따로 얹는다. 도안을 다시 그릴 때마다
                 자국까지 다시 그리지 않아도 되고, 지울 때도 도안이 안 상한다.
                 손가락은 아래 도안이 받으므로 여기서는 안 받는다. */}
-            <canvas ref={markRef} className="pointer-events-none absolute left-0 top-0" />
+            <canvas
+              ref={markRef}
+              // 아래 도안과 섞이게 하는 건 CSS 다. 이걸 빼면 형광펜이 아니라
+              // 물감이 되어 표시한 글자가 안 보인다.
+              style={{ mixBlendMode: 'multiply' }}
+              className="pointer-events-none absolute left-0 top-0"
+            />
           </div>
         )}
       </div>
 
-      {/* 형광펜을 켜면 색과 지우개가 나온다. 평소에는 자리를 차지하지 않는다. */}
-      {!loading && !error && penOn && fileId != null && (
-        <div className="flex shrink-0 items-center gap-1.5 border-t border-white/10 px-3 py-2">
-          {MARK_COLORS.map(c => (
+      {/*
+        형광펜 줄.
+
+        색은 형광펜을 켜지 않아도 늘 보인다. 켜야만 보이면 이 기능이 있다는 것
+        자체를 모른다 — 실제로 못 찾겠다는 말을 들었다. 색을 누르는 것이 곧
+        형광펜을 켜는 일이 된다.
+      */}
+      {!loading && !error && fileId != null && (
+        <div className="relative shrink-0 border-t border-white/10 px-3 py-2">
+          {/* 진하기·굵기 — 쓰던 색을 한 번 더 누르면 열린다 */}
+          {tuning && (
+            <div className="absolute bottom-full left-3 right-3 z-10 mb-2 rounded-2xl border border-white/10 bg-neutral-900 p-3 shadow-xl">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-white/90">형광펜 굵기와 진하기</span>
+                <button
+                  type="button"
+                  onClick={() => setTuning(false)}
+                  className="rounded-full px-2 py-1 text-[12px] text-white/60 hover:bg-white/10"
+                >
+                  닫기
+                </button>
+              </div>
+
+              {/* 고른 값이 어떻게 보일지 — 숫자보다 이게 빠르다 */}
+              <div className="mb-3 flex h-10 items-center rounded-lg bg-white px-3">
+                <span className="text-[13px] text-neutral-800">보기</span>
+                <span
+                  className="ml-2 flex-1 rounded-sm"
+                  style={{
+                    background: color,
+                    opacity,
+                    height: `${Math.round(penWidth * 260)}px`,
+                  }}
+                />
+              </div>
+
+              <label className="mb-2 block">
+                <span className="mb-1 flex justify-between text-[12px] text-white/60">
+                  <span>진하기</span>
+                  <span>{Math.round(opacity * 100)}%</span>
+                </span>
+                <input
+                  type="range"
+                  min={MIN_MARK_OPACITY}
+                  max={MAX_MARK_OPACITY}
+                  step={0.05}
+                  value={opacity}
+                  onChange={e => setOpacity(Number(e.target.value))}
+                  className="w-full accent-pink-400"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 flex justify-between text-[12px] text-white/60">
+                  <span>굵기</span>
+                  <span>{Math.round((penWidth / MARK_WIDTH) * 100)}%</span>
+                </span>
+                <input
+                  type="range"
+                  min={MIN_MARK_WIDTH}
+                  max={MAX_MARK_WIDTH}
+                  step={0.002}
+                  value={penWidth}
+                  onChange={e => setPenWidth(Number(e.target.value))}
+                  className="w-full accent-pink-400"
+                />
+              </label>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              key={c.key}
-              onClick={() => { setColor(c.css); setErasing(false); }}
-              aria-label={c.label}
-              className={`h-8 w-8 shrink-0 rounded-full border-2 transition ${
-                color === c.css && !erasing ? 'border-white' : 'border-transparent'
+              onClick={() => { setPenOn(v => !v); setErasing(false); setTuning(false); }}
+              aria-label="형광펜"
+              aria-pressed={penOn}
+              className={`shrink-0 rounded-full p-2 transition ${
+                penOn ? 'bg-white text-neutral-900' : 'text-white/80 hover:bg-white/10'
               }`}
-              style={{ background: c.css }}
-            />
-          ))}
-          <span className="mx-1 h-6 w-px bg-white/15" />
-          <button
-            type="button"
-            onClick={() => setErasing(v => !v)}
-            aria-label="지우개"
-            className={`rounded-full p-2 transition ${
-              erasing ? 'bg-white text-neutral-900' : 'text-white/80 hover:bg-white/10'
-            }`}
-          >
-            <Eraser className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void undoLastMark(fileId, page)}
-            aria-label="되돌리기"
-            className="rounded-full p-2 text-white/80 hover:bg-white/10"
-          >
-            <Undo2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void clearMarks(fileId, page)}
-            className="ml-auto rounded-full px-3 py-1.5 text-[12px] font-semibold text-white/70 hover:bg-white/10"
-          >
-            이 쪽 지우기
-          </button>
+            >
+              <Highlighter className="h-5 w-5" />
+            </button>
+
+            {MARK_COLORS.map(c => {
+              const picked = color === c.css && penOn && !erasing;
+              return (
+                <button
+                  type="button"
+                  key={c.key}
+                  onClick={() => {
+                    // 쓰던 색을 한 번 더 누르면 진하기·굵기를 연다
+                    if (picked) { setTuning(v => !v); return; }
+                    setColor(c.css);
+                    setPenOn(true);
+                    setErasing(false);
+                    setTuning(false);
+                  }}
+                  aria-label={picked ? `${c.label} — 굵기와 진하기` : c.label}
+                  className={`h-8 w-8 shrink-0 rounded-full border-2 transition ${
+                    picked ? 'border-white' : 'border-transparent opacity-70'
+                  }`}
+                  style={{ background: c.css }}
+                />
+              );
+            })}
+
+            {penOn && (
+              <>
+                <span className="mx-0.5 h-6 w-px bg-white/15" />
+                <button
+                  type="button"
+                  onClick={() => { setErasing(v => !v); setTuning(false); }}
+                  aria-label="지우개"
+                  className={`rounded-full p-2 transition ${
+                    erasing ? 'bg-white text-neutral-900' : 'text-white/80 hover:bg-white/10'
+                  }`}
+                >
+                  <Eraser className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void undoLastMark(fileId, page)}
+                  aria-label="되돌리기"
+                  className="rounded-full p-2 text-white/80 hover:bg-white/10"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void clearMarks(fileId, page)}
+                  className="ml-auto shrink-0 rounded-full px-2.5 py-1.5 text-[12px] font-semibold text-white/70 hover:bg-white/10"
+                >
+                  이 쪽 지우기
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
       {/* 장 넘기기와 확대 */}
       {!loading && !error && (
         <div className="flex shrink-0 items-center gap-1 border-t border-white/10 px-2 py-1.5">
-          {fileId != null && (
-            <button
-              type="button"
-              onClick={() => { setPenOn(v => !v); setErasing(false); }}
-              aria-label="형광펜"
-              aria-pressed={penOn}
-              className={`mr-1 shrink-0 rounded-full p-2 transition ${
-                penOn ? 'bg-white text-neutral-900' : 'text-white/80 hover:bg-white/10'
-              }`}
-            >
-              <Highlighter className="h-5 w-5" />
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setPage(p => Math.max(1, p - 1))}

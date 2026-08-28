@@ -123,6 +123,13 @@ export interface PatternMark {
   color: string;
   /** 선 굵기. 도안 너비에 대한 비율이라 배율이 바뀌어도 두께가 같아 보인다. */
   width: number;
+  /**
+   * 진하기 (0~1). 없으면 기본값으로 본다 — 이 칸이 생기기 전에 그은 자국.
+   *
+   * 형광펜은 아래 글자가 비쳐야 형광펜이다. 진하게 덮으면 무엇에 표시했는지
+   * 알 수 없게 된다.
+   */
+  opacity?: number;
   createdAt: number;
 }
 

@@ -29,6 +29,23 @@ export const MARK_COLORS = [
  * 종이에 그은 것과 같은 굵기로 보인다.
  */
 export const MARK_WIDTH = 0.022;
+export const MIN_MARK_WIDTH = 0.008;
+export const MAX_MARK_WIDTH = 0.06;
+
+/**
+ * 기본 진하기.
+ *
+ * 형광펜은 아래 글자가 비쳐야 한다. 진하게 덮으면 '무엇에 표시했는지' 를
+ * 알 수 없게 되어, 표시하는 의미가 사라진다.
+ */
+export const MARK_OPACITY = 0.5;
+export const MIN_MARK_OPACITY = 0.15;
+export const MAX_MARK_OPACITY = 0.9;
+
+/** 이 칸이 생기기 전에 그은 자국은 기본값으로 본다 */
+export function markOpacity(m: { opacity?: number }): number {
+  return m.opacity ?? MARK_OPACITY;
+}
 
 /** 이 파일의 이 쪽에 그어둔 자국들 */
 export async function marksFor(patternFileId: number, page: number): Promise<PatternMark[]> {

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   distanceToStroke, markAt, shouldAddPoint, MARK_WIDTH, MARK_COLORS, MIN_POINT_GAP,
+  MARK_OPACITY, MIN_MARK_OPACITY, MAX_MARK_OPACITY, MIN_MARK_WIDTH, MAX_MARK_WIDTH,
+  markOpacity,
 } from '@/lib/patternMark';
 import type { PatternMark } from '@/lib/db';
 
@@ -88,5 +90,38 @@ describe('굵기와 색', () => {
   it('색은 네 가지', () => {
     expect(MARK_COLORS).toHaveLength(4);
     for (const c of MARK_COLORS) expect(c.css).toMatch(/^#[0-9A-F]{6}$/i);
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 진하기
+// ----------------------------------------------------------------------------
+// 형광펜을 쓰는 까닭은 '지금 여기를 뜨고 있다' 를 표시하기 위해서다. 진하게
+// 덮어버리면 무엇에 표시했는지 자체를 못 읽어 표시한 의미가 사라진다.
+
+describe('진하기', () => {
+  it('아래 글자가 비쳐야 한다', () => {
+    expect(MARK_OPACITY).toBeGreaterThan(0);
+    expect(MARK_OPACITY).toBeLessThan(1);
+  });
+
+  it('이 칸이 생기기 전에 그은 자국도 기본 진하기로 보인다', () => {
+    expect(markOpacity({})).toBe(MARK_OPACITY);
+    expect(markOpacity({ opacity: undefined })).toBe(MARK_OPACITY);
+  });
+
+  it('정해 둔 값이 있으면 그 값을 쓴다', () => {
+    expect(markOpacity({ opacity: 0.2 })).toBe(0.2);
+  });
+
+  it('0 을 기본값으로 되돌리지 않는다 — ?? 대신 || 로 쓰면 여기서 걸린다', () => {
+    expect(markOpacity({ opacity: 0 })).toBe(0);
+  });
+
+  it('기본값은 고를 수 있는 범위 안에 있다', () => {
+    expect(MARK_OPACITY).toBeGreaterThanOrEqual(MIN_MARK_OPACITY);
+    expect(MARK_OPACITY).toBeLessThanOrEqual(MAX_MARK_OPACITY);
+    expect(MARK_WIDTH).toBeGreaterThanOrEqual(MIN_MARK_WIDTH);
+    expect(MARK_WIDTH).toBeLessThanOrEqual(MAX_MARK_WIDTH);
   });
 });
