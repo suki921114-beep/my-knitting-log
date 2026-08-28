@@ -7,9 +7,10 @@
 //   · 경로가 다르면 보안 규칙도 따로 걸 수 있다 — PDF 만 30MB 까지 허용하고
 //     사진은 2MB 로 묶어 둘 수 있다.
 //
-// 경로: users/{uid}/patternFiles/{patternCloudId}.pdf
-//   도안 하나에 파일 하나라 이름을 따로 둘 필요가 없다. 같은 도안의 파일을
-//   바꾸면 덮어써지고, 옛 파일이 남아 자리를 먹는 일도 없다.
+// 경로: users/{uid}/patternFiles/{patternCloudId}/{fileCloudId}.pdf
+//   도안 하나에 파일이 여럿일 수 있다 — 차트 따로, 사이즈 옵션 따로.
+//   도안 cloudId 로 폴더를 만들고 그 안에 파일 id 로 담는다.
+//   파일 id 를 안 쓰면 두 번째 파일이 첫 번째를 덮어쓴다.
 //
 // ⚠️ storage.rules 에 이 경로가 열려 있어야 한다. 규칙을 게시하지 않으면
 //    업로드가 storage/unauthorized 로 막힌다.
@@ -17,17 +18,23 @@
 import { getBytes, ref as storageRef, uploadBytes, deleteObject } from 'firebase/storage';
 import { storage } from '../firebase';
 
-export function buildPatternFilePath(uid: string, patternCloudId: string): string {
-  return `users/${uid}/patternFiles/${patternCloudId}.pdf`;
+export function buildPatternFilePath(uid: string, patternCloudId: string, fileCloudId: string): string {
+  return `users/${uid}/patternFiles/${patternCloudId}/${fileCloudId}.pdf`;
+}
+
+/** 도안의 파일 폴더 — 도안을 통째로 지울 때 쓴다 */
+export function patternFileFolder(uid: string, patternCloudId: string): string {
+  return `users/${uid}/patternFiles/${patternCloudId}`;
 }
 
 /** 올리고 저장된 자리를 돌려준다. 실패는 throw. */
 export async function uploadPatternFile(
   uid: string,
   patternCloudId: string,
+  fileCloudId: string,
   blob: Blob,
 ): Promise<string> {
-  const path = buildPatternFilePath(uid, patternCloudId);
+  const path = buildPatternFilePath(uid, patternCloudId, fileCloudId);
   await uploadBytes(storageRef(storage, path), blob, { contentType: 'application/pdf' });
   return path;
 }

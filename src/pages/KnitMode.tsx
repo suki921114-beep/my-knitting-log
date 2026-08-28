@@ -15,7 +15,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, type PatternFile, type RowCounter } from '@/lib/db';
 import { PdfSurface } from '@/components/PdfViewer';
-import { getPatternFile } from '@/lib/patternFile';
+import { getPatternFiles } from '@/lib/patternFile';
 import {
   ChevronLeft,
   Plus,
@@ -73,8 +73,11 @@ export default function KnitMode() {
   }, [patternLinks.map(l => l.patternId).join(',')]) || [];
 
   const [pickedId, setPickedId] = useState<number | null>(null);
-  const [file, setFile] = useState<PatternFile | null>(null);
+  // 도안 하나에 파일이 여럿일 수 있다 — 본문과 차트를 오가며 뜬다
+  const [files, setFiles] = useState<PatternFile[]>([]);
+  const [fileIdx, setFileIdx] = useState(0);
   const [loadingFile, setLoadingFile] = useState(true);
+  const file = files[fileIdx] ?? null;
 
   // 고른 도안이 없으면 첫 번째를 연다
   const activeId = pickedId ?? filed[0]?.patternId ?? null;
@@ -82,14 +85,15 @@ export default function KnitMode() {
   useEffect(() => {
     let alive = true;
     if (activeId == null) {
-      setFile(null);
+      setFiles([]);
       setLoadingFile(filed.length > 0);
       return;
     }
     setLoadingFile(true);
-    getPatternFile(activeId).then(f => {
+    getPatternFiles(activeId).then(list => {
       if (alive) {
-        setFile(f ?? null);
+        setFiles(list);
+        setFileIdx(0);
         setLoadingFile(false);
       }
     });
@@ -200,6 +204,21 @@ export default function KnitMode() {
         <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white">
           {project.name}
         </div>
+        {/* 한 도안 안에 파일이 여럿이면 그것부터 고른다 (본문 / 차트 …) */}
+        {files.length > 1 && (
+          <select
+            value={fileIdx}
+            onChange={e => setFileIdx(Number(e.target.value))}
+            aria-label="도안 파일 고르기"
+            className="max-w-[7rem] rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-[12px] text-white outline-none"
+          >
+            {files.map((f, i) => (
+              <option key={f.cloudId ?? f.id ?? i} value={i} className="text-black">
+                {f.name.replace(/\.pdf$/i, '')}
+              </option>
+            ))}
+          </select>
+        )}
         {/* 도안이 여럿이면 골라 볼 수 있게 */}
         {filed.length > 1 && (
           <select
@@ -277,7 +296,7 @@ export default function KnitMode() {
       ) : file ? (
         <PdfSurface
           file={file}
-          rememberKey={String(file.patternId)}
+          rememberKey={`${file.patternId}:${file.cloudId ?? fileIdx}`}
           className="flex-1 pb-[env(safe-area-inset-bottom,0px)]"
         />
       ) : (

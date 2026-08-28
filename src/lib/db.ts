@@ -76,6 +76,15 @@ export interface PatternFile {
   patternId: number;
   /** 도안의 cloudId. 기기가 달라도 같은 값이라 클라우드에서 짝이 맞는다. */
   patternCloudId?: string;
+  /**
+   * 이 파일 자체의 id.
+   *
+   * 도안 하나에 파일이 여럿일 수 있어서(차트 따로, 사이즈 옵션 따로) 파일마다
+   * 고유한 값이 필요하다. 기기가 달라도 같은 파일은 같은 값을 갖는다.
+   */
+  cloudId?: string;
+  /** 몇 번째로 보여줄지. 사람이 넣은 순서를 지킨다. */
+  sortOrder?: number;
   /** 사람이 고른 원래 파일명 — 내려받을 때 이 이름으로 준다 */
   name: string;
   size: number;
@@ -88,6 +97,15 @@ export interface PatternFile {
   /** 클라우드에 올라간 자리. 없으면 아직 이 기기에만 있다는 뜻. */
   storagePath?: string;
   createdAt: number;
+}
+
+/** 문서에 실리는 도안 파일 정보 — 파일 자체는 Storage 에 있다 */
+export interface RemotePatternFileRef {
+  cloudId: string;
+  storagePath: string;
+  name: string;
+  size: number;
+  sortOrder: number;
 }
 
 export interface Pattern extends SyncMetadata {
@@ -107,9 +125,19 @@ export interface Pattern extends SyncMetadata {
   imageDataUrl?: string; // 대표 이미지
   /** 대표 이미지가 올라간 Storage 위치. 그림 자체는 문서에 담지 않는다. */
   imageStoragePath?: string;
-  /** 도안 PDF 가 올라간 Storage 자리. 파일 자체는 문서에 담지 않는다. */
+  /**
+   * 도안 PDF 들이 올라간 자리. 파일 자체는 문서에 담지 않는다.
+   *
+   * 도안 하나에 파일이 여럿일 수 있다 — 차트 따로, 사이즈별 옵션 따로 오는
+   * 도안이 흔하다. 최대 3개까지 담는다.
+   */
+  files?: RemotePatternFileRef[];
+  /**
+   * @deprecated 파일이 하나뿐이던 시절의 칸.
+   * 이미 백업해 둔 기기가 있어서 읽을 때는 계속 받아 준다.
+   * 새로 올릴 때는 files 만 쓴다.
+   */
   fileStoragePath?: string;
-  /** 내려받을 때 쓸 원래 파일명과 크기 */
   fileName?: string;
   fileSize?: number;
   /**
@@ -693,6 +721,35 @@ class KnitDB extends Dexie {
       for (const f of await files.toArray()) {
         const cid = cloudIdById.get(f.patternId);
         if (cid && !f.patternCloudId) await files.put({ ...f, patternCloudId: cid });
+      }
+    });
+
+    // 도안 하나에 파일을 여러 개 담을 수 있게 되면서 파일마다 제 id 가 필요해졌다.
+    // 예전 파일은 도안 cloudId 를 그대로 쓰던 시절이라 값이 없다.
+    this.version(11).stores({
+      projects: '++id, cloudId, isDeleted, updatedAt, status, name',
+      patterns: '++id, cloudId, isDeleted, updatedAt, name',
+      yarns: '++id, cloudId, isDeleted, updatedAt, name, brand',
+      needles: '++id, cloudId, isDeleted, updatedAt, type',
+      notions: '++id, cloudId, isDeleted, updatedAt, name',
+      projectYarns: '++id, cloudId, isDeleted, updatedAt, projectId, yarnId',
+      projectPatterns: '++id, cloudId, isDeleted, updatedAt, projectId, patternId',
+      projectNeedles: '++id, cloudId, isDeleted, updatedAt, projectId, needleId',
+      projectNotions: '++id, cloudId, isDeleted, updatedAt, projectId, notionId',
+      rowCounters: '++id, cloudId, isDeleted, updatedAt, projectId',
+      gaugePresets: '++id, cloudId, isDeleted, updatedAt',
+      projectGauges: '++id, cloudId, isDeleted, updatedAt, projectId',
+      logs: '++id, cloudId, isDeleted, updatedAt, date, projectId',
+      patternFiles: '++id, patternId, patternCloudId, cloudId',
+    }).upgrade(async (tx) => {
+      const files = tx.table('patternFiles');
+      for (const f of await files.toArray()) {
+        if (f.cloudId && f.sortOrder != null) continue;
+        await files.put({
+          ...f,
+          cloudId: f.cloudId || crypto.randomUUID(),
+          sortOrder: f.sortOrder ?? 0,
+        });
       }
     });
 

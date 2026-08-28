@@ -4,6 +4,7 @@ import {
   formatBytes,
   saveErrorMessage,
   MAX_PATTERN_FILE_BYTES,
+  MAX_PATTERN_FILES,
 } from '@/lib/patternFile';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -55,8 +56,14 @@ describe('한도', () => {
     expect(MAX_PATTERN_FILE_BYTES).toBe(30 * 1024 * 1024);
   });
 
+  it('도안 하나에 세 장까지', () => {
+    // 도안이 한 장으로 안 오는 경우가 많다 — 본문 따로, 차트 따로,
+    // 사이즈별 옵션 따로. 그렇다고 무제한이면 한 도안이 30MB×N 을 먹는다.
+    expect(MAX_PATTERN_FILES).toBe(3);
+  });
+
   it('실패 이유마다 할 말이 있다', () => {
-    for (const e of ['type', 'size', 'quota', 'unknown'] as const) {
+    for (const e of ['type', 'size', 'quota', 'limit', 'unknown'] as const) {
       expect(saveErrorMessage(e).title.length).toBeGreaterThan(0);
     }
   });
@@ -121,5 +128,12 @@ describe('도안 파일이 새면 안 되는 곳', () => {
     const src = read('../lib/sync/patternFileStorage.ts');
     expect(src).toContain('patternCloudId');
     expect(src).not.toContain('patternId');
+  });
+
+  it('파일마다 제 자리를 갖는다', () => {
+    // 도안 cloudId 만으로 경로를 만들면 두 번째 파일이 첫 번째를 덮어쓴다.
+    // 실제로 한 번 겪으면 원본이 사라지므로 되돌릴 수 없다.
+    const src = read('../lib/sync/patternFileStorage.ts');
+    expect(src).toContain('${patternCloudId}/${fileCloudId}.pdf');
   });
 });

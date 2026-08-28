@@ -28,7 +28,16 @@ export const MAX_PATTERN_FILE_BYTES = 30 * 1024 * 1024;
 
 export const ACCEPTED_PATTERN_FILE_TYPES = 'application/pdf';
 
-export type SaveFileError = 'type' | 'size' | 'quota' | 'unknown';
+/**
+ * 도안 하나에 담을 수 있는 파일 수.
+ *
+ * 도안이 한 장으로 안 오는 경우가 많다 — 본문 따로, 차트 따로,
+ * 사이즈별 옵션 따로. 그렇다고 무제한으로 두면 한 도안이 30MB×N 을
+ * 차지하게 되므로 셋으로 묶는다.
+ */
+export const MAX_PATTERN_FILES = 3;
+
+export type SaveFileError = 'type' | 'size' | 'quota' | 'limit' | 'unknown';
 
 export interface SaveFileResult {
   ok: boolean;
@@ -86,6 +95,9 @@ export async function savePatternFile(patternId: number, file: File): Promise<Sa
       // 도안의 cloudId 를 함께 적어 둔다. 클라우드에서 짝을 맞추는 열쇠는
       // 기기마다 다른 patternId 가 아니라 이 값이다.
       patternCloudId: (await db.patterns.get(patternId))?.cloudId,
+      // 파일마다 제 id 를 갖는다 — 도안 cloudId 를 쓰면 두 번째 파일이 첫 번째를 덮는다
+      cloudId: crypto.randomUUID(),
+      sortOrder: 0,
       name: file.name || '도안.pdf',
       size: bytes.byteLength || file.size,
       type: 'application/pdf',
@@ -93,11 +105,15 @@ export async function savePatternFile(patternId: number, file: File): Promise<Sa
       createdAt: Date.now(),
     };
 
-    // 지우고 넣는다. 도안 하나에 파일 하나이므로 옛것이 남아 자리를 먹으면 안 된다.
+    // 뒤에 붙인다. 도안 하나에 여러 장이 올 수 있다.
+    let overflow = false;
     await db.transaction('rw', db.patternFiles, async () => {
-      await db.patternFiles.where('patternId').equals(patternId).delete();
+      const rows = await db.patternFiles.where('patternId').equals(patternId).toArray();
+      if (rows.length >= MAX_PATTERN_FILES) { overflow = true; return; }
+      record.sortOrder = rows.reduce((m, r) => Math.max(m, r.sortOrder ?? 0), -1) + 1;
       record.id = (await db.patternFiles.add(record)) as number;
     });
+    if (overflow) return { ok: false, error: 'limit' };
     // 도안 쪽 표시를 지우고 시각을 올린다.
     // 안 하면 클라우드에는 옛 파일 자리가 남아, 새로 넣은 파일이 안 올라간다.
     await markPatternFileChanged(patternId);
@@ -110,8 +126,24 @@ export async function savePatternFile(patternId: number, file: File): Promise<Sa
   }
 }
 
+/** 이 도안의 파일들 — 사람이 넣은 순서대로 */
+export async function getPatternFiles(patternId: number): Promise<PatternFile[]> {
+  const rows = await db.patternFiles.where('patternId').equals(patternId).toArray();
+  return rows.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.createdAt - b.createdAt));
+}
+
+/** 첫 번째 파일. 한 장만 필요할 때 쓴다. */
 export async function getPatternFile(patternId: number): Promise<PatternFile | undefined> {
-  return db.patternFiles.where('patternId').equals(patternId).first();
+  return (await getPatternFiles(patternId))[0];
+}
+
+/** 한 장만 지운다 */
+export async function deletePatternFileById(id: number): Promise<void> {
+  const row = await db.patternFiles.get(id);
+  if (!row) return;
+  await db.patternFiles.delete(id);
+  await markPatternFileChanged(row.patternId);
+  await removeFromCloud([row]);
 }
 
 /**
@@ -205,6 +237,11 @@ export function saveErrorMessage(error: SaveFileError): SaveErrorMessage {
       return {
         title: `파일이 너무 커요 (최대 ${formatBytes(MAX_PATTERN_FILE_BYTES)})`,
         description: '도안이 여러 장으로 나뉘어 있다면 필요한 부분만 넣어보세요.',
+      };
+    case 'limit':
+      return {
+        title: `도안 파일은 ${MAX_PATTERN_FILES}개까지 넣을 수 있어요`,
+        description: '자리를 비우려면 넣어둔 파일 중 하나를 빼주세요.',
       };
     case 'quota':
       return {

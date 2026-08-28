@@ -49,7 +49,7 @@ service firebase.storage {
     }
 
     // ------------------------------------------------------------------
-    // 도안 PDF — users/{uid}/patternFiles/{patternCloudId}.pdf
+    // 도안 PDF — users/{uid}/patternFiles/{patternCloudId}/{fileCloudId}.pdf
     // ------------------------------------------------------------------
     // 사진과 경로를 나눈 덕에 크기 제한을 따로 걸 수 있다.
     // PDF 는 사진보다 크지만(30MB) 그만큼 총량 확인이 중요하다.
@@ -59,7 +59,7 @@ service firebase.storage {
       allow delete: if isOwner(uid);
     }
 
-    match /users/{uid}/patternFiles/{fileName} {
+    match /users/{uid}/patternFiles/{patternId}/{fileName} {
       allow write: if isOwner(uid)
                    && request.resource.size < 30 * 1024 * 1024         // 한 개 30MB
                    && request.resource.contentType == 'application/pdf'

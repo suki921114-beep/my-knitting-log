@@ -7,8 +7,8 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useGoBack } from '@/hooks/useGoBack';
 import { ImageInput } from '@/components/ImageInput';
 import ReverseProjectsSection from '@/components/ReverseProjectsSection';
-import PatternFileInput, { type PendingPatternFile } from '@/components/PatternFileInput';
-import { deletePatternFile, savePatternFile, saveErrorMessage } from '@/lib/patternFile';
+import PatternFileInput, { EMPTY_PENDING, type PendingFiles } from '@/components/PatternFileInput';
+import { deletePatternFileById, savePatternFile, saveErrorMessage } from '@/lib/patternFile';
 import GaugeRowsInput from '@/components/GaugeRowsInput';
 import { toGaugeRows, fromGaugeRows, type GaugeRow } from '@/lib/gauge';
 import { Save, Trash2 } from 'lucide-react';
@@ -28,11 +28,15 @@ export default function PatternForm() {
   const [hyd, setHyd] = useState(false);
   // 도안 PDF 는 patterns 표가 아니라 patternFiles 에 따로 있다.
   // 목록을 그릴 때마다 몇 MB 를 읽지 않으려고 갈라 두었다.
-  const savedFile = useLiveQuery(
-    () => (pid ? db.patternFiles.where('patternId').equals(pid).first() : undefined),
+  const savedFiles = useLiveQuery(
+    async () => {
+      if (!pid) return [];
+      const rows = await db.patternFiles.where('patternId').equals(pid).toArray();
+      return rows.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.createdAt - b.createdAt);
+    },
     [pid],
-  );
-  const [pendingFile, setPendingFile] = useState<PendingPatternFile>(undefined);
+  ) || [];
+  const [pendingFiles, setPendingFiles] = useState<PendingFiles>(EMPTY_PENDING);
   // 도안이 요구하는 게이지. 실과 같은 모양이라 같은 부품을 쓴다.
   const [gauges, setGauges] = useState<GaugeRow[]>([]);
   useEffect(() => {
@@ -83,12 +87,11 @@ export default function PatternForm() {
       })) as number;
     }
 
-    // PDF 는 도안이 저장돼 id 가 생긴 뒤에 붙인다.
+    // PDF 는 도안이 저장돼 id 가 생긴 뒤에 붙인다. 빼기를 먼저 해야 자리가 난다.
     // 파일 저장이 실패해도 도안 자체는 이미 저장됐다 — 알리기만 하고 넘어간다.
-    if (pendingFile === null) {
-      await deletePatternFile(targetId);
-    } else if (pendingFile) {
-      const r = await savePatternFile(targetId, pendingFile);
+    for (const id of pendingFiles.removed) await deletePatternFileById(id);
+    for (const f of pendingFiles.added) {
+      const r = await savePatternFile(targetId, f);
       if (!r.ok) {
         const m = saveErrorMessage(r.error ?? 'unknown');
         toast.error(m.title, { description: m.description });
@@ -147,9 +150,9 @@ export default function PatternForm() {
       <div>
         <span className="mb-1.5 block text-xs font-medium text-muted-foreground">도안 파일 (PDF)</span>
         <PatternFileInput
-          saved={savedFile}
-          pending={pendingFile}
-          onPending={setPendingFile}
+          saved={savedFiles}
+          pending={pendingFiles}
+          onPending={setPendingFiles}
           rememberKey={pid ? String(pid) : undefined}
         />
       </div>

@@ -502,12 +502,24 @@ export function PdfSurface({ file, rememberKey, className = '' }: SurfaceProps) 
   );
 }
 
-interface Props extends SurfaceProps {
+interface Props {
+  /** 이 도안에 딸린 파일들 — 차트 따로, 사이즈 옵션 따로일 수 있다 */
+  files: PatternFile[];
+  index: number;
+  onIndexChange: (i: number) => void;
+  rememberKey?: string;
   onClose: () => void;
 }
 
-/** 화면 전체를 덮는 뷰어 */
-export default function PdfViewer({ file, rememberKey, onClose }: Props) {
+/**
+ * 화면 전체를 덮는 뷰어.
+ *
+ * 파일이 여럿이면 위에 이름 탭이 생긴다. 도안을 보다가 차트로 건너뛰는 일이
+ * 잦아서, 나갔다 다시 들어오게 하지 않는다.
+ */
+export default function PdfViewer({ files, index, onIndexChange, rememberKey, onClose }: Props) {
+  const file = files[index];
+
   // ESC 로 닫기 + 뒤 화면 스크롤 잠금
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -521,6 +533,8 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
       document.body.style.overflow = prev;
     };
   }, [onClose]);
+
+  if (!file) return null;
 
   const body = (
     <div className="fixed inset-0 z-[60] flex flex-col bg-neutral-900">
@@ -546,9 +560,28 @@ export default function PdfViewer({ file, rememberKey, onClose }: Props) {
         </button>
       </div>
 
+      {/* 파일이 여럿일 때만 고르는 줄을 낸다 */}
+      {files.length > 1 && (
+        <div className="-mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2">
+          {files.map((f, i) => (
+            <button
+              type="button"
+              key={f.cloudId ?? f.id ?? i}
+              onClick={() => onIndexChange(i)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition ${
+                i === index ? 'bg-white text-neutral-900' : 'bg-white/10 text-white/70'
+              }`}
+            >
+              <span className="max-w-[9rem] truncate">{f.name.replace(/\.pdf$/i, '')}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <PdfSurface
         file={file}
-        rememberKey={rememberKey}
+        // 파일마다 보던 장을 따로 기억한다 — 본문 3장과 차트 1장은 다른 자리다
+        rememberKey={rememberKey ? `${rememberKey}:${file.cloudId ?? index}` : undefined}
         className="flex-1 pb-[env(safe-area-inset-bottom,0px)]"
       />
     </div>

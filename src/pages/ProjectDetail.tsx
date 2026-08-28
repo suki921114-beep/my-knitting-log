@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import RowCounterSection from '@/components/RowCounterSection';
 import ProjectGaugeSection from '@/components/ProjectGaugeSection';
 import PdfViewer from '@/components/PdfViewer';
-import { getPatternFile } from '@/lib/patternFile';
+import { getPatternFiles } from '@/lib/patternFile';
 import type { PatternFile } from '@/lib/db';
 import { toast } from '@/components/ui/sonner';
 
@@ -44,11 +44,12 @@ export default function ProjectDetail() {
     async () => new Set((await db.patternFiles.orderBy('patternId').keys()) as number[]),
     [],
   ) || new Set<number>();
-  const [viewingFile, setViewingFile] = useState<PatternFile | null>(null);
+  const [viewingFiles, setViewingFiles] = useState<PatternFile[] | null>(null);
+  const [viewingIndex, setViewingIndex] = useState(0);
 
   async function openPatternFile(patternId: number) {
-    const file = await getPatternFile(patternId);
-    if (file) setViewingFile(file);
+    const files = await getPatternFiles(patternId);
+    if (files.length) { setViewingFiles(files); setViewingIndex(0); }
     else toast.error('도안 파일을 찾지 못했어요');
   }
 
@@ -376,11 +377,13 @@ export default function ProjectDetail() {
         </div>
       </Section>
 
-      {viewingFile && (
+      {viewingFiles && (
         <PdfViewer
-          file={viewingFile}
-          rememberKey={String(viewingFile.patternId)}
-          onClose={() => setViewingFile(null)}
+          files={viewingFiles}
+          index={viewingIndex}
+          onIndexChange={setViewingIndex}
+          rememberKey={String(viewingFiles[0].patternId)}
+          onClose={() => setViewingFiles(null)}
         />
       )}
 

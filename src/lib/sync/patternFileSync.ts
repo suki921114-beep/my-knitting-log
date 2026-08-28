@@ -15,7 +15,8 @@
 // 권한이 없는 계정에서는 아무 일도 하지 않는다 — 올리지도, 받지도 않는다.
 // 그 계정의 PDF 는 지금까지처럼 기기에만 남는다.
 
-import { db, type Pattern, type PatternFile } from '@/lib/db';
+import { db, type Pattern, type PatternFile, type RemotePatternFileRef } from '@/lib/db';
+import { getPatternFiles } from '@/lib/patternFile';
 import { isProAccount } from '@/lib/entitlement';
 import { auth } from '@/lib/firebase';
 import { canUpload, type StorageUsage } from '@/lib/quota';
@@ -26,6 +27,7 @@ import {
   uploadPatternFile,
   downloadPatternFile,
   deletePatternFileObject,
+  patternFileFolder,
 } from './patternFileStorage';
 
 /** 지금 로그인한 사람이 도안 파일을 클라우드에 둘 수 있는지 */
@@ -45,15 +47,16 @@ export function canSyncPatternFiles(): boolean {
  */
 export async function needsPatternFileUpload(local: Pattern, remote: Pattern): Promise<boolean> {
   if (!canSyncPatternFiles() || local.id == null) return false;
-  // 문서에 이미 자리가 적혀 있으면 올라간 것이다
-  if (remote.fileStoragePath || local.fileStoragePath) return false;
-  return (await db.patternFiles.where('patternId').equals(local.id).count()) > 0;
+  const here = await db.patternFiles.where('patternId').equals(local.id).count();
+  if (here === 0) return false;
+  // 문서에 적힌 개수가 기기보다 적으면 아직 안 올라간 게 있다는 뜻이다.
+  // 옛 칸(fileStoragePath)만 있는 도안은 한 개로 친다.
+  const there = remote.files?.length ?? (remote.fileStoragePath ? 1 : 0);
+  return there < here;
 }
 
 export interface PatternFilePayload {
-  fileStoragePath?: string;
-  fileName?: string;
-  fileSize?: number;
+  files?: RemotePatternFileRef[];
 }
 
 export interface UploadPatternFileResult {
@@ -77,8 +80,6 @@ export async function uploadPatternFileFor(
 ): Promise<UploadPatternFileResult> {
   const none: UploadPatternFileResult = { payload: {}, usage, usageChanged: false };
 
-  // 왜 안 올라갔는지는 조용히 넘어가면 알 길이 없다. 백업은 성공했다고 나오고
-  // 파일만 없으니, 나중에 기기를 바꾼 뒤에야 알게 된다. 이유를 남긴다.
   if (!canSyncPatternFiles()) {
     console.info(
       `[${context}] 도안 파일 업로드 건너뜀 — 이 계정은 클라우드 보관 대상이 아니에요`,
@@ -88,94 +89,112 @@ export async function uploadPatternFileFor(
   }
   if (!pattern.cloudId || pattern.id == null) return none;
 
-  const local = await db.patternFiles.where('patternId').equals(pattern.id).first();
-  if (!local) {
-    // 기기에 파일이 없다. 클라우드에 있던 것을 지운 경우일 수 있으니
-    // 문서의 자리도 함께 비운다.
-    return { payload: {}, usage, usageChanged: false };
+  const locals = await getPatternFiles(pattern.id);
+  if (!locals.length) return { payload: { files: [] }, usage, usageChanged: false };
+
+  const refs: RemotePatternFileRef[] = [];
+  let next = { ...usage };
+  let changed = false;
+
+  for (const local of locals) {
+    const cloudId = local.cloudId || crypto.randomUUID();
+
+    // 이미 올라가 있으면 자리만 다시 적는다
+    if (local.storagePath) {
+      refs.push({
+        cloudId, storagePath: local.storagePath,
+        name: local.name, size: local.size, sortOrder: local.sortOrder ?? 0,
+      });
+      continue;
+    }
+
+    const verdict = canUpload(next, local.size);
+    if (!verdict.ok) {
+      // 올리지 않을 뿐 기기에는 남는다. 자리가 생기면 다음 백업에서 다시 시도한다.
+      reportSkippedPhoto(verdict.reason!);
+      continue;
+    }
+
+    try {
+      console.info(`[${context}] 도안 파일 올리는 중 — ${local.name} (${local.size} bytes)`);
+      const path = await uploadPatternFile(userId, pattern.cloudId, cloudId, local.blob);
+      await db.patternFiles.update(local.id!, {
+        storagePath: path, patternCloudId: pattern.cloudId, cloudId,
+      });
+      refs.push({
+        cloudId, storagePath: path,
+        name: local.name, size: local.size, sortOrder: local.sortOrder ?? 0,
+      });
+      next = { ...next, bytes: next.bytes + local.size };
+      changed = true;
+    } catch (e) {
+      console.error(`[${context}] 도안 파일 업로드 실패:`, e);
+      captureError(
+        `도안 파일 업로드 실패 | ${pattern.cloudId} | ${String((e as Error)?.message ?? e)}`,
+        `${context}/patternFileUpload`,
+      );
+    }
   }
 
-  // 이미 올라가 있으면 자리만 다시 적어 준다
-  if (local.storagePath) {
-    return {
-      payload: {
-        fileStoragePath: local.storagePath,
-        fileName: local.name,
-        fileSize: local.size,
-      },
-      usage,
-      usageChanged: false,
-    };
-  }
-
-  const verdict = canUpload(usage, local.size);
-  if (!verdict.ok) {
-    // 올리지 않을 뿐 기기에는 남는다. 자리가 생기면 다음 백업에서 다시 시도한다.
-    reportSkippedPhoto(verdict.reason!);
-    return none;
-  }
-
-  try {
-    console.info(`[${context}] 도안 파일 올리는 중 — ${local.name} (${local.size} bytes)`);
-    const path = await uploadPatternFile(userId, pattern.cloudId, local.blob);
-    // 기기에도 자리를 적어 둔다 — 안 적으면 다음 백업에 같은 파일을 또 올린다.
-    // 도안 쪽에도 적는 이유는 '올라갔는지' 를 파일을 안 읽고 알기 위해서다.
-    await db.patternFiles.update(local.id!, {
-      storagePath: path,
-      patternCloudId: pattern.cloudId,
-    });
-    await db.patterns.update(pattern.id, { fileStoragePath: path } as any);
-    return {
-      payload: { fileStoragePath: path, fileName: local.name, fileSize: local.size },
-      usage: { ...usage, bytes: usage.bytes + local.size },
-      usageChanged: true,
-    };
-  } catch (e) {
-    console.error(`[${context}] 도안 파일 업로드 실패:`, e);
-    captureError(
-      `도안 파일 업로드 실패 | ${pattern.cloudId} | ${String((e as Error)?.message ?? e)}`,
-      `${context}/patternFileUpload`,
-    );
-    return none;
-  }
+  return { payload: { files: refs }, usage: next, usageChanged: changed };
 }
 
 /**
- * 문서에 적힌 도안 파일을 이 기기로 받아온다.
+ * 문서에 적힌 도안 파일들을 이 기기로 받아온다.
  *
- * 이미 기기에 있으면 건드리지 않는다. 같은 파일을 두 번 받을 이유가 없고,
- * 받는 동안 쓰던 파일이 사라지면 곤란하다.
+ * 이미 기기에 있는 파일은 건드리지 않는다. 같은 파일을 두 번 받을 이유가 없고,
+ * 받는 동안 보던 파일이 사라지면 곤란하다.
  */
 export async function downloadPatternFileFor(
   localPatternId: number,
   remote: Pattern,
   context: string,
 ): Promise<void> {
-  if (!canSyncPatternFiles() || !remote.fileStoragePath) return;
+  if (!canSyncPatternFiles()) return;
 
-  const existing = await db.patternFiles.where('patternId').equals(localPatternId).first();
-  if (existing) return;
+  // 옛 칸만 있는 도안도 받아 준다 — 파일이 하나뿐이던 시절에 백업한 것들
+  const refs: RemotePatternFileRef[] = remote.files?.length
+    ? remote.files
+    : remote.fileStoragePath
+      ? [{
+          cloudId: remote.cloudId ?? 'legacy',
+          storagePath: remote.fileStoragePath,
+          name: remote.fileName || '도안.pdf',
+          size: remote.fileSize ?? 0,
+          sortOrder: 0,
+        }]
+      : [];
+  if (!refs.length) return;
 
-  try {
-    const blob = await downloadPatternFile(remote.fileStoragePath);
-    const record: PatternFile = {
-      patternId: localPatternId,
-      patternCloudId: remote.cloudId,
-      name: remote.fileName || '도안.pdf',
-      size: remote.fileSize ?? blob.size,
-      type: 'application/pdf',
-      blob,
-      storagePath: remote.fileStoragePath,
-      createdAt: Date.now(),
-    };
-    await db.patternFiles.add(record);
-  } catch (e) {
-    // 조용히 넘어가면 도안이 원래 없는 줄 안다. 기록은 남긴다.
-    console.error(`[${context}] 도안 파일 다운로드 실패:`, remote.fileStoragePath, e);
-    captureError(
-      `도안 파일 다운로드 실패 | ${remote.fileStoragePath} | ${String((e as Error)?.message ?? e)}`,
-      `${context}/patternFileDownload`,
-    );
+  const here = await db.patternFiles.where('patternId').equals(localPatternId).toArray();
+  const haveCloud = new Set(here.map(f => f.cloudId).filter(Boolean));
+  const havePath = new Set(here.map(f => f.storagePath).filter(Boolean));
+
+  for (const ref of refs) {
+    if (haveCloud.has(ref.cloudId) || havePath.has(ref.storagePath)) continue;
+    try {
+      const blob = await downloadPatternFile(ref.storagePath);
+      const record: PatternFile = {
+        patternId: localPatternId,
+        patternCloudId: remote.cloudId,
+        cloudId: ref.cloudId,
+        sortOrder: ref.sortOrder ?? 0,
+        name: ref.name || '도안.pdf',
+        size: ref.size || blob.size,
+        type: 'application/pdf',
+        blob,
+        storagePath: ref.storagePath,
+        createdAt: Date.now(),
+      };
+      await db.patternFiles.add(record);
+    } catch (e) {
+      // 조용히 넘어가면 도안이 원래 없는 줄 안다. 기록은 남긴다.
+      console.error(`[${context}] 도안 파일 다운로드 실패:`, ref.storagePath, e);
+      captureError(
+        `도안 파일 다운로드 실패 | ${ref.storagePath} | ${String((e as Error)?.message ?? e)}`,
+        `${context}/patternFileDownload`,
+      );
+    }
   }
 }
 
@@ -185,5 +204,13 @@ export async function purgePatternFileFromCloud(
   patternCloudId: string,
 ): Promise<void> {
   if (!canSyncPatternFiles()) return;
-  await deletePatternFileObject(`users/${userId}/patternFiles/${patternCloudId}.pdf`);
+  // 폴더 안의 파일을 훑어 지운다 — 도안 하나에 여러 장이 들어 있을 수 있다
+  const { listAll, ref: storageRef } = await import('firebase/storage');
+  const { storage } = await import('@/lib/firebase');
+  try {
+    const listed = await listAll(storageRef(storage, patternFileFolder(userId, patternCloudId)));
+    await Promise.all(listed.items.map(i => deletePatternFileObject(i.fullPath)));
+  } catch (e) {
+    console.warn('[patternFileSync] 도안 파일 폴더 정리 실패', e);
+  }
 }
