@@ -70,13 +70,19 @@ export async function deleteCloudData(uid: string, onProgress?: DeleteAccountPro
       await deleteDoc(d.ref);
     }
   }
-  // 사진은 Firestore 가 아니라 Storage 에 있다. 문서만 지우면 파일이 남아
-  // 계속 용량을 차지하고, 개인정보도 남는다.
-  onProgress?.('클라우드 사진 삭제 중…');
-  try {
-    await deleteStorageFolder(`users/${uid}/projectPhotos`);
-  } catch (e) {
-    console.warn('[deleteAccount] 사진 삭제 실패:', e);
+  // 사진과 도안은 Firestore 가 아니라 Storage 에 있다. 문서만 지우면 파일이
+  // 남아 계속 용량을 차지하고, 개인정보도 남는다.
+  //
+  // ⚠️ Storage 에 새 폴더를 만들면 여기에도 반드시 추가할 것.
+  //    빠뜨리면 "계정을 지웠다" 고 해놓고 파일은 남는다 — 지운 사람은
+  //    남은 줄도 모르고, 계정이 사라진 뒤에는 규칙상 아무도 못 지운다.
+  for (const folder of ['projectPhotos', 'patternFiles']) {
+    onProgress?.(`클라우드 ${folder === 'projectPhotos' ? '사진' : '도안'} 삭제 중…`);
+    try {
+      await deleteStorageFolder(`users/${uid}/${folder}`);
+    } catch (e) {
+      console.warn(`[deleteAccount] ${folder} 삭제 실패:`, e);
+    }
   }
 
   onProgress?.('클라우드 사용자 문서 삭제 중…');

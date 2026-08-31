@@ -137,9 +137,11 @@ export default function PatternForm() {
     <div className="space-y-4">
       <PageHeader title={editing ? '도안 수정' : '새 도안'} back />
       {dialog}
-      <Field label="대표 이미지">
+      {/* ⚠️ label 로 감싸면 안 된다. 안에 숨은 file input 이 있어서,
+          어디를 눌러도 앨범이 바로 열려 고르는 창이 뜨지 않는다. */}
+      <FieldDiv label="대표 이미지">
         <ImageInput value={image} onChange={setImage} aspect="video" />
-      </Field>
+      </FieldDiv>
       <Field label="도안명 *"><input className={inp} value={f.name} onChange={u('name')} /></Field>
       <Field label="디자이너"><input className={inp} value={f.designer} onChange={u('designer')} /></Field>
       <div className="grid grid-cols-2 gap-3">
@@ -170,6 +172,15 @@ export default function PatternForm() {
 }
 
 const inp = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';
+/** 안에 버튼이 들어가는 칸 — label 로 감싸면 클릭이 엉킨다 */
+function FieldDiv({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="block">
+      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  );
+}
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>{children}</label>;
 }

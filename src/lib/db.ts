@@ -854,7 +854,7 @@ const IMPORT_TABLES = [
 export async function importAll(data: any) {
   await db.transaction(
     'rw',
-    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges, db.logs],
+    [db.projects, db.patterns, db.yarns, db.needles, db.notions, db.projectYarns, db.projectPatterns, db.projectNeedles, db.projectNotions, db.rowCounters, db.gaugePresets, db.projectGauges, db.logs, db.patternFiles, db.patternMarks],
     async () => {
       for (const name of IMPORT_TABLES) {
         const incoming = data?.[name];
@@ -900,6 +900,11 @@ export async function clearAll() {
           db.gaugePresets.clear(),
           db.projectGauges.clear(),
           db.logs.clear(),
+          // ⚠️ 도안 PDF 와 형광펜 자국도 여기서 지운다. 빼놓으면 도안이
+          //    사라진 뒤에도 파일만 남아, 보이지도 않는 것이 폰 용량을
+          //    수십 MB 씩 계속 차지한다. 지울 방법도 없다.
+          db.patternFiles.clear(),
+          db.patternMarks.clear(),
         ]);
       }
     );

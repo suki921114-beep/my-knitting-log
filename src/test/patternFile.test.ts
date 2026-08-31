@@ -81,7 +81,12 @@ describe('도안 파일이 새면 안 되는 곳', () => {
     // 새면 백업 한 번에 수백 MB 가 된다 — 열지도 보내지도 못한다.
     // 클라우드에는 올라가도 파일 백업에는 절대 안 담는다.
     const src = read('../lib/db.ts');
-    const body = src.slice(src.indexOf('export async function exportAll'));
+    // ⚠️ 함수 하나만 잘라야 한다. 파일 끝까지 보면 뒤에 오는 clearAll 의
+    //    patternFiles 까지 걸려서, 백업과 상관없는 변경에 애먼 실패가 난다.
+    const from = src.indexOf('export async function exportAll');
+    expect(from).toBeGreaterThan(-1);
+    const body = src.slice(from, src.indexOf('\n}', from));
+    expect(body).toContain('logs:');   // 잘라낸 자리가 맞는지
     expect(body).not.toContain('patternFiles');
   });
 

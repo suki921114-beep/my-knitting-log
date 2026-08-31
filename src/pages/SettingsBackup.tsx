@@ -508,8 +508,12 @@ export default function SettingsBackup() {
             e.target.value = '';
           }}
         />
+        {/* ⚠️ "모든 기록" 이라고 하면 안 된다. 도안 PDF 와 형광펜 자국은
+            내보내기에 담기지 않는다 (exportAll 참고). 다 담긴 줄 알고 앱을
+            지우면 도안이 사라지고, 그건 되돌릴 방법이 없다. */}
         <p className="px-1 text-[10.5px] leading-relaxed text-muted-foreground">
-          기기를 바꾸거나 앱을 지우기 전에는 꼭 한 번 내보내 두세요. 사진을 포함해 모든 기록이 파일 하나에 담깁니다.
+          기기를 바꾸거나 앱을 지우기 전에는 꼭 한 번 내보내 두세요. 사진을 포함해 기록이 파일 하나에 담깁니다.{' '}
+          <strong className="text-foreground">도안 PDF와 형광펜 표시는 담기지 않으니</strong> 원본 파일은 따로 보관해 주세요.
         </p>
       </Section>
 

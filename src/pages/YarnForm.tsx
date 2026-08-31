@@ -159,9 +159,11 @@ export default function YarnForm() {
     <div className="space-y-4">
       <PageHeader title={editing ? '실 수정' : '새 실'} back />
       {dialog}
-      <Field label="대표 이미지">
+      {/* ⚠️ label 로 감싸면 안 된다. 안에 숨은 file input 이 있어서,
+          어디를 눌러도 앨범이 바로 열려 고르는 창이 뜨지 않는다. */}
+      <FieldDiv label="대표 이미지">
         <ImageInput value={photo} onChange={setPhoto} aspect="square" />
-      </Field>
+      </FieldDiv>
       <Field label="이름 *"><input className={inp} value={f.name} onChange={u('name')} /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="브랜드"><input className={inp} value={f.brand} onChange={u('brand')} /></Field>

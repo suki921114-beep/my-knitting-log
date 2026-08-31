@@ -100,9 +100,11 @@ export default function NotionForm() {
     <div className="space-y-4">
       <PageHeader title={editing ? '부자재 수정' : '새 부자재'} back />
       {dialog}
-      <Field label="대표 이미지">
+      {/* ⚠️ label 로 감싸면 안 된다. 안에 숨은 file input 이 있어서,
+          어디를 눌러도 앨범이 바로 열려 고르는 창이 뜨지 않는다. */}
+      <FieldDiv label="대표 이미지">
         <ImageInput value={photo} onChange={setPhoto} aspect="square" />
-      </Field>
+      </FieldDiv>
       <Field label="품목명 *"><input className={inp} value={f.name} onChange={u('name')} placeholder="단추, 마커..." /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="종류"><input className={inp} value={f.kind} onChange={u('kind')} /></Field>
@@ -122,6 +124,15 @@ export default function NotionForm() {
   );
 }
 const inp = 'w-full rounded-xl border bg-card px-3.5 py-2.5 text-sm outline-none focus:border-primary';
+/** 안에 버튼이 들어가는 칸 — label 로 감싸면 클릭이 엉킨다 */
+function FieldDiv({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="block">
+      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  );
+}
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>{children}</label>;
 }
