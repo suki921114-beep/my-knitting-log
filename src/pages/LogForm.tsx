@@ -7,11 +7,11 @@ import { saveLog, deleteLog, todayStr } from '@/lib/logs';
 import { photoUrls } from '@/lib/photo';
 import PageHeader from '@/components/PageHeader';
 import { MultiImageInput } from '@/components/ImageInput';
+import { MoodPicker } from '@/components/MoodPicker';
 import { useConfirm } from '@/hooks/useConfirm';
 import { toast } from '@/components/ui/sonner';
 import { Save, Trash2 } from 'lucide-react';
 
-const MOODS = ['🧶', '😊', '🔥', '😮‍💨', '😴', '🎉'];
 
 function reconcilePhotos(prev: ProjectPhoto[], urls: string[]): ProjectPhoto[] {
   const byUrl = new Map<string, ProjectPhoto>();
@@ -130,34 +130,22 @@ export default function LogForm() {
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="오늘 뜬 단수">
-          <input
-            type="number"
-            inputMode="numeric"
-            className={inp}
-            value={rows}
-            onChange={e => setRows(e.target.value)}
-            placeholder="선택"
-          />
-        </Field>
-        <Field label="기분">
-          <div className="flex flex-wrap gap-1.5">
-            {MOODS.map(m => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMood(mood === m ? undefined : m)}
-                className={`h-9 w-9 rounded-full text-[17px] transition ${
-                  mood === m ? 'bg-primary/15 ring-2 ring-primary/50' : 'bg-secondary/60'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        </Field>
-      </div>
+      <Field label="오늘 뜬 단수">
+        <input
+          type="number"
+          inputMode="numeric"
+          className={inp}
+          value={rows}
+          onChange={e => setRows(e.target.value)}
+          placeholder="선택"
+        />
+      </Field>
+
+      {/* 기분은 한 줄을 통째로 쓴다. 단수 옆 반 칸에 두면 이모지가 서너 개씩
+          접혀서, 뒤에 더 있다는 것을 모르고 지나간다. */}
+      <FieldDiv label="기분">
+        <MoodPicker value={mood} onChange={setMood} />
+      </FieldDiv>
 
       {/* 프로젝트가 늘면 칩이 화면을 반쯤 덮는다. 목록에서 고르게 하고,
           진행중인 것을 맨 위로 올려 대개는 바로 눈에 띄게 한다. */}

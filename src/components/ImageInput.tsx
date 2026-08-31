@@ -19,7 +19,11 @@ interface SingleProps {
 
 export function ImageInput({ value, onChange, label = '대표 이미지', aspect = 'square' }: SingleProps) {
   const ref = useRef<HTMLInputElement>(null);
+  // 카메라로 바로 가는 입력은 따로 둔다.
+  // 같은 입력에 capture 를 붙이면 앨범에서 고르는 길이 막힌다.
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function handle(file?: File) {
     if (!file) return;
@@ -66,6 +70,17 @@ export function ImageInput({ value, onChange, label = '대표 이미지', aspect
           e.target.value = '';
         }}
       />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={e => {
+          handle(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
       {value ? (
         <div className={`relative overflow-hidden rounded-2xl border bg-muted ${aspect === 'square' ? 'aspect-square' : 'aspect-video'}`}>
           <img src={value} alt={label} className="h-full w-full object-cover" />
@@ -77,27 +92,77 @@ export function ImageInput({ value, onChange, label = '대표 이미지', aspect
           >
             <X className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={() => ref.current?.click()}
-            className="absolute bottom-2 right-2 rounded-full bg-background/90 px-2.5 py-1 text-[11px] font-medium text-foreground shadow"
+          <PhotoSourcePicker
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            onCamera={() => cameraRef.current?.click()}
+            onAlbum={() => ref.current?.click()}
           >
-            변경
-          </button>
+            <button
+              type="button"
+              className="absolute bottom-2 right-2 rounded-full bg-background/90 px-2.5 py-1 text-[11px] font-medium text-foreground shadow"
+            >
+              변경
+            </button>
+          </PhotoSourcePicker>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => ref.current?.click()}
-          className={`flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary ${
-            aspect === 'square' ? 'aspect-square' : 'aspect-video'
-          }`}
+        <PhotoSourcePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onCamera={() => cameraRef.current?.click()}
+          onAlbum={() => ref.current?.click()}
         >
-          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-          <span className="text-xs">{label} 추가</span>
-        </button>
+          <button
+            type="button"
+            className={`flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary ${
+              aspect === 'square' ? 'aspect-square' : 'aspect-video'
+            }`}
+          >
+            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+            <span className="text-xs">{label} 추가</span>
+          </button>
+        </PhotoSourcePicker>
       )}
     </div>
+  );
+}
+
+/**
+ * 사진을 어디서 가져올지 고르는 자리.
+ *
+ * 카메라와 앨범 버튼을 나란히 놓지 않고 하나로 묶는다. 사진이 아직 없을 때
+ * 버튼이 둘이면 화면이 어수선하고, 넣는 자리가 어디인지 한눈에 안 들어온다.
+ */
+function PhotoSourcePicker({
+  open, onOpenChange, onCamera, onAlbum, children,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCamera: () => void;
+  onAlbum: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent align="center" className="w-44 p-1.5">
+        <button
+          type="button"
+          onClick={() => { onOpenChange(false); onCamera(); }}
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground hover:bg-secondary"
+        >
+          <Camera className="h-4 w-4 text-primary" /> 사진 찍기
+        </button>
+        <button
+          type="button"
+          onClick={() => { onOpenChange(false); onAlbum(); }}
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground hover:bg-secondary"
+        >
+          <ImagePlus className="h-4 w-4 text-primary" /> 앨범에서 고르기
+        </button>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -216,41 +281,20 @@ export function MultiImageInput({ values, onChange, max = 12 }: MultiProps) {
           </div>
         ))}
         {values.length < max && (
-          // 들어가는 자리는 한 칸. 누르면 카메라와 앨범 중에 고른다.
-          // 버튼 두 개를 나란히 두면 아직 사진이 없을 때 화면이 어수선하다.
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="사진 넣기"
-                className="flex aspect-square items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
-              >
-                {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="center" className="w-44 p-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setPickerOpen(false);
-                  cameraRef.current?.click();
-                }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground hover:bg-secondary"
-              >
-                <Camera className="h-4 w-4 text-primary" /> 사진 찍기
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPickerOpen(false);
-                  ref.current?.click();
-                }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-foreground hover:bg-secondary"
-              >
-                <ImagePlus className="h-4 w-4 text-primary" /> 앨범에서 고르기
-              </button>
-            </PopoverContent>
-          </Popover>
+          <PhotoSourcePicker
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            onCamera={() => cameraRef.current?.click()}
+            onAlbum={() => ref.current?.click()}
+          >
+            <button
+              type="button"
+              aria-label="사진 넣기"
+              className="flex aspect-square items-center justify-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-primary"
+            >
+              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+            </button>
+          </PhotoSourcePicker>
         )}
       </div>
     </div>
