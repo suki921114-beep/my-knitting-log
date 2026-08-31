@@ -26,6 +26,10 @@ export default function Privacy() {
             <li>Google 계정 식별자(UID), 이메일, 표시 이름, 프로필 사진 URL</li>
             <li>이용자가 직접 입력한 뜨개 기록 데이터: 실/도안/바늘/부자재/프로젝트/단수 카운터/게이지/메모 등</li>
             <li>이용자가 추가한 사진(기기에 저장되며, 클라우드 백업 시 함께 저장됩니다)</li>
+            <li>
+              이용자가 도안에 첨부한 PDF 파일(기기에 저장되며, 클라우드 백업이 열린 계정에서는
+              함께 저장됩니다)
+            </li>
             <li>마지막 백업 시각, 자동 백업 모드, 휴지통 상태 등 동작 메타</li>
             <li>
               <strong className="text-foreground">의견을 보낼 때에 한해</strong>: 이용자가 작성한 신고 내용,
@@ -52,8 +56,8 @@ export default function Privacy() {
             <li>이용자의 기기(브라우저 내부 저장소) — 모든 입력 데이터의 1차 저장소</li>
             <li>Google Cloud Firestore — 로그인한 이용자의 UID 경로 아래에만 저장. 다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.</li>
             <li>
-              Google Cloud Storage — 이용자가 클라우드 백업을 실행하면 사진이 본인 UID 경로 아래에 저장됩니다.
-              다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.
+              Google Cloud Storage — 이용자가 클라우드 백업을 실행하면 사진과 도안 PDF 파일이
+              본인 UID 경로 아래에 저장됩니다. 다른 이용자는 접근할 수 없도록 보안 규칙이 적용됩니다.
             </li>
             <li>
               보내주신 의견은 Google Cloud Firestore 에 별도로 저장되며, 운영자만 열람할 수 있습니다.
@@ -70,7 +74,11 @@ export default function Privacy() {
             업로드되지 않고 기기에만 남습니다.
           </p>
           <p className="mt-1 text-muted-foreground">
-            ※ 프리미엄 사진 백업 기능이 도입되면 본 방침을 갱신하고 이용자에게 별도로 안내합니다.
+            ※ 클라우드 백업은 현재 운영자가 지정한 계정에서만 제공됩니다. 그 외 계정에서는
+            사진이 기기에만 저장되며 클라우드로 전송되지 않습니다.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            ※ 이 기능이 유료로 전환되면 본 방침을 갱신하고 이용자에게 별도로 안내합니다.
           </p>
         </Section>
 
@@ -81,7 +89,7 @@ export default function Privacy() {
             클라우드의 동기화 기록도 다음 동기화 시 동일 상태로 반영됩니다.
           </p>
           <p>
-            계정 삭제(아래 7항) 시에는 클라우드에 저장된 기록과 사진을 모두 함께 삭제합니다.
+            계정 삭제(아래 7항) 시에는 클라우드에 저장된 기록·사진·도안 PDF 파일을 모두 함께 삭제합니다.
           </p>
         </Section>
 
@@ -110,7 +118,7 @@ export default function Privacy() {
           <ul className="ml-4 mt-1 list-disc space-y-1">
             <li>
               Google LLC — Firebase Authentication (로그인), Firestore (기록 데이터 저장),
-              Cloud Storage (사진 저장)
+              Cloud Storage (사진 및 도안 PDF 저장)
             </li>
             <li>Vercel Inc. — 웹 호스팅 (HTTPS 트래픽)</li>
           </ul>
