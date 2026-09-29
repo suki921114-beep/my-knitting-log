@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import BugReport from "./pages/BugReport";
 import ScrollToTop from "@/components/ScrollToTop";
+import WidgetOpenHandler from "@/components/WidgetOpenHandler";
 
 // 개발용 화면 — 별도 청크로 분리되어 프로덕션에서는 로드되지 않는다.
 const AiLog = lazy(() => import("./pages/AiLog"));
@@ -51,6 +52,7 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
         <ScrollToTop />
+        <WidgetOpenHandler />
         <ErrorBoundary>
           <Routes>
             {/* 개발용 AI 입력 실험 화면 — 로컬 Ollama 서버가 필요하므로

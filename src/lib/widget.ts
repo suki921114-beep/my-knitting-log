@@ -14,8 +14,13 @@
 import { db, type Project } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
 
-/** 위젯 한 장에 담을 프로젝트 수 — 더 넣어도 홈 화면에서 안 보인다 */
-const MAX_ITEMS = 3;
+/**
+ * 요약본에 담을 프로젝트 수.
+ *
+ * 위젯 하나에 하나씩 붙이는 구조라, 홈 화면에 여러 개를 놓을 것을 생각해
+ * 진행중인 것을 넉넉히 보낸다. 사진까지 딸려 가므로 무한정은 못 보낸다.
+ */
+const MAX_ITEMS = 12;
 
 /**
  * 사진 한 변의 최대 크기.
@@ -96,8 +101,10 @@ export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
       id: p.id,
       name: p.name,
       photo: await coverOf(p),
+      // 방금 손댄 카운터를 앞으로. 처음 만든 것부터 보여주면 소매를 뜨는데
+      // 위젯에는 다 끝난 고무단이 떠 있게 된다.
       counters: counters
-        .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
         .map(c => ({ name: c.name, count: c.count, goal: c.goal })),
     });
   }
@@ -124,12 +131,64 @@ export async function pushWidgetSnapshot(): Promise<void> {
     const { Capacitor, registerPlugin } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()) return;
 
-    const plugin = registerPlugin<{ update(o: { payload: string }): Promise<void> }>('KnitWidget');
+    const plugin = registerPlugin<KnitWidgetPlugin>('KnitWidget');
     const snapshot = await buildWidgetSnapshot();
     await plugin.update({ payload: JSON.stringify(snapshot) });
   } catch (e) {
     console.warn('[widget] 위젯 갱신 실패 (무시)', e);
   }
+}
+
+interface KnitWidgetPlugin {
+  update(o: { payload: string }): Promise<void>;
+  consumeTarget(): Promise<{ projectId: number }>;
+  addListener(
+    event: 'openProject',
+    fn: (data: { projectId: number }) => void,
+  ): Promise<{ remove: () => Promise<void> }>;
+}
+
+async function nativePlugin(): Promise<KnitWidgetPlugin | null> {
+  const { Capacitor, registerPlugin } = await import('@capacitor/core');
+  if (!Capacitor.isNativePlatform()) return null;
+  return registerPlugin<KnitWidgetPlugin>('KnitWidget');
+}
+
+/**
+ * 위젯을 눌러 들어왔을 때 갈 곳을 알려 준다.
+ *
+ * 두 갈래로 들어온다.
+ *   앱이 꺼져 있었으면 — 네이티브가 들고 있다가 여기서 가져간다 (consumeTarget)
+ *   앱이 떠 있었으면  — 그 자리에서 알려 준다 (openProject)
+ *
+ * 돌려주는 함수를 부르면 구독을 끊는다.
+ */
+export function onWidgetOpen(go: (projectId: number) => void): () => void {
+  let stop: (() => Promise<void>) | null = null;
+  let alive = true;
+
+  void (async () => {
+    try {
+      const plugin = await nativePlugin();
+      if (!plugin || !alive) return;
+
+      const handle = await plugin.addListener('openProject', ({ projectId }) => {
+        if (projectId > 0) go(projectId);
+      });
+      stop = handle.remove;
+
+      // 꺼져 있던 앱을 위젯으로 깨운 경우. 화면이 그려진 뒤에 부른다.
+      const { projectId } = await plugin.consumeTarget();
+      if (alive && projectId > 0) go(projectId);
+    } catch (e) {
+      console.warn('[widget] 위젯 진입 처리 실패 (무시)', e);
+    }
+  })();
+
+  return () => {
+    alive = false;
+    void stop?.();
+  };
 }
 
 /**
