@@ -19,7 +19,8 @@ import { db, type Pattern, type PatternFile, type RemotePatternFileRef } from '@
 import { getPatternFiles } from '@/lib/patternFile';
 import { isProAccount } from '@/lib/entitlement';
 import { auth } from '@/lib/firebase';
-import { canUpload, type StorageUsage } from '@/lib/quota';
+import { canUpload, FREE_QUOTA_BYTES, type StorageUsage } from '@/lib/quota';
+import { MAX_PATTERN_FILE_BYTES } from '@/lib/patternFile';
 import { reportSkippedPhoto } from '@/lib/cloudUsage';
 import { captureError } from '@/lib/errorLog';
 import { ENABLE_CLOUD_PHOTO_SYNC } from '@/lib/featureFlags';
@@ -108,10 +109,18 @@ export async function uploadPatternFileFor(
       continue;
     }
 
-    const verdict = canUpload(next, local.size);
+    // ⚠️ 상한을 반드시 넘긴다. 기본값은 사진 기준(2MB)이라, 안 넘기면
+    //    3~10MB 인 도안이 전부 조용히 걸러지고 '사진이 크다' 는 엉뚱한
+    //    안내만 뜬다. 실제로 그렇게 새어 나간 적이 있다.
+    const verdict = canUpload(next, local.size, FREE_QUOTA_BYTES, MAX_PATTERN_FILE_BYTES);
     if (!verdict.ok) {
       // 올리지 않을 뿐 기기에는 남는다. 자리가 생기면 다음 백업에서 다시 시도한다.
-      reportSkippedPhoto(verdict.reason!);
+      // 사진이 아니라 도안이라는 것을 알려야 한다 — 안 그러면 사진을 줄여 보다
+      // 시간을 버린다.
+      reportSkippedPhoto(verdict.reason === 'photo-too-large' ? 'file-too-large' : verdict.reason!);
+      console.warn(
+        `[${context}] 도안 파일을 올리지 못했어요 — ${local.name} (${local.size} bytes) / ${verdict.reason}`,
+      );
       continue;
     }
 

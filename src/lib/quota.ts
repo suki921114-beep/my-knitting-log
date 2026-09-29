@@ -71,7 +71,7 @@ export function usageRatio(bytes: number, quota: number = FREE_QUOTA_BYTES): num
   return Math.min(1, Math.max(0, bytes / quota));
 }
 
-export type UploadRejection = 'photo-too-large' | 'quota-exceeded';
+export type UploadRejection = 'photo-too-large' | 'file-too-large' | 'quota-exceeded';
 
 export interface UploadVerdict {
   ok: boolean;
@@ -79,8 +79,12 @@ export interface UploadVerdict {
 }
 
 /**
- * 이 사진을 올려도 되는지 판단한다.
- * 상한을 넘으면 올리지 않을 뿐, 로컬 사진은 그대로 둔다 (기기에서는 계속 보인다).
+ * 이 파일을 올려도 되는지 판단한다.
+ * 상한을 넘으면 올리지 않을 뿐, 기기에는 그대로 둔다 (기기에서는 계속 보인다).
+ *
+ * ⚠️ maxPhotoBytes 의 기본값은 '사진' 기준(2MB)이다. 도안 PDF 처럼 상한이
+ *    다른 것을 넘길 때는 반드시 그 상한을 같이 넘겨야 한다. 기본값에 기대면
+ *    2MB 넘는 도안이 전부 조용히 안 올라가고, 사용자는 사진이 걸린 줄 안다.
  */
 export function canUpload(
   usage: Pick<StorageUsage, 'bytes'>,
@@ -106,6 +110,8 @@ export function describeRejection(reason: UploadRejection): string {
   switch (reason) {
     case 'photo-too-large':
       return `사진 한 장이 ${formatBytes(MAX_PHOTO_BYTES)}를 넘어 올리지 못했어요.`;
+    case 'file-too-large':
+      return '도안 파일이 너무 커서 올리지 못했어요. 파일은 기기에 그대로 있어요.';
     case 'quota-exceeded':
       return `클라우드 보관 용량 ${formatBytes(FREE_QUOTA_BYTES)}를 다 썼어요. 사진은 기기에 그대로 있어요.`;
   }

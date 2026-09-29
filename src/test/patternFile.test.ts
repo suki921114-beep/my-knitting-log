@@ -6,6 +6,9 @@ import {
   MAX_PATTERN_FILE_BYTES,
   MAX_PATTERN_FILES,
 } from '@/lib/patternFile';
+import {
+  canUpload, describeRejection, FREE_QUOTA_BYTES, MAX_PHOTO_BYTES,
+} from '@/lib/quota';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -140,5 +143,47 @@ describe('도안 파일이 새면 안 되는 곳', () => {
     // 실제로 한 번 겪으면 원본이 사라지므로 되돌릴 수 없다.
     const src = read('../lib/sync/patternFileStorage.ts');
     expect(src).toContain('${patternCloudId}/${fileCloudId}.pdf');
+  });
+});
+
+// ----------------------------------------------------------------------------
+// 용량 상한을 도안 기준으로 쓰는가
+// ----------------------------------------------------------------------------
+// 실제로 났던 사고다. canUpload 의 기본 상한은 '사진' 기준 2MB 인데, 도안을
+// 올릴 때 상한을 안 넘겨서 3~10MB 짜리 도안이 전부 조용히 걸러졌다.
+// 오류도 안 나고, 사용자에게는 '사진이 크다' 는 엉뚱한 안내만 떴다.
+
+describe('도안 파일 용량 상한', () => {
+  it('도안 상한은 사진 상한보다 훨씬 크다', () => {
+    expect(MAX_PATTERN_FILE_BYTES).toBeGreaterThan(MAX_PHOTO_BYTES);
+  });
+
+  it('사진 상한을 쓰면 보통 크기의 도안이 막힌다 — 이게 그 버그였다', () => {
+    const 보통도안 = 5 * 1024 * 1024; // 5MB
+    expect(canUpload({ bytes: 0 }, 보통도안).ok).toBe(false);
+  });
+
+  it('도안 상한을 넘기면 통과한다', () => {
+    const 보통도안 = 5 * 1024 * 1024;
+    const verdict = canUpload({ bytes: 0 }, 보통도안, FREE_QUOTA_BYTES, MAX_PATTERN_FILE_BYTES);
+    expect(verdict.ok).toBe(true);
+  });
+
+  it('도안 상한을 넘는 것은 여전히 막는다', () => {
+    const 너무큰도안 = MAX_PATTERN_FILE_BYTES + 1;
+    const verdict = canUpload({ bytes: 0 }, 너무큰도안, FREE_QUOTA_BYTES, MAX_PATTERN_FILE_BYTES);
+    expect(verdict.ok).toBe(false);
+  });
+
+  it('업로드 코드가 상한을 직접 넘긴다 — 기본값에 기대면 안 된다', () => {
+    const src = read('../lib/sync/patternFileSync.ts');
+    const from = src.indexOf('export async function uploadPatternFileFor');
+    expect(from).toBeGreaterThan(-1);
+    const body = src.slice(from);
+    expect(body).toContain('MAX_PATTERN_FILE_BYTES');
+  });
+
+  it('안내 문구가 사진이 아니라 도안이라고 말한다', () => {
+    expect(describeRejection('file-too-large')).toContain('도안');
   });
 });
