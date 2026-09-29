@@ -12,6 +12,7 @@ import PdfViewer from '@/components/PdfViewer';
 import { getPatternFiles } from '@/lib/patternFile';
 import type { PatternFile } from '@/lib/db';
 import { toast } from '@/components/ui/sonner';
+import { UsedGramsEditor } from '@/components/UsedGramsEditor';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -263,9 +264,22 @@ export default function ProjectDetail() {
                       {y?.name || '실'}
                     </div>
                     <div className="truncate text-[10.5px] text-muted-foreground">
-                      {[y?.colorName, `${l.usedGrams}g`].filter(Boolean).join(' · ')}
+                      {y?.colorName}
                     </div>
                   </div>
+                  {/* 사용량은 뜨면서 계속 바뀐다. 수정 화면까지 들어갔다 나오게
+                      하면 아예 안 적게 되니 여기서 바로 고치게 둔다.
+                      지워진 실은 손대지 않는다 — 되살리는 게 먼저다. */}
+                  {!deleted && l.id != null ? (
+                    <UsedGramsEditor
+                      linkId={l.id}
+                      grams={l.usedGrams}
+                      label={y?.name}
+                      className="text-[12px] font-medium text-accent"
+                    />
+                  ) : (
+                    <span className="shrink-0 text-[12px] text-muted-foreground">{l.usedGrams}g</span>
+                  )}
                 </MaybeLink>
               );
             })}

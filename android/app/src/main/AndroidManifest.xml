@@ -33,6 +33,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- 홈 화면 위젯. 보여 주기만 하고 값은 바꾸지 않는다 -->
+        <receiver
+            android:name=".KnitWidgetProvider"
+            android:label="@string/knit_widget_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/knit_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

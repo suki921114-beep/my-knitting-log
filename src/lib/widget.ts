@@ -1,0 +1,163 @@
+// ----------------------------------------------------------------------------
+// 홈 화면 위젯에 보낼 요약본
+// ----------------------------------------------------------------------------
+// ⚠️ 위젯은 IndexedDB 를 못 읽는다. 그건 앱 안(WebView)에만 있는 저장소라,
+//    홈 화면에 붙은 위젯이 들여다볼 방법이 없다.
+//
+//    그래서 앱이 바뀔 때마다 '위젯이 읽을 수 있는 곳'(SharedPreferences)에
+//    작은 요약본을 따로 써 둔다. 위젯은 그것만 본다.
+//
+// 한 방향이다. 앱 → 위젯. 위젯은 아무 값도 바꾸지 않는다.
+// 위젯에서 단수를 올리게 만들면 양쪽이 서로 다른 값을 들고 있게 되고, 그러면
+// 뜨던 단수가 어긋난다. 단수는 되돌릴 수 없는 값이라 그 위험을 지지 않는다.
+
+import { db, type Project } from '@/lib/db';
+import { photoUrls } from '@/lib/photo';
+
+/** 위젯 한 장에 담을 프로젝트 수 — 더 넣어도 홈 화면에서 안 보인다 */
+const MAX_ITEMS = 3;
+
+/**
+ * 사진 한 변의 최대 크기.
+ *
+ * 위젯에 그림을 넘기는 통로(RemoteViews)는 크기 제한이 빡빡하다. 원본을 그대로
+ * 넘기면 TransactionTooLargeException 이 나면서 위젯이 통째로 안 뜬다.
+ */
+const PHOTO_MAX_DIM = 320;
+
+export interface WidgetCounter {
+  name: string;
+  count: number;
+  goal?: number;
+}
+
+export interface WidgetProject {
+  id: number;
+  name: string;
+  /** 작게 줄인 대표 사진 (base64, 접두사 없음). 없으면 빈 문자열 */
+  photo: string;
+  counters: WidgetCounter[];
+}
+
+export interface WidgetSnapshot {
+  updatedAt: number;
+  projects: WidgetProject[];
+}
+
+/** 위젯에 넣을 만큼만 사진을 줄인다. 실패하면 사진 없이 간다 */
+async function shrinkForWidget(dataUrl: string): Promise<string> {
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = dataUrl;
+    });
+    const scale = Math.min(1, PHOTO_MAX_DIM / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const out = canvas.toDataURL('image/jpeg', 0.7);
+    const comma = out.indexOf(',');
+    return comma < 0 ? '' : out.slice(comma + 1);
+  } catch {
+    // 사진이 없는 위젯은 심심할 뿐이지만, 여기서 throw 하면 위젯이 아예 안 뜬다
+    return '';
+  }
+}
+
+/** 지금 기기 상태로 요약본을 만든다 */
+export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
+  const projects = await db.projects
+    .filter(p => !p.isDeleted && p.status === 'in_progress')
+    .toArray();
+
+  // 최근에 손댄 것부터. 홈 화면에는 지금 뜨고 있는 것이 보여야 한다.
+  projects.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const picked = projects.slice(0, MAX_ITEMS);
+
+  const out: WidgetProject[] = [];
+  for (const p of picked) {
+    if (p.id == null) continue;
+    const counters = await db.rowCounters
+      .where('projectId')
+      .equals(p.id)
+      .filter(c => !c.isDeleted)
+      .toArray();
+
+    out.push({
+      id: p.id,
+      name: p.name,
+      photo: await coverOf(p),
+      counters: counters
+        .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+        .map(c => ({ name: c.name, count: c.count, goal: c.goal })),
+    });
+  }
+
+  return { updatedAt: Date.now(), projects: out };
+}
+
+async function coverOf(p: Project): Promise<string> {
+  const urls = photoUrls(p.photos ?? []);
+  const first = urls[0];
+  if (!first || !first.startsWith('data:')) return '';
+  return shrinkForWidget(first);
+}
+
+/**
+ * 요약본을 위젯 쪽에 넘긴다.
+ *
+ * 웹에서는 아무 일도 하지 않는다 — 홈 화면 위젯이라는 것이 없다.
+ * 실패해도 조용히 넘어간다. 위젯이 안 갱신되는 것은 불편할 뿐이지만,
+ * 여기서 터지면 방금 단수를 센 화면이 같이 죽는다.
+ */
+export async function pushWidgetSnapshot(): Promise<void> {
+  try {
+    const { Capacitor, registerPlugin } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()) return;
+
+    const plugin = registerPlugin<{ update(o: { payload: string }): Promise<void> }>('KnitWidget');
+    const snapshot = await buildWidgetSnapshot();
+    await plugin.update({ payload: JSON.stringify(snapshot) });
+  } catch (e) {
+    console.warn('[widget] 위젯 갱신 실패 (무시)', e);
+  }
+}
+
+/**
+ * 언제 위젯을 새로 그릴지.
+ *
+ * 단수를 한 번 셀 때마다 사진까지 다시 줄여 넘기면 세는 손이 걸린다.
+ * 그래서 '앱을 벗어날 때' 에 맞춘다 — 홈 화면으로 나가는 순간이 곧 위젯을
+ * 보게 되는 순간이라, 그때만 맞으면 충분하다.
+ */
+export function startWidgetSync(): void {
+  // 시작할 때 한 번. 앱을 지웠다 깔았거나 위젯을 새로 붙인 경우를 위해서다.
+  void pushWidgetSnapshot();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void pushWidgetSnapshot();
+  });
+
+  // 안드로이드에서는 위 이벤트가 안 올 때가 있어 앱 상태도 같이 본다
+  void (async () => {
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) return;
+      const { App } = await import('@capacitor/app');
+      await App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) void pushWidgetSnapshot();
+      });
+    } catch (e) {
+      console.warn('[widget] 앱 상태 구독 실패 (무시)', e);
+    }
+  })();
+}

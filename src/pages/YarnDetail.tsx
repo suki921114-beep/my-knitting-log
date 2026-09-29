@@ -7,6 +7,7 @@ import { formatNeedleSize } from '@/lib/needleType';
 import PageHeader from '@/components/PageHeader';
 import { Pencil, ExternalLink, Scale, Ruler, CheckCircle2, RotateCcw } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { UsedGramsEditor } from '@/components/UsedGramsEditor';
 
 /** 스킴이 없으면 https:// 를 붙여 준다 (예: "shop.com/x" → "https://shop.com/x") */
 function normalizeUrl(raw: string): string {
@@ -153,9 +154,19 @@ export default function YarnDetail() {
               const p = pmap.get(l.projectId);
               return (
                 <li key={l.id}>
-                  <Link to={`/projects/${l.projectId}`} className="card-soft flex items-center justify-between p-3">
-                    <span className="text-sm text-ink">{p?.name || '프로젝트'}</span>
-                    <span className="text-sm font-medium text-accent">{l.usedGrams}g</span>
+                  <Link to={`/projects/${l.projectId}`} className="card-soft flex items-center justify-between gap-2 p-3">
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{p?.name || '프로젝트'}</span>
+                    {/* 여기서 고치면 위의 잔여량 막대가 바로 따라 움직인다 */}
+                    {l.id != null ? (
+                      <UsedGramsEditor
+                        linkId={l.id}
+                        grams={l.usedGrams}
+                        label={p?.name}
+                        className="text-sm font-medium text-accent"
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-accent">{l.usedGrams}g</span>
+                    )}
                   </Link>
                 </li>
               );

@@ -9,6 +9,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // 로그인 문제 진단용. 설정 → 버그 신고에서 이 앱의 서명 지문을 보여 준다.
         registerPlugin(SigningInfoPlugin.class);
+        // 홈 화면 위젯에 요약본을 넘기는 통로
+        registerPlugin(KnitWidgetPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
