@@ -252,21 +252,25 @@ export default function ProjectDetail() {
               const y = yarnMap.get(l.yarnId);
               const deleted = !!y?.isDeleted;
               return (
-                <MaybeLink
-                  key={l.id}
-                  to={`/library/yarns/${l.yarnId}`}
-                  isDeleted={deleted}
-                  className="card-soft flex items-center gap-2 p-2"
-                >
-                  <Thumb src={y?.photoDataUrl} />
-                  <div className="min-w-0 flex-1">
-                    <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
-                      {y?.name || '실'}
+                // 사용량 버튼은 링크 밖에 형제로 둔다. 링크 안에 넣으면
+                // 누를 때마다 실 화면으로 넘어가 고칠 수가 없다.
+                <div key={l.id} className="card-soft flex items-center gap-2 p-2">
+                  <MaybeLink
+                    to={`/library/yarns/${l.yarnId}`}
+                    isDeleted={deleted}
+                    className="flex min-w-0 flex-1 items-center gap-2"
+                  >
+                    <Thumb src={y?.photoDataUrl} />
+                    <div className="min-w-0 flex-1">
+                      <div className={`truncate text-[12.5px] font-medium ${deleted ? 'text-muted-foreground line-through' : 'text-ink'}`}>
+                        {y?.name || '실'}
+                      </div>
+                      <div className="truncate text-[10.5px] text-muted-foreground">
+                        {y?.colorName}
+                      </div>
                     </div>
-                    <div className="truncate text-[10.5px] text-muted-foreground">
-                      {y?.colorName}
-                    </div>
-                  </div>
+                  </MaybeLink>
+
                   {/* 사용량은 뜨면서 계속 바뀐다. 수정 화면까지 들어갔다 나오게
                       하면 아예 안 적게 되니 여기서 바로 고치게 둔다.
                       지워진 실은 손대지 않는다 — 되살리는 게 먼저다. */}
@@ -274,13 +278,12 @@ export default function ProjectDetail() {
                     <UsedGramsEditor
                       linkId={l.id}
                       grams={l.usedGrams}
-                      label={y?.name}
                       className="text-[12px] font-medium text-accent"
                     />
                   ) : (
                     <span className="shrink-0 text-[12px] text-muted-foreground">{l.usedGrams}g</span>
                   )}
-                </MaybeLink>
+                </div>
               );
             })}
           </MiniSection>

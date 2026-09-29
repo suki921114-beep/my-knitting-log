@@ -153,21 +153,22 @@ export default function YarnDetail() {
             {links.map(l => {
               const p = pmap.get(l.projectId);
               return (
-                <li key={l.id}>
-                  <Link to={`/projects/${l.projectId}`} className="card-soft flex items-center justify-between gap-2 p-3">
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{p?.name || '프로젝트'}</span>
-                    {/* 여기서 고치면 위의 잔여량 막대가 바로 따라 움직인다 */}
-                    {l.id != null ? (
-                      <UsedGramsEditor
-                        linkId={l.id}
-                        grams={l.usedGrams}
-                        label={p?.name}
-                        className="text-sm font-medium text-accent"
-                      />
-                    ) : (
-                      <span className="text-sm font-medium text-accent">{l.usedGrams}g</span>
-                    )}
+                // 사용량 버튼은 링크 밖에. 안에 넣으면 누를 때마다 프로젝트
+                // 화면으로 넘어가 버린다.
+                <li key={l.id} className="card-soft flex items-center justify-between gap-2 p-3">
+                  <Link to={`/projects/${l.projectId}`} className="min-w-0 flex-1 truncate text-sm text-ink">
+                    {p?.name || '프로젝트'}
                   </Link>
+                  {/* 여기서 고치면 위의 잔여량 막대가 바로 따라 움직인다 */}
+                  {l.id != null ? (
+                    <UsedGramsEditor
+                      linkId={l.id}
+                      grams={l.usedGrams}
+                      className="text-sm font-medium text-accent"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-accent">{l.usedGrams}g</span>
+                  )}
                 </li>
               );
             })}
