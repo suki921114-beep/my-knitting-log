@@ -115,15 +115,33 @@ public class KnitWidgetConfigActivity extends Activity {
         Context context = this;
         SharedPreferences prefs =
                 context.getSharedPreferences(KnitWidgetPlugin.PREFS, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KnitWidgetProvider.projectKey(widgetId), projectId).commit();
+        prefs.edit().putInt(KnitCounterWidgetProvider.projectKey(widgetId), projectId).commit();
 
+        // 어느 종류의 위젯에서 왔는지 보고 그것만 그린다
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        KnitWidgetProvider.renderAll(context, manager, new int[] { widgetId });
+        int[] one = new int[] { widgetId };
+        if (isPatternWidget(manager)) {
+            KnitPatternWidgetProvider.renderAll(context, manager, one);
+        } else {
+            KnitCounterWidgetProvider.renderAll(context, manager, one);
+        }
 
         Intent result = new Intent();
         result.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         setResult(RESULT_OK, result);
         finish();
+    }
+
+    /** 도안 미리보기 위젯에서 열린 설정 화면인가 */
+    private boolean isPatternWidget(AppWidgetManager manager) {
+        try {
+            android.appwidget.AppWidgetProviderInfo info = manager.getAppWidgetInfo(widgetId);
+            return info != null
+                    && info.provider != null
+                    && info.provider.getClassName().contains("Pattern");
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private JSONArray readProjects() {

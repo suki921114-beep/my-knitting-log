@@ -39,23 +39,37 @@
             android:name=".KnitWidgetConfigActivity"
             android:exported="true"
             android:theme="@style/AppTheme.NoActionBar"
-            android:label="@string/knit_widget_label">
+            android:label="@string/knit_widget_counter_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
 
-        <!-- 홈 화면 위젯. 보여 주기만 하고 값은 바꾸지 않는다 -->
+        <!-- 단수 카운터 위젯 -->
         <receiver
-            android:name=".KnitWidgetProvider"
-            android:label="@string/knit_widget_label"
+            android:name=".KnitCounterWidgetProvider"
+            android:label="@string/knit_widget_counter_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.suki.knittinglog.BUMP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/knit_widget_counter_info" />
+        </receiver>
+
+        <!-- 도안 미리보기 위젯 -->
+        <receiver
+            android:name=".KnitPatternWidgetProvider"
+            android:label="@string/knit_widget_pattern_label"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/knit_widget_info" />
+                android:resource="@xml/knit_widget_pattern_info" />
         </receiver>
     </application>
 

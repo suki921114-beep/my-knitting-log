@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ⚠️ minResizeWidth/Height 가 없으면 꾹 눌러도 크기가 안 바뀐다.
+     안드로이드가 '최소 크기 = 기본 크기' 로 보기 때문이다.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="60dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="60dp"
+    android:maxResizeWidth="500dp"
+    android:maxResizeHeight="300dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:initialLayout="@layout/knit_widget_counter"
+    android:previewLayout="@layout/knit_widget_counter"
+    android:configure="com.suki.knittinglog.KnitWidgetConfigActivity"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/knit_widget_counter_description"
+    android:updatePeriodMillis="1800000" />

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  단수 카운터 위젯.
+
+  위젯은 RemoteViews 가 아는 View 만 쓸 수 있다 — LinearLayout / RelativeLayout /
+  TextView / ImageView / Button 정도. ConstraintLayout 같은 건 못 쓴다.
+
+  ⚠️ 크기를 손으로 바꿀 수 있으므로 고정 높이를 두지 않는다.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="12dp"
+    android:background="@drawable/knit_widget_bg">
+
+    <!-- 글자 쪽을 누르면 도안 보며 뜨기로. +/- 와 따로 둬야 서로 안 겹친다 -->
+    <LinearLayout
+        android:id="@+id/widget_body"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/widget_photo"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="10dp"
+            android:scaleType="centerCrop"
+            android:contentDescription="@string/knit_widget_photo_desc" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="12sp"
+                android:textColor="#3C3243"
+                android:textStyle="bold"
+                android:text="뜨개일기" />
+
+            <TextView
+                android:id="@+id/widget_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:textSize="28sp"
+                android:textColor="#6F4FA0"
+                android:textStyle="bold"
+                android:text="—" />
+
+            <TextView
+                android:id="@+id/widget_caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="10sp"
+                android:textColor="#7C7288"
+                android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 뜨면서 한 손으로 누른다. 작으면 헛손질이 나므로 넉넉히 둔다 -->
+    <TextView
+        android:id="@+id/widget_minus"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="−"
+        android:textSize="22sp"
+        android:textColor="#6F4FA0"
+        android:background="@drawable/knit_widget_btn_soft"
+        android:contentDescription="@string/knit_widget_minus" />
+
+    <TextView
+        android:id="@+id/widget_plus"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_marginStart="6dp"
+        android:gravity="center"
+        android:text="+"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/knit_widget_btn_strong"
+        android:contentDescription="@string/knit_widget_plus" />
+</LinearLayout>

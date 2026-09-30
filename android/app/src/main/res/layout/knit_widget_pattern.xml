@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  도안 미리보기 위젯.
+
+  도안 그림이 주인공이라 자리를 거의 다 준다. 제목은 한 줄만.
+  크기를 키울수록 차트가 크게 보이도록 그림은 가운데 맞춤(fitCenter)으로 둔다.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:background="@drawable/knit_widget_bg">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingBottom="6dp"
+        android:textSize="12sp"
+        android:textColor="#3C3243"
+        android:textStyle="bold"
+        android:text="뜨개일기" />
+
+    <ImageView
+        android:id="@+id/widget_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scaleType="fitCenter"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/knit_widget_page_desc" />
+
+    <TextView
+        android:id="@+id/widget_hint"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:textSize="11sp"
+        android:textColor="#7C7288"
+        android:text="" />
+</LinearLayout>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 도안은 크게 볼수록 쓸모가 있어 기본 크기를 넉넉히 준다 -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="500dp"
+    android:maxResizeHeight="500dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:initialLayout="@layout/knit_widget_pattern"
+    android:previewLayout="@layout/knit_widget_pattern"
+    android:configure="com.suki.knittinglog.KnitWidgetConfigActivity"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/knit_widget_pattern_description"
+    android:updatePeriodMillis="1800000" />

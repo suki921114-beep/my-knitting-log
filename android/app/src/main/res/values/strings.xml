@@ -4,7 +4,12 @@
     <string name="title_activity_main">뜨개일기</string>
     <string name="package_name">com.suki.knittinglog</string>
     <string name="custom_url_scheme">com.suki.knittinglog</string>
-    <string name="knit_widget_label">뜨개일기 — 지금 뜨는 것</string>
-    <string name="knit_widget_description">진행중인 프로젝트와 단수를 홈 화면에서 봅니다.</string>
     <string name="knit_widget_photo_desc">프로젝트 사진</string>
+    <string name="knit_widget_page_desc">도안</string>
+    <string name="knit_widget_minus">단수 하나 줄이기</string>
+    <string name="knit_widget_plus">단수 하나 올리기</string>
+    <string name="knit_widget_counter_label">뜨개일기 — 단수 세기</string>
+    <string name="knit_widget_counter_description">홈 화면에서 바로 단수를 셉니다.</string>
+    <string name="knit_widget_pattern_label">뜨개일기 — 도안 보기</string>
+    <string name="knit_widget_pattern_description">보던 도안 한 쪽을 홈 화면에 띄워 둡니다.</string>
 </resources>

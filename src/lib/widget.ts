@@ -13,6 +13,7 @@
 
 import { db, type Project } from '@/lib/db';
 import { photoUrls } from '@/lib/photo';
+import { renderPatternPreview } from '@/lib/widgetPreview';
 
 /**
  * 요약본에 담을 프로젝트 수.
@@ -31,6 +32,8 @@ const MAX_ITEMS = 12;
 const PHOTO_MAX_DIM = 320;
 
 export interface WidgetCounter {
+  /** 위젯에서 누른 단수를 어느 카운터에 더할지 가리킨다 */
+  id: number;
   name: string;
   count: number;
   goal?: number;
@@ -41,6 +44,8 @@ export interface WidgetProject {
   name: string;
   /** 작게 줄인 대표 사진 (base64, 접두사 없음). 없으면 빈 문자열 */
   photo: string;
+  /** 보던 도안 한 쪽 (base64). 미리보기 위젯이 붙은 프로젝트만 채운다 */
+  preview: string;
   counters: WidgetCounter[];
 }
 
@@ -79,7 +84,7 @@ async function shrinkForWidget(dataUrl: string): Promise<string> {
 }
 
 /** 지금 기기 상태로 요약본을 만든다 */
-export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
+export async function buildWidgetSnapshot(wantPreview: Set<number> = new Set()): Promise<WidgetSnapshot> {
   const projects = await db.projects
     .filter(p => !p.isDeleted && p.status === 'in_progress')
     .toArray();
@@ -101,11 +106,14 @@ export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
       id: p.id,
       name: p.name,
       photo: await coverOf(p),
+      // 도안 한 쪽을 그리는 데 시간이 꽤 든다. 미리보기 위젯이 실제로 붙어
+      // 있는 것만 그린다 — 전부 그리면 앱을 나갈 때마다 몇 초씩 걸린다.
+      preview: wantPreview.has(p.id) ? await renderPatternPreview(p.id) : '',
       // 방금 손댄 카운터를 앞으로. 처음 만든 것부터 보여주면 소매를 뜨는데
       // 위젯에는 다 끝난 고무단이 떠 있게 된다.
       counters: counters
         .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-        .map(c => ({ name: c.name, count: c.count, goal: c.goal })),
+        .map(c => ({ id: c.id ?? -1, name: c.name, count: c.count, goal: c.goal })),
     });
   }
 
@@ -132,20 +140,60 @@ export async function pushWidgetSnapshot(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
 
     const plugin = registerPlugin<KnitWidgetPlugin>('KnitWidget');
-    const snapshot = await buildWidgetSnapshot();
+
+    // 위젯에서 누른 단수를 먼저 받아 반영한다. 그래야 아래에서 보낼 요약본이
+    // 그 값을 담는다 — 순서가 바뀌면 위젯이 한 박자 옛 숫자를 보여준다.
+    await applyPendingBumps(plugin);
+
+    const { projectIds } = await plugin.wantedPreviews();
+    const snapshot = await buildWidgetSnapshot(new Set(projectIds));
     await plugin.update({ payload: JSON.stringify(snapshot) });
   } catch (e) {
     console.warn('[widget] 위젯 갱신 실패 (무시)', e);
   }
 }
 
+interface PendingBump {
+  counterId: number;
+  delta: number;
+}
+
 interface KnitWidgetPlugin {
   update(o: { payload: string }): Promise<void>;
   consumeTarget(): Promise<{ projectId: number }>;
+  wantedPreviews(): Promise<{ projectIds: number[] }>;
+  consumePending(): Promise<{ items: PendingBump[] }>;
   addListener(
     event: 'openProject',
     fn: (data: { projectId: number }) => void,
   ): Promise<{ remove: () => Promise<void> }>;
+}
+
+/**
+ * 위젯에서 누른 단수를 카운터에 더한다.
+ *
+ * ⚠️ 위젯은 '지금 몇 단' 이 아니라 '몇 번 눌렸는지' 만 들고 있다. 그래서 여기서
+ *    덮어쓰지 않고 더한다. 앱에서 직접 고친 값과 위젯에서 누른 것이 둘 다
+ *    살아야 하기 때문이다. 덮어쓰면 한쪽이 없던 일이 된다.
+ */
+async function applyPendingBumps(plugin: KnitWidgetPlugin): Promise<void> {
+  try {
+    const { items } = await plugin.consumePending();
+    if (!items?.length) return;
+
+    for (const { counterId, delta } of items) {
+      if (!delta || counterId < 0) continue;
+      const counter = await db.rowCounters.get(counterId);
+      // 그새 지워진 카운터. 눌린 것은 버린다 — 되살릴 자리가 없다.
+      if (!counter || counter.isDeleted) continue;
+      await db.rowCounters.update(counterId, {
+        count: Math.max(0, counter.count + delta),
+        updatedAt: Date.now(),
+      });
+    }
+  } catch (e) {
+    console.warn('[widget] 위젯에서 누른 단수 반영 실패 (무시)', e);
+  }
 }
 
 async function nativePlugin(): Promise<KnitWidgetPlugin | null> {
@@ -233,8 +281,12 @@ export function startWidgetSync(): void {
       const { Capacitor } = await import('@capacitor/core');
       if (!Capacitor.isNativePlatform()) return;
       const { App } = await import('@capacitor/app');
-      await App.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive) void pushWidgetSnapshot();
+      await App.addListener('appStateChange', () => {
+        // 나갈 때 — 홈 화면에서 보게 될 값을 맞춰 둔다.
+        // 돌아올 때 — 그 사이 위젯에서 누른 단수를 앱에 들여온다.
+        //   안 하면 위젯은 12단인데 앱을 열면 10단이라, 어느 쪽이 맞는지
+        //   알 수 없어진다.
+        void pushWidgetSnapshot();
       });
     } catch (e) {
       console.warn('[widget] 앱 상태 구독 실패 (무시)', e);
