@@ -5,6 +5,10 @@
   위젯은 보통 화면과 다르게 RemoteViews 가 아는 View 만 쓸 수 있다.
   ConstraintLayout 같은 건 못 쓴다 — LinearLayout / RelativeLayout / TextView /
   ImageView 정도로만 짠다.
+
+  ⚠️ 크기를 손으로 바꿀 수 있으므로 고정 높이를 두지 않는다. 작게 줄였을 때
+     글자가 잘리지 않도록 글자 칸은 가운데 정렬로 두고, 사진은 자리가 모자라면
+     코드에서 숨긴다.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -12,14 +16,14 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="14dp"
+    android:padding="12dp"
     android:background="@drawable/knit_widget_bg">
 
     <ImageView
         android:id="@+id/widget_photo"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_marginEnd="12dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="10dp"
         android:scaleType="centerCrop"
         android:contentDescription="@string/knit_widget_photo_desc" />
 
@@ -45,7 +49,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:maxLines="1"
-            android:textSize="30sp"
+            android:textSize="28sp"
             android:textColor="#6F4FA0"
             android:textStyle="bold"
             android:text="—" />

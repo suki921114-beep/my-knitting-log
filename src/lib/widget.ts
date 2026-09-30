@@ -157,14 +157,18 @@ async function nativePlugin(): Promise<KnitWidgetPlugin | null> {
 /**
  * 위젯을 눌러 들어왔을 때 갈 곳을 알려 준다.
  *
- * 두 갈래로 들어온다.
- *   앱이 꺼져 있었으면 — 네이티브가 들고 있다가 여기서 가져간다 (consumeTarget)
- *   앱이 떠 있었으면  — 그 자리에서 알려 준다 (openProject)
+ * ⚠️ 이벤트(openProject)만 믿으면 안 된다. 위젯을 누르는 순간 앱이
+ *    꺼져 있었는지, 백그라운드에 있었는지, 안드로이드가 화면을 새로
+ *    만들었는지에 따라 들어오는 길이 다르고, 어떤 길에서는 이벤트를
+ *    받을 웹이 아직 없다. 실제로 그래서 프로젝트가 아니라 홈이 떴다.
+ *
+ *    그래서 '앱이 앞으로 나올 때마다 물어본다'. 네이티브가 목적지를
+ *    들고 있으면 넘겨주고 비운다. 어느 길로 들어와도 걸린다.
  *
  * 돌려주는 함수를 부르면 구독을 끊는다.
  */
 export function onWidgetOpen(go: (projectId: number) => void): () => void {
-  let stop: (() => Promise<void>) | null = null;
+  const stops: Array<() => void | Promise<void>> = [];
   let alive = true;
 
   void (async () => {
@@ -172,14 +176,31 @@ export function onWidgetOpen(go: (projectId: number) => void): () => void {
       const plugin = await nativePlugin();
       if (!plugin || !alive) return;
 
-      const handle = await plugin.addListener('openProject', ({ projectId }) => {
-        if (projectId > 0) go(projectId);
-      });
-      stop = handle.remove;
+      const ask = async () => {
+        if (!alive) return;
+        try {
+          const { projectId } = await plugin.consumeTarget();
+          if (alive && projectId > 0) go(projectId);
+        } catch (e) {
+          console.warn('[widget] 목적지 확인 실패 (무시)', e);
+        }
+      };
 
-      // 꺼져 있던 앱을 위젯으로 깨운 경우. 화면이 그려진 뒤에 부른다.
-      const { projectId } = await plugin.consumeTarget();
-      if (alive && projectId > 0) go(projectId);
+      // 1) 지금 — 꺼져 있던 앱을 위젯으로 깨운 경우
+      await ask();
+
+      // 2) 앞으로 나올 때마다 — 백그라운드에 있던 앱을 위젯으로 부른 경우
+      const { App } = await import('@capacitor/app');
+      const handle = await App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) void ask();
+      });
+      stops.push(() => handle.remove());
+
+      // 3) 덤. 앱이 살아 있을 때는 네이티브가 바로 알려 주기도 한다
+      const opened = await plugin.addListener('openProject', ({ projectId }) => {
+        if (alive && projectId > 0) go(projectId);
+      });
+      stops.push(() => opened.remove());
     } catch (e) {
       console.warn('[widget] 위젯 진입 처리 실패 (무시)', e);
     }
@@ -187,7 +208,7 @@ export function onWidgetOpen(go: (projectId: number) => void): () => void {
 
   return () => {
     alive = false;
-    void stop?.();
+    for (const stop of stops) void stop();
   };
 }
 
