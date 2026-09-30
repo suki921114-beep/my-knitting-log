@@ -35,6 +35,32 @@ function rememberedPage(patternId: number, fileCloudId: string | undefined, inde
 }
 
 /**
+ * 프로젝트별로 '마지막에 보던 도안 파일'.
+ *
+ * 도안이 여러 개면 그중 몇 번째를 보고 있었는지 알아야 한다. 안 그러면 위젯이
+ * 늘 첫 번째 파일만 띄워서, 차트 도안을 보다가 홈에 나가면 엉뚱한 설명 쪽이
+ * 떠 있게 된다.
+ */
+const LAST_FILE_KEY = (projectId: number) => `widgetFile:${projectId}`;
+
+export function rememberViewedFile(projectId: number, patternFileId: number): void {
+  try {
+    localStorage.setItem(LAST_FILE_KEY(projectId), String(patternFileId));
+  } catch {
+    // 기억 못 하면 첫 번째 파일로 떨어진다. 그만한 일이다.
+  }
+}
+
+function lastViewedFileId(projectId: number): number | null {
+  try {
+    const raw = Number(localStorage.getItem(LAST_FILE_KEY(projectId)));
+    return raw > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 이 프로젝트에서 보던 도안 한 쪽을 그림으로. 없으면 빈 문자열.
  *
  * 실패해도 throw 하지 않는다. 미리보기가 없는 위젯은 심심할 뿐이지만,
@@ -42,6 +68,17 @@ function rememberedPage(patternId: number, fileCloudId: string | undefined, inde
  */
 export async function renderPatternPreview(projectId: number): Promise<string> {
   try {
+    // 마지막에 보던 파일이 있으면 그것부터. 없으면 연결된 도안의 첫 파일.
+    const wanted = lastViewedFileId(projectId);
+    if (wanted != null) {
+      const file = await db.patternFiles.get(wanted);
+      if (file) {
+        const page = rememberedPage(file.patternId, file.cloudId, 0);
+        const drawn = await drawPage(file.blob, page, file.id);
+        if (drawn) return drawn;
+      }
+    }
+
     const links = await db.projectPatterns.where('projectId').equals(projectId).toArray();
     if (!links.length) return '';
 

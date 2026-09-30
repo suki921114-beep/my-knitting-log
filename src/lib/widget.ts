@@ -260,6 +260,26 @@ export function onWidgetOpen(go: (projectId: number) => void): () => void {
   };
 }
 
+let soonTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 조금 있다가 위젯을 새로 그린다.
+ *
+ * ⚠️ 이게 필요한 까닭 — 앱을 나갈 때만 그리면 도안이 안 바뀐다.
+ *    도안 한 쪽을 그리는 데 1~3초가 걸리는데, 홈 버튼을 누르는 순간
+ *    안드로이드가 WebView 를 재워 버려서 그리다 만 채로 끝난다.
+ *    그래서 아직 화면이 살아 있을 때, 장을 넘기는 그 자리에서 그린다.
+ *
+ * 장을 후루룩 넘길 때마다 그리면 손이 걸리므로 잠깐 기다렸다 한 번만 한다.
+ */
+export function refreshWidgetSoon(delay = 1200): void {
+  if (soonTimer) clearTimeout(soonTimer);
+  soonTimer = setTimeout(() => {
+    soonTimer = null;
+    void pushWidgetSnapshot();
+  }, delay);
+}
+
 /**
  * 언제 위젯을 새로 그릴지.
  *

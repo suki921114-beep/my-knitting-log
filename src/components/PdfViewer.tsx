@@ -83,6 +83,8 @@ interface SurfaceProps {
    * 아직 저장 안 한 파일에 그으면 자국을 어디에 붙일지 알 수 없다.
    */
   allowMarks?: boolean;
+  /** 보던 쪽이 바뀔 때. 홈 화면 위젯을 맞추는 데 쓴다 */
+  onPageChange?: (page: number) => void;
 }
 
 /**
@@ -92,7 +94,7 @@ interface SurfaceProps {
  *    높이가 내용에 따라 늘어나는 자리에 두면 캔버스와 부모가 서로를 밀며
  *    끝없이 커진다.
  */
-export function PdfSurface({ file, rememberKey, className = '', allowMarks = true }: SurfaceProps) {
+export function PdfSurface({ file, rememberKey, className = '', allowMarks = true, onPageChange }: SurfaceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const markRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -380,7 +382,8 @@ export function PdfSurface({ file, rememberKey, className = '', allowMarks = tru
   useEffect(() => {
     const key = pageMemoryKey(rememberKey);
     if (key && pageCount > 0) localStorage.setItem(key, String(page));
-  }, [page, pageCount, rememberKey]);
+    if (pageCount > 0) onPageChange?.(page);
+  }, [page, pageCount, rememberKey, onPageChange]);
 
   // 장을 넘기면 맨 위부터 보여준다 — 확대해 둔 채 넘기면 아래쪽이 나온다
   useEffect(() => {

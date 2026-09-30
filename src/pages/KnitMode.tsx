@@ -12,6 +12,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { refreshWidgetSoon } from '@/lib/widget';
+import { rememberViewedFile } from '@/lib/widgetPreview';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, now, type PatternFile, type RowCounter } from '@/lib/db';
 import { PdfSurface } from '@/components/PdfViewer';
@@ -78,6 +80,18 @@ export default function KnitMode() {
   const [fileIdx, setFileIdx] = useState(0);
   const [loadingFile, setLoadingFile] = useState(true);
   const file = files[fileIdx] ?? null;
+
+  /**
+   * 장을 넘기면 홈 화면 위젯도 따라오게 한다.
+   *
+   * ⚠️ 앱을 나갈 때 그리면 늦다. 도안 한 쪽을 그리는 데 몇 초가 걸리는데
+   *    홈 버튼을 누르는 순간 안드로이드가 화면을 재워서 그리다 만다.
+   *    그래서 아직 보고 있는 지금 그려 둔다.
+   */
+  const handlePageChange = useCallback(() => {
+    if (file?.id != null) rememberViewedFile(pid, file.id);
+    refreshWidgetSoon();
+  }, [pid, file?.id]);
 
   // 고른 도안이 없으면 첫 번째를 연다
   const activeId = pickedId ?? filed[0]?.patternId ?? null;
@@ -298,6 +312,7 @@ export default function KnitMode() {
           file={file}
           rememberKey={`${file.patternId}:${file.cloudId ?? fileIdx}`}
           className="flex-1 pb-[env(safe-area-inset-bottom,0px)]"
+          onPageChange={handlePageChange}
         />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
