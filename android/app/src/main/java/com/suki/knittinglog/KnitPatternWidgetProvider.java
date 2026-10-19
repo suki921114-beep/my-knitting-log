@@ -48,6 +48,16 @@ public class KnitPatternWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    @Override
+    public void onAppWidgetOptionsChanged(
+            Context context, AppWidgetManager manager, int widgetId, android.os.Bundle newOptions) {
+        super.onAppWidgetOptionsChanged(context, manager, widgetId, newOptions);
+        // 크기를 바꾸면 그림도 그 크기에 맞춰 다시 넣어야 한다.
+        // 안 그러면 크게 늘렸을 때 작게 줄여 둔 그림이 뿌옇게 늘어나고,
+        // 작게 줄였을 때는 그림이 한도를 넘겨 위젯이 안 뜬다.
+        manager.updateAppWidget(widgetId, build(context, widgetId));
+    }
+
     private static RemoteViews build(Context context, int widgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.knit_widget_pattern);
 
@@ -82,7 +92,9 @@ public class KnitPatternWidgetProvider extends AppWidgetProvider {
             base64 = previews.optString(String.valueOf(fileId), "");
             if (base64.isEmpty()) base64 = previews.optString("0", "");
         }
-        Bitmap page = WidgetData.decode(base64);
+        Bitmap page = WidgetData.fitToWidget(
+                context, AppWidgetManager.getInstance(context), widgetId,
+                WidgetData.decode(base64));
         if (page != null) {
             views.setImageViewBitmap(R.id.widget_page, page);
             views.setViewVisibility(R.id.widget_page, View.VISIBLE);

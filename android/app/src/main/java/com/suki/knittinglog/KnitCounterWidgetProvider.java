@@ -82,6 +82,13 @@ public class KnitCounterWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    @Override
+    public void onAppWidgetOptionsChanged(
+            Context context, AppWidgetManager manager, int widgetId, android.os.Bundle newOptions) {
+        super.onAppWidgetOptionsChanged(context, manager, widgetId, newOptions);
+        manager.updateAppWidget(widgetId, build(context, widgetId));
+    }
+
     private static RemoteViews build(Context context, int widgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.knit_widget_counter);
 
@@ -145,7 +152,9 @@ public class KnitCounterWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(R.id.widget_plus, View.GONE);
         }
 
-        Bitmap photo = WidgetData.decode(project.optString("photo", ""));
+        Bitmap photo = WidgetData.fitToWidget(
+                context, AppWidgetManager.getInstance(context), widgetId,
+                WidgetData.decode(project.optString("photo", "")));
         if (photo != null) {
             views.setImageViewBitmap(R.id.widget_photo, photo);
             views.setViewVisibility(R.id.widget_photo, View.VISIBLE);

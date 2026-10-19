@@ -104,6 +104,9 @@ export async function buildWidgetSnapshot(
 
   // 최근에 손댄 것부터. 홈 화면에는 지금 뜨고 있는 것이 보여야 한다.
   projects.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+
+  // 한도는 요약본 한 벌마다 새로 센다
+  previewBudget = MAX_PREVIEW_BYTES;
   const picked = projects.slice(0, MAX_ITEMS);
 
   const out: WidgetProject[] = [];
@@ -148,6 +151,18 @@ async function filesOf(projectId: number): Promise<WidgetFile[]> {
   return out;
 }
 
+/**
+ * 요약본에 담을 도안 그림의 총량 한도.
+ *
+ * ⚠️ 요약본은 통째로 한 덩어리 글자로 안드로이드에 건너가고, 위젯은 그릴
+ *    때마다 그걸 다시 읽는다. 끝없이 담으면 위젯을 그리다 시간이 다 돼서
+ *    (브로드캐스트는 10초 안에 끝나야 한다) 아예 안 뜨게 된다.
+ *
+ *    도안 위젯을 많이 달아도 앞의 몇 개는 뜨도록, 넘치면 조용히 자른다.
+ */
+const MAX_PREVIEW_BYTES = 900 * 1024;
+let previewBudget = MAX_PREVIEW_BYTES;
+
 /** 위젯이 달라는 도안만 그린다 */
 async function previewsOf(
   projectId: number,
@@ -158,8 +173,14 @@ async function previewsOf(
 
   // 0 은 '파일을 안 골랐다' 는 뜻 — 보던 것으로 그린다
   for (const fileId of wanted) {
+    if (previewBudget <= 0) {
+      console.warn('[widget] 도안 그림이 너무 많아 일부를 건너뜁니다');
+      break;
+    }
     const drawn = await renderPatternPreview(projectId, fileId > 0 ? fileId : undefined);
-    if (drawn) out[String(fileId)] = drawn;
+    if (!drawn) continue;
+    previewBudget -= drawn.length;
+    out[String(fileId)] = drawn;
   }
   return out;
 }

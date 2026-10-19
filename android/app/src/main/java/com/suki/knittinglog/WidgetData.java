@@ -1,10 +1,12 @@
 package com.suki.knittinglog;
 
 import android.app.PendingIntent;
+import android.appwidget.AppWidgetManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Bundle;
 import android.util.Base64;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -50,6 +52,49 @@ final class WidgetData {
         return PendingIntent.getActivity(
                 context, widgetId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /**
+     * 위젯 크기에 맞게 그림을 줄인다.
+     *
+     * ⚠️ 이게 없으면 위젯이 통째로 안 뜬다.
+     *    안드로이드는 위젯 한 개가 쓸 수 있는 그림 메모리를 위젯 크기에 맞춰
+     *    제한한다. 작게 줄여 놓은 위젯에 큰 그림을 밀어 넣으면 한도를 넘겨
+     *    "RemoteViews ... exceeds maximum bitmap memory usage" 로 거부당하고,
+     *    사용자에게는 빈 칸이나 '위젯을 불러올 수 없음' 만 보인다.
+     *
+     *    도안 그림은 720px 로 그려 오는데 1x1 칸 위젯의 한도는 그보다 훨씬
+     *    작다. 그래서 지금 이 위젯이 실제로 몇 dp 인지 물어보고 맞춘다.
+     */
+    static Bitmap fitToWidget(
+            Context context, AppWidgetManager manager, int widgetId, Bitmap src) {
+        if (src == null) return null;
+        try {
+            Bundle options = manager.getAppWidgetOptions(widgetId);
+            int wDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0);
+            int hDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+            if (wDp <= 0 || hDp <= 0) return src;
+
+            float density = context.getResources().getDisplayMetrics().density;
+            int maxW = Math.max(1, Math.round(wDp * density));
+            int maxH = Math.max(1, Math.round(hDp * density));
+
+            float scale = Math.min(
+                    (float) maxW / src.getWidth(), (float) maxH / src.getHeight());
+            if (scale >= 1f) return src;
+
+            int w = Math.max(1, Math.round(src.getWidth() * scale));
+            int h = Math.max(1, Math.round(src.getHeight() * scale));
+            return Bitmap.createScaledBitmap(src, w, h, true);
+        } catch (Exception e) {
+            // 크기를 못 물어봤다. 원본을 쓰면 한도에 걸릴 수 있으니 안전하게 반으로.
+            try {
+                return Bitmap.createScaledBitmap(
+                        src, Math.max(1, src.getWidth() / 2), Math.max(1, src.getHeight() / 2), true);
+            } catch (Exception ignored) {
+                return src;
+            }
+        }
     }
 
     static Bitmap decode(String base64) {
