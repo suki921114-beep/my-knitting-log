@@ -17,6 +17,7 @@
 
 import { db, type PatternFile } from '@/lib/db';
 import { deleteMarksForFiles } from '@/lib/patternMark';
+import { forgetViewedFile } from '@/lib/widgetPreview';
 
 /**
  * 받을 수 있는 파일 크기.
@@ -145,6 +146,7 @@ export async function deletePatternFileById(id: number): Promise<void> {
   await db.patternFiles.delete(id);
   // 자국은 파일에 딸린 것이다. 파일이 없으면 남을 이유가 없다.
   await deleteMarksForFiles([id]);
+  forgetViewedFile(id);
   await markPatternFileChanged(row.patternId);
   await removeFromCloud([row]);
 }
@@ -183,12 +185,20 @@ async function markPatternFileChanged(patternId: number): Promise<void> {
     fileSize: undefined,
     updatedAt: Date.now(),
   } as any);
+
+  // ⚠️ 홈 화면 위젯도 여기서 다시 그린다.
+  //    앱을 나갈 때 그리면 늦다 — 도안 한 쪽을 그리는 데 몇 초가 걸리는데
+  //    홈 버튼을 누르는 순간 안드로이드가 화면을 재워서 그리다 만다.
+  //    그래서 '도안을 지웠는데 위젯에 그 도안이 그대로' 가 된다.
+  const { refreshWidgetSoon } = await import('@/lib/widget');
+  refreshWidgetSoon();
 }
 
 export async function deletePatternFile(patternId: number): Promise<void> {
   const rows = await db.patternFiles.where('patternId').equals(patternId).toArray();
   await db.patternFiles.where('patternId').equals(patternId).delete();
   await deleteMarksForFiles(rows.map(r => r.id!).filter(Boolean));
+  for (const r of rows) if (r.id != null) forgetViewedFile(r.id);
   await markPatternFileChanged(patternId);
   await removeFromCloud(rows);
 }

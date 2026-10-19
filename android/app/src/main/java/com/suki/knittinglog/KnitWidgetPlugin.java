@@ -98,17 +98,24 @@ public class KnitWidgetPlugin extends Plugin {
         int[] ids = manager.getAppWidgetIds(
                 new ComponentName(context, KnitPatternWidgetProvider.class));
 
-        Set<Integer> wanted = new HashSet<>();
+        // 위젯마다 '어느 프로젝트의 어느 도안' 을 보는지 알려 준다.
+        // 파일을 안 골랐으면 0 — 앱이 '보던 것' 으로 알아서 그린다.
+        JSArray out = new JSArray();
+        Set<String> seen = new HashSet<>();
         for (int id : ids) {
             int projectId = prefs.getInt(KnitCounterWidgetProvider.projectKey(id), -1);
-            if (projectId > 0) wanted.add(projectId);
+            if (projectId <= 0) continue;
+            int fileId = prefs.getInt(KnitPatternWidgetProvider.fileKey(id), 0);
+            if (!seen.add(projectId + ":" + fileId)) continue;
+
+            JSObject item = new JSObject();
+            item.put("projectId", projectId);
+            item.put("fileId", fileId);
+            out.put(item);
         }
 
-        JSArray out = new JSArray();
-        for (Integer id : wanted) out.put(id);
-
         JSObject result = new JSObject();
-        result.put("projectIds", out);
+        result.put("items", out);
         call.resolve(result);
     }
 

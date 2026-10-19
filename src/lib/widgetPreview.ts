@@ -51,6 +51,27 @@ export function rememberViewedFile(projectId: number, patternFileId: number): vo
   }
 }
 
+/**
+ * 지워진 파일을 가리키던 기억을 치운다.
+ *
+ * ⚠️ 안 치우면 도안을 지워도 위젯이 그 파일을 계속 가리킨다. 파일이 없으니
+ *    그릴 것도 없는데, 위젯에는 지우기 전에 그려 둔 그림이 그대로 남아
+ *    '지웠는데 안 없어진다' 가 된다.
+ */
+export function forgetViewedFile(patternFileId: number): void {
+  try {
+    const target = String(patternFileId);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('widgetFile:') && localStorage.getItem(key) === target) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // 못 치워도 아래 renderPatternPreview 가 '없는 파일' 로 보고 넘어간다
+  }
+}
+
 function lastViewedFileId(projectId: number): number | null {
   try {
     const raw = Number(localStorage.getItem(LAST_FILE_KEY(projectId)));
@@ -66,10 +87,14 @@ function lastViewedFileId(projectId: number): number | null {
  * 실패해도 throw 하지 않는다. 미리보기가 없는 위젯은 심심할 뿐이지만,
  * 여기서 터지면 위젯 갱신 전체가 멈춘다.
  */
-export async function renderPatternPreview(projectId: number): Promise<string> {
+export async function renderPatternPreview(
+  projectId: number,
+  pinnedFileId?: number,
+): Promise<string> {
   try {
-    // 마지막에 보던 파일이 있으면 그것부터. 없으면 연결된 도안의 첫 파일.
-    const wanted = lastViewedFileId(projectId);
+    // 위젯에서 콕 집어 고른 파일이 가장 먼저다. 고르지 않았으면 마지막에
+    // 보던 파일, 그것도 없으면 연결된 도안의 첫 파일.
+    const wanted = pinnedFileId ?? lastViewedFileId(projectId);
     if (wanted != null) {
       const file = await db.patternFiles.get(wanted);
       if (file) {

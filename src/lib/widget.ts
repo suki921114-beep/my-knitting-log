@@ -44,9 +44,19 @@ export interface WidgetProject {
   name: string;
   /** 작게 줄인 대표 사진 (base64, 접두사 없음). 없으면 빈 문자열 */
   photo: string;
-  /** 보던 도안 한 쪽 (base64). 미리보기 위젯이 붙은 프로젝트만 채운다 */
-  preview: string;
+  /**
+   * 도안 그림. 열쇠는 도안 파일 id — 위젯마다 다른 파일을 볼 수 있어서
+   * 하나만 담으면 안 된다.
+   */
+  previews: Record<string, string>;
+  /** 이 프로젝트에 붙은 PDF 도안들. 위젯 설정에서 고르게 하려고 담는다 */
+  files: WidgetFile[];
   counters: WidgetCounter[];
+}
+
+export interface WidgetFile {
+  id: number;
+  name: string;
 }
 
 export interface WidgetSnapshot {
@@ -84,7 +94,10 @@ async function shrinkForWidget(dataUrl: string): Promise<string> {
 }
 
 /** 지금 기기 상태로 요약본을 만든다 */
-export async function buildWidgetSnapshot(wantPreview: Set<number> = new Set()): Promise<WidgetSnapshot> {
+export async function buildWidgetSnapshot(
+  /** 프로젝트 id → 그려야 할 도안 파일 id 들 (빈 집합이면 보던 것 하나) */
+  wantPreview: Map<number, Set<number>> = new Map(),
+): Promise<WidgetSnapshot> {
   const projects = await db.projects
     .filter(p => !p.isDeleted && p.status === 'in_progress')
     .toArray();
@@ -106,9 +119,10 @@ export async function buildWidgetSnapshot(wantPreview: Set<number> = new Set()):
       id: p.id,
       name: p.name,
       photo: await coverOf(p),
+      files: await filesOf(p.id),
       // 도안 한 쪽을 그리는 데 시간이 꽤 든다. 미리보기 위젯이 실제로 붙어
       // 있는 것만 그린다 — 전부 그리면 앱을 나갈 때마다 몇 초씩 걸린다.
-      preview: wantPreview.has(p.id) ? await renderPatternPreview(p.id) : '',
+      previews: await previewsOf(p.id, wantPreview.get(p.id)),
       // 방금 손댄 카운터를 앞으로. 처음 만든 것부터 보여주면 소매를 뜨는데
       // 위젯에는 다 끝난 고무단이 떠 있게 된다.
       counters: counters
@@ -118,6 +132,36 @@ export async function buildWidgetSnapshot(wantPreview: Set<number> = new Set()):
   }
 
   return { updatedAt: Date.now(), projects: out };
+}
+
+/** 이 프로젝트에 붙은 PDF 도안 목록 */
+async function filesOf(projectId: number): Promise<WidgetFile[]> {
+  const links = await db.projectPatterns.where('projectId').equals(projectId).toArray();
+  const out: WidgetFile[] = [];
+  for (const link of links) {
+    const files = await db.patternFiles.where('patternId').equals(link.patternId).toArray();
+    files.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    for (const f of files) {
+      if (f.id != null) out.push({ id: f.id, name: f.name });
+    }
+  }
+  return out;
+}
+
+/** 위젯이 달라는 도안만 그린다 */
+async function previewsOf(
+  projectId: number,
+  wanted: Set<number> | undefined,
+): Promise<Record<string, string>> {
+  if (!wanted) return {};
+  const out: Record<string, string> = {};
+
+  // 0 은 '파일을 안 골랐다' 는 뜻 — 보던 것으로 그린다
+  for (const fileId of wanted) {
+    const drawn = await renderPatternPreview(projectId, fileId > 0 ? fileId : undefined);
+    if (drawn) out[String(fileId)] = drawn;
+  }
+  return out;
 }
 
 async function coverOf(p: Project): Promise<string> {
@@ -145,8 +189,14 @@ export async function pushWidgetSnapshot(): Promise<void> {
     // 그 값을 담는다 — 순서가 바뀌면 위젯이 한 박자 옛 숫자를 보여준다.
     await applyPendingBumps(plugin);
 
-    const { projectIds } = await plugin.wantedPreviews();
-    const snapshot = await buildWidgetSnapshot(new Set(projectIds));
+    const { items } = await plugin.wantedPreviews();
+    const want = new Map<number, Set<number>>();
+    for (const { projectId, fileId } of items ?? []) {
+      const set = want.get(projectId) ?? new Set<number>();
+      set.add(fileId);
+      want.set(projectId, set);
+    }
+    const snapshot = await buildWidgetSnapshot(want);
     await plugin.update({ payload: JSON.stringify(snapshot) });
   } catch (e) {
     console.warn('[widget] 위젯 갱신 실패 (무시)', e);
@@ -161,7 +211,7 @@ interface PendingBump {
 interface KnitWidgetPlugin {
   update(o: { payload: string }): Promise<void>;
   consumeTarget(): Promise<{ projectId: number }>;
-  wantedPreviews(): Promise<{ projectIds: number[] }>;
+  wantedPreviews(): Promise<{ items: Array<{ projectId: number; fileId: number }> }>;
   consumePending(): Promise<{ items: PendingBump[] }>;
   addListener(
     event: 'openProject',

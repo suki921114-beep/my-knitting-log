@@ -98,7 +98,8 @@ public class KnitWidgetConfigActivity extends Activity {
             lp.topMargin = dp(8);
             row.setLayoutParams(lp);
 
-            row.setOnClickListener(v -> choose(projectId));
+            final JSONObject project = p;
+            row.setOnClickListener(v -> onProjectPicked(project, projectId));
             root.addView(row);
         }
 
@@ -111,11 +112,79 @@ public class KnitWidgetConfigActivity extends Activity {
         return scroll;
     }
 
-    private void choose(int projectId) {
+    /**
+     * 프로젝트를 골랐다.
+     *
+     * 도안 미리보기 위젯이고 PDF 가 여럿이면 어느 도안을 볼지 한 번 더 묻는다.
+     * 안 물으면 '마지막에 보던 것' 으로만 정해져서, 1번 도안을 끝내고 2번으로
+     * 넘어가려 해도 위젯을 바꿀 방법이 없다.
+     */
+    private void onProjectPicked(JSONObject project, int projectId) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(this);
+        JSONArray files = project.optJSONArray("files");
+
+        if (!isPatternWidget(manager) || files == null || files.length() < 2) {
+            choose(projectId, 0);
+            return;
+        }
+        setContentView(buildFileView(files, projectId));
+    }
+
+    private View buildFileView(JSONArray files, int projectId) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#FBF9F5"));
+        int pad = dp(20);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("어떤 도안을 보시겠어요?");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        title.setTextColor(Color.parseColor("#3C3243"));
+        root.addView(title);
+
+        TextView note = new TextView(this);
+        note.setText("보던 쪽이 위젯에 뜹니다.");
+        note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        note.setTextColor(Color.parseColor("#7C7288"));
+        note.setPadding(0, dp(4), 0, 0);
+        root.addView(note);
+
+        for (int i = 0; i < files.length(); i++) {
+            JSONObject f = files.optJSONObject(i);
+            if (f == null) continue;
+            final int fileId = f.optInt("id", -1);
+            if (fileId < 0) continue;
+
+            TextView row = new TextView(this);
+            row.setText(f.optString("name", "도안"));
+            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            row.setTextColor(Color.parseColor("#3C3243"));
+            row.setPadding(dp(14), dp(14), dp(14), dp(14));
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackgroundColor(Color.parseColor("#F1ECF7"));
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = dp(8);
+            row.setLayoutParams(lp);
+
+            row.setOnClickListener(v -> choose(projectId, fileId));
+            root.addView(row);
+        }
+
+        return wrap(root);
+    }
+
+    private void choose(int projectId, int fileId) {
         Context context = this;
         SharedPreferences prefs =
                 context.getSharedPreferences(KnitWidgetPlugin.PREFS, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KnitCounterWidgetProvider.projectKey(widgetId), projectId).commit();
+        prefs.edit()
+                .putInt(KnitCounterWidgetProvider.projectKey(widgetId), projectId)
+                .putInt(KnitPatternWidgetProvider.fileKey(widgetId), fileId)
+                .commit();
 
         // 어느 종류의 위젯에서 왔는지 보고 그것만 그린다
         AppWidgetManager manager = AppWidgetManager.getInstance(context);

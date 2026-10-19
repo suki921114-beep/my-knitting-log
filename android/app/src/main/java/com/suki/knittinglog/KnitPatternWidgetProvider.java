@@ -20,6 +20,11 @@ import org.json.JSONObject;
  */
 public class KnitPatternWidgetProvider extends AppWidgetProvider {
 
+    /** 위젯 번호별로 어떤 도안 파일을 보는지. 0 이면 '마지막에 보던 것' */
+    static String fileKey(int widgetId) {
+        return "widget_" + widgetId + "_file";
+    }
+
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         renderAll(context, manager, ids);
@@ -30,7 +35,10 @@ public class KnitPatternWidgetProvider extends AppWidgetProvider {
         SharedPreferences prefs =
                 context.getSharedPreferences(KnitWidgetPlugin.PREFS, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
-        for (int id : ids) editor.remove(KnitCounterWidgetProvider.projectKey(id));
+        for (int id : ids) {
+            editor.remove(KnitCounterWidgetProvider.projectKey(id));
+            editor.remove(fileKey(id));
+        }
         editor.apply();
     }
 
@@ -66,7 +74,15 @@ public class KnitPatternWidgetProvider extends AppWidgetProvider {
 
         views.setTextViewText(R.id.widget_title, project.optString("name", "프로젝트"));
 
-        Bitmap page = WidgetData.decode(project.optString("preview", ""));
+        // 고른 도안의 그림. 못 찾으면 '보던 것'(열쇠 0) 으로 떨어진다.
+        int fileId = prefs.getInt(fileKey(widgetId), 0);
+        org.json.JSONObject previews = project.optJSONObject("previews");
+        String base64 = "";
+        if (previews != null) {
+            base64 = previews.optString(String.valueOf(fileId), "");
+            if (base64.isEmpty()) base64 = previews.optString("0", "");
+        }
+        Bitmap page = WidgetData.decode(base64);
         if (page != null) {
             views.setImageViewBitmap(R.id.widget_page, page);
             views.setViewVisibility(R.id.widget_page, View.VISIBLE);
@@ -75,7 +91,9 @@ public class KnitPatternWidgetProvider extends AppWidgetProvider {
             // 도안이 없거나 아직 안 그려졌다. 빈 칸을 두면 고장으로 보인다.
             views.setViewVisibility(R.id.widget_page, View.GONE);
             views.setViewVisibility(R.id.widget_hint, View.VISIBLE);
-            views.setTextViewText(R.id.widget_hint, "PDF 도안을 넣고 앱에서 한 번 열어주세요");
+            // 도안을 막 고른 직후에도 여기로 온다 — 그 도안은 아직 안 그려졌다.
+            // '넣어주세요' 라고만 하면 이미 넣은 사람이 고장으로 여긴다.
+            views.setTextViewText(R.id.widget_hint, "앱을 한 번 열었다 나오면 도안이 떠요");
         }
 
         return views;
